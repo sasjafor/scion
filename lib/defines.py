@@ -25,7 +25,7 @@ SCION_PROTO_VERSION = 0
 #: Max TTL of a PathSegment in realtime seconds.
 MAX_SEGMENT_TTL = 24 * 60 * 60
 #: Time unit for HOF expiration.
-EXP_TIME_UNIT = MAX_SEGMENT_TTL / 2 ** 8
+EXP_TIME_UNIT = MAX_SEGMENT_TTL // 256
 #: Max number of supported HopByHop extensions (does not include SCMP)
 MAX_HOPBYHOP_EXT = 3
 #: Number of bytes per 'line'. Used for padding in many places.
@@ -84,7 +84,7 @@ SERVICE_TYPES = (
 )
 
 #: Dispatcher registration timeout
-DISPATCHER_TIMEOUT = 60.0
+DISPATCHER_TIMEOUT = 60
 
 #: How often IFID packet is sent to neighboring router.
 IFID_PKT_TOUT = 1
@@ -135,9 +135,9 @@ HASHTREE_TTL = 15 * 60
 # Number of epochs in one TTL per interface
 HASHTREE_N_EPOCHS = HASHTREE_TTL // HASHTREE_EPOCH_TIME
 # How much time in advance to compute the next hash tree
-HASHTREE_UPDATE_WINDOW = HASHTREE_TTL / 3
+HASHTREE_UPDATE_WINDOW = HASHTREE_TTL // 3
 
 # TCP polling timeouts, used by accept() and recv().
-TCP_ACCEPT_POLLING_TOUT = 1.0
+TCP_ACCEPT_POLLING_TOUT = 1
 # SCION control-plane TCP connection timeout.
-TCP_TIMEOUT = 5.0
+TCP_TIMEOUT = 5
