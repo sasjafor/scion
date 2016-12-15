@@ -36,14 +36,7 @@ from py2viper_contracts.contracts import *
 class PathPolicy(object):
     """Stores a path policy."""
     def __init__(self) -> None:  # pragma: no cover
-        Ensures(Acc(self.best_set_size) and self.best_set_size == 5)
-        Ensures(Acc(self.candidates_set_size) and self.candidates_set_size == 20)
-        Ensures(Acc(self.history_limit) and self.history_limit == 0)
-        Ensures(Acc(self.update_after_number) and self.update_after_number == 0)
-        Ensures(Acc(self.update_after_time) and self.update_after_time == 0)
-        Ensures(Acc(self.unwanted_ases))
-        Ensures(Acc(self.property_ranges))
-        Ensures(Acc(self.property_weights))
+        Ensures(self.State())
         self.best_set_size = 5  # type: int
         self.candidates_set_size = 20  # type: int
         self.history_limit = 0  # type: int
@@ -52,28 +45,28 @@ class PathPolicy(object):
         self.unwanted_ases = []  # type: List[ISD_AS]
         self.property_ranges = {}  # type: Dict[str, Tuple[int, int]]
         self.property_weights = {}  # type: Dict[str, int]
+        Fold(self.State())
+
+    @Predicate
+    def State(self) -> bool:
+        return (Acc(self.best_set_size) and
+            Acc(self.candidates_set_size) and
+            Acc(self.history_limit) and
+            Acc(self.update_after_number) and
+            Acc(self.update_after_time) and
+            Acc(self.unwanted_ases) and Acc(list_pred(self.unwanted_ases)) and
+            Acc(self.property_ranges) and Acc(dict_pred(self.property_ranges)) and
+            Acc(self.property_weights)) and Acc(dict_pred(self.property_weights))
+
 
     def get_path_policy_dict(self) -> Dict[str, object]:  # pragma: no cover
-        Requires(Acc(self.best_set_size, 1/100))
-        Requires(Acc(self.candidates_set_size, 1 / 100))
-        Requires(Acc(self.history_limit, 1 / 100))
-        Requires(Acc(self.update_after_number, 1 / 100))
-        Requires(Acc(self.update_after_time, 1 / 100))
-        Requires(Acc(self.unwanted_ases, 1 / 100))
-        Requires(Acc(self.property_ranges, 1 / 100))
-        Requires(Acc(self.property_weights, 1 / 100))
-        Ensures(Acc(self.best_set_size, 1 / 100))
-        Ensures(Acc(self.candidates_set_size, 1 / 100))
-        Ensures(Acc(self.history_limit, 1 / 100))
-        Ensures(Acc(self.update_after_number, 1 / 100))
-        Ensures(Acc(self.update_after_time, 1 / 100))
-        Ensures(Acc(self.unwanted_ases, 1 / 100))
-        Ensures(Acc(self.property_ranges, 1 / 100))
-        Ensures(Acc(self.property_weights, 1 / 100))
+        Requires(Acc(self.State(), 1/100))
+        Ensures(Acc(self.State(), 1/100))
         Ensures(Acc(dict_pred(Result())))
         Ensures('best_set_size' in Result())
         """Return path policy info in a dictionary."""
-        return {
+        Unfold(Acc(self.State(), 1/100))
+        result =  {
             'best_set_size': self.best_set_size,
             'candidates_set_size': self.candidates_set_size,
             'history_limit': self.history_limit,
@@ -83,6 +76,8 @@ class PathPolicy(object):
             'property_ranges': self.property_ranges,
             'property_weights': self.property_weights
         }
+        Fold(Acc(self.State(), 1/100))
+        return result
 
     def check_filters(self, pcb: PathSegment) -> bool:
         """
@@ -113,6 +108,7 @@ class PathPolicy(object):
         return True
 
     def _check_unwanted_ases(self, pcb: PathSegment) -> Optional[ISD_AS]:  # pragma: no cover
+        Requires(Acc(pcb.State()))
         """
         Checks whether any of the ASes in the path belong to the black list.
 
@@ -125,7 +121,13 @@ class PathPolicy(object):
                 return isd_as
 
     def _check_range(self, reasons: List[str], name: str, actual: int) -> None:
-        range_ = self.property_ranges[name]
+        Requires(Acc(list_pred(reasons)))
+        Requires(Acc(self.State(), 1/200))
+        Requires(Unfolding(Acc(self.State(), 1/400), name in self.property_ranges))
+        Ensures(Acc(list_pred(reasons)))
+        Ensures(Acc(self.State(), 1 / 200))
+
+        range_ = Unfolding(Acc(self.State(), 1/100), self.property_ranges[name])
         if not range_:
             return
         if (actual < range_[0] or actual > range_[1]):
@@ -133,6 +135,9 @@ class PathPolicy(object):
                 name, range_[0], actual, range_[1]))
 
     def _check_property_ranges(self, pcb: PathSegment) -> List[str]:
+        Requires(Acc(self.State(), 1 / 100))
+        Requires(self.valid_ranges())
+        Ensures(Acc(self.State(), 1 / 100))
         """
         Checks whether any of the path properties has a value outside the
         predefined min-max range.
@@ -179,8 +184,8 @@ class PathPolicy(object):
 
     @classmethod
     def from_dict(cls, policy_dict: Dict[str, object]) -> 'PathPolicy':  # pragma: no cover
-        Requires(Acc(dict_pred(policy_dict)), 1/20)
-        Ensures(Acc(dict_pred(policy_dict)), 1 / 20)
+        Requires(Acc(dict_pred(policy_dict), 1/20))
+        Ensures(Acc(dict_pred(policy_dict), 1 / 20))
         """
         Create a PathPolicy instance from the dictionary.
 
@@ -191,37 +196,17 @@ class PathPolicy(object):
         return path_policy
 
     def parse_dict(self, path_policy: Dict[str, object]) -> None:
-        Requires(Acc(self.best_set_size))
-        Requires(Acc(self.candidates_set_size))
-        Requires(Acc(self.history_limit))
-        Requires(Acc(self.update_after_number))
-        Requires(Acc(self.update_after_time))
-        Requires(Acc(self.unwanted_ases))
-        Requires(Acc(self.property_ranges))
-        Requires(Acc(self.property_weights))
+        Requires(self.State())
         Requires(Acc(dict_pred(path_policy), 1/10))
-        Requires(isinstance(path_policy.get('BestSetSize'), int))
-        Requires(isinstance(path_policy.get('CandidatesSetSize'), int))
-        Requires(isinstance(path_policy.get('HistoryLimit'), int))
-        Requires(isinstance(path_policy.get('UpdateAfterNumber'), int))
-        Requires(isinstance(path_policy.get('UpdateAfterTime'), int))
-        Requires(isinstance(path_policy.get('UnwantedASes'), str))
-        Requires(Acc(dict_pred(self.unwanted_ases)))
-        Ensures(Acc(self.best_set_size))
-        Ensures(Acc(self.candidates_set_size))
-        Ensures(Acc(self.history_limit))
-        Ensures(Acc(self.update_after_number))
-        Ensures(Acc(self.update_after_time))
-        Ensures(Acc(self.unwanted_ases))
-        Ensures(Acc(self.property_ranges))
-        Ensures(Acc(self.property_weights))
+        Requires(valid_policy(path_policy))
+        Ensures(self.State())
         Ensures(Acc(dict_pred(path_policy), 1 / 10))
-        Ensures(Acc(dict_pred(self.unwanted_ases)))
         """
         Parses the policies from the dictionary.
 
         :param dict path_policy: path policy.
         """
+        Unfold(self.State())
         self.best_set_size = cast(int, path_policy['BestSetSize'])
         self.candidates_set_size = cast(int, path_policy['CandidatesSetSize'])
         self.history_limit = cast(int, path_policy['HistoryLimit'])
@@ -236,6 +221,31 @@ class PathPolicy(object):
             property_range_temp = int(property_range[0]), int(property_range[1])
             self.property_ranges[key] = property_range_temp
         self.property_weights = cast(Dict[str, int], path_policy['PropertyWeights'])
+        Fold(self.State())
+
+    @Pure
+    def valid_ranges(self) -> bool:
+        Requires(Acc(self.State(), 1/200))
+        return Unfolding(Acc(self.State(), 1/200),
+                         'PeerLinks' in self.property_ranges and
+                         'HopsLength' in self.property_ranges and
+                         'DelayTime' in self.property_ranges and
+                         'GuaranteedBandwidth' in self.property_ranges and
+                         'AvailableBandwidth' in self.property_ranges and
+                         'TotalBandwidth' in self.property_ranges
+                         )
+
+@Pure
+def valid_policy(path_policy: Dict[str, object]) -> bool:
+    Requires(Acc(dict_pred(path_policy), 1 / 10))
+    return (isinstance(path_policy.get('BestSetSize'), int) and
+        isinstance(path_policy.get('CandidatesSetSize'), int) and
+        isinstance(path_policy.get('HistoryLimit'), int) and
+        isinstance(path_policy.get('UpdateAfterNumber'), int) and
+        isinstance(path_policy.get('UpdateAfterTime'), int) and
+        isinstance(path_policy.get('UnwantedASes'), str))
+
+
 
     # def __str__(self) -> str:
     #     path_policy_dict = self.get_path_policy_dict()

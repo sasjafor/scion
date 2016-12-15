@@ -1,17 +1,26 @@
 import lib.packet.scion_addr
 
 from typing import List
+from py2viper_contracts.contracts import *
 
 class PathSegment:
     def short_desc(self) -> str: ...
 
-    def iter_asms(self, start: int=0) -> List[ASMarking]:  ...
+    def iter_asms(self, start: int=0) -> List[ASMarking]:
+        Requires(Acc(self.State(), 1/100))
+        Ensures(Acc(self.State(), 1/100))
+        Ensures(Acc(list_pred(Result())))
+        ...
 
     def get_n_peer_links(self) -> int:  ...
 
     def get_n_hops(self) -> int: ...
 
     def get_timestamp(self) -> int: ...
+
+    @Predicate
+    def State(self) -> bool:
+        return True
 
 
 class PCBMarking:
@@ -21,6 +30,10 @@ class PCBMarking:
     def inIA(self) -> 'lib.packet.scion_addr.ISD_AS': ...
 
     def outIA(self) -> 'lib.packet.scion_addr.ISD_AS': ...
+
+    @Predicate
+    def State(self) -> bool:
+        return True
 
 class PPCBMarking:
     """
@@ -40,6 +53,14 @@ class PPCBMarking:
         self.outIA = 0
         self.outIF = 0
 
+    @Predicate
+    def State(self) -> bool:
+        return True
+
 class ASMarking:
     def isd_as(self) -> 'lib.packet.scion_addr.ISD_AS': ...
     def iter_pcbms(self, start: int=0) -> List[PCBMarking]:  ...
+
+    @Predicate
+    def State(self) -> bool:
+        return True
