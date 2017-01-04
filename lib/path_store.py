@@ -80,6 +80,11 @@ class PathPolicy(object):
         return result
 
     def check_filters(self, pcb: PathSegment) -> bool:
+        Requires(Acc(pcb.State(), 1/10))
+        Requires(Acc(self.State(), 1 / 7))
+        Requires(self.valid_ranges())
+        Ensures(Acc(pcb.State(), 1 / 10))
+        Ensures(Acc(self.State(), 1 / 7))
         """
         Runs some checks, including: unwanted ASes and min/max property values.
 
@@ -108,17 +113,26 @@ class PathPolicy(object):
         return True
 
     def _check_unwanted_ases(self, pcb: PathSegment) -> Optional[ISD_AS]:  # pragma: no cover
-        Requires(Acc(pcb.State()))
+        Requires(Acc(pcb.State(), 1/20))
+        Requires(Acc(self.State(), 1/8))
+        Ensures(Acc(pcb.State(), 1 / 20))
+        Ensures(Acc(self.State(), 1 / 8))
         """
         Checks whether any of the ASes in the path belong to the black list.
 
         :param pcb: beacon to analyze.
         :type pcb: :class:`PathSegment`
         """
-        for asm in pcb.iter_asms():
+        asms = pcb.iter_asms()
+        for asm in asms:
+            Invariant(Forall(asms, lambda a: (Acc(a.State(), 1 / 4), [])))
+            Invariant(Acc(self.State(), 1/9))
             isd_as = asm.isd_as()
+            Unfold(Acc(self.State(), 1/10))
             if isd_as in self.unwanted_ases:
+                Fold(Acc(self.State(), 1 / 10))
                 return isd_as
+            Fold(Acc(self.State(), 1 / 10))
 
     def _check_range(self, reasons: List[str], name: str, actual: int) -> None:
         Requires(Acc(list_pred(reasons)))
@@ -127,7 +141,7 @@ class PathPolicy(object):
         Ensures(Acc(list_pred(reasons)))
         Ensures(Acc(self.State(), 1 / 200))
 
-        range_ = Unfolding(Acc(self.State(), 1/100), self.property_ranges[name])
+        range_ = Unfolding(Acc(self.State(), 1/300), self.property_ranges[name])
         if not range_:
             return
         if (actual < range_[0] or actual > range_[1]):
@@ -138,6 +152,7 @@ class PathPolicy(object):
         Requires(Acc(self.State(), 1 / 100))
         Requires(self.valid_ranges())
         Ensures(Acc(self.State(), 1 / 100))
+        Ensures(Acc(list_pred(Result())))
         """
         Checks whether any of the path properties has a value outside the
         predefined min-max range.
@@ -157,6 +172,8 @@ class PathPolicy(object):
         return reasons
 
     def _check_remote_ifid(self, pcb: PathSegment) -> Optional[ISD_AS]:
+        Requires(Acc(pcb.State(), 1 / 20))
+        Ensures(Acc(pcb.State(), 1 / 20))
         """
         Checkes whether any PCB markings have unset remote IFID values for
         up/downstream ASes. This can happen during normal startup depending
@@ -165,11 +182,15 @@ class PathPolicy(object):
         Remote IFID is only allowed to be 0 if the corresponding ISD-AS is
         0-0.
         """
-        for asm in pcb.iter_asms():
-            for pcbm in asm.iter_pcbms():
-                if pcbm.inIA().to_int() and not pcbm.p.inIF:
+        asms = pcb.iter_asms()
+        for asm in asms:
+            Invariant(Forall(asms, lambda a: (Acc(a.State(), 1 / 4), [])))
+            pcbms = asm.iter_pcbms()
+            for pcbm in pcbms:
+                Invariant(Forall(pcbms, lambda p: (Acc(p.State(), 1 / 4), [])))
+                if pcbm.inIA().to_int() and not Unfolding(Acc(pcbm.State(), 1/8), Unfolding(Acc(pcbm.p.State(), 1/16), pcbm.p.inIF)):
                     return pcbm.inIA()
-                if pcbm.outIA().to_int() and not pcbm.p.outIF:
+                if pcbm.outIA().to_int() and not Unfolding(Acc(pcbm.State(), 1/8), Unfolding(Acc(pcbm.p.State(), 1/16), pcbm.p.outIF)):
                     return pcbm.outIA()
         return None
 
@@ -184,8 +205,10 @@ class PathPolicy(object):
 
     @classmethod
     def from_dict(cls, policy_dict: Dict[str, object]) -> 'PathPolicy':  # pragma: no cover
-        Requires(Acc(dict_pred(policy_dict), 1/20))
-        Ensures(Acc(dict_pred(policy_dict), 1 / 20))
+        Requires(Acc(dict_pred(policy_dict), 1/10))
+        Requires(valid_policy(policy_dict))
+        Requires(Acc(dict_pred(policy_dict['PropertyRanges'])))
+        Ensures(Acc(dict_pred(policy_dict), 1 / 10))
         """
         Create a PathPolicy instance from the dictionary.
 
@@ -197,10 +220,11 @@ class PathPolicy(object):
 
     def parse_dict(self, path_policy: Dict[str, object]) -> None:
         Requires(self.State())
-        Requires(Acc(dict_pred(path_policy), 1/10))
+        Requires(Acc(dict_pred(path_policy), 1/20))
         Requires(valid_policy(path_policy))
+        Requires(Acc(dict_pred(path_policy['PropertyRanges'])))
         Ensures(self.State())
-        Ensures(Acc(dict_pred(path_policy), 1 / 10))
+        Ensures(Acc(dict_pred(path_policy), 1 / 20))
         """
         Parses the policies from the dictionary.
 
@@ -214,9 +238,11 @@ class PathPolicy(object):
         self.update_after_time = cast(int, path_policy['UpdateAfterTime'])
         unwanted_ases = cast(str, path_policy['UnwantedASes']).split(',')
         for unwanted in unwanted_ases:
+            Invariant(Acc(self.unwanted_ases, 1/2) and Acc(list_pred(self.unwanted_ases)))
             self.unwanted_ases.append(ISD_AS(unwanted))
         property_ranges = cast(Dict[str, str], path_policy['PropertyRanges'])
         for key in property_ranges:
+            Invariant(Acc(self.property_ranges, 1/2) and Acc(dict_pred(self.property_ranges)))
             property_range = property_ranges[key].split('-')
             property_range_temp = int(property_range[0]), int(property_range[1])
             self.property_ranges[key] = property_range_temp
@@ -235,17 +261,20 @@ class PathPolicy(object):
                          'TotalBandwidth' in self.property_ranges
                          )
 
+DICT_STR_INT_INT = Dict[str, Tuple[int, int]]
+DICT_STR_INT = Dict[str, int]
+
 @Pure
 def valid_policy(path_policy: Dict[str, object]) -> bool:
-    Requires(Acc(dict_pred(path_policy), 1 / 10))
+    Requires(Acc(dict_pred(path_policy), 1 / 1000))
     return (isinstance(path_policy.get('BestSetSize'), int) and
         isinstance(path_policy.get('CandidatesSetSize'), int) and
         isinstance(path_policy.get('HistoryLimit'), int) and
         isinstance(path_policy.get('UpdateAfterNumber'), int) and
         isinstance(path_policy.get('UpdateAfterTime'), int) and
-        isinstance(path_policy.get('UnwantedASes'), str))
-
-
+        isinstance(path_policy.get('UnwantedASes'), str) and
+        isinstance(path_policy.get('PropertyRanges'), DICT_STR_INT_INT) and
+        isinstance(path_policy.get('PropertyWeights'), DICT_STR_INT))
 
     # def __str__(self) -> str:
     #     path_policy_dict = self.get_path_policy_dict()

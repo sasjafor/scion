@@ -1,6 +1,6 @@
 import lib.packet.scion_addr
 
-from typing import List
+from typing import cast, List
 from py2viper_contracts.contracts import *
 
 class PathSegment:
@@ -10,6 +10,7 @@ class PathSegment:
         Requires(Acc(self.State(), 1/100))
         Ensures(Acc(self.State(), 1/100))
         Ensures(Acc(list_pred(Result())))
+        Ensures(Forall(cast(List[ASMarking], Result()), lambda a: (a.State(), [])))
         ...
 
     def get_n_peer_links(self) -> int:  ...
@@ -33,7 +34,7 @@ class PCBMarking:
 
     @Predicate
     def State(self) -> bool:
-        return True
+        return Acc(self.p) and self.p.State()
 
 class PPCBMarking:
     """
@@ -55,11 +56,16 @@ class PPCBMarking:
 
     @Predicate
     def State(self) -> bool:
-        return True
+        return Acc(self.inIF) and Acc(self.outIF)
 
 class ASMarking:
     def isd_as(self) -> 'lib.packet.scion_addr.ISD_AS': ...
-    def iter_pcbms(self, start: int=0) -> List[PCBMarking]:  ...
+    def iter_pcbms(self, start: int=0) -> List[PCBMarking]:
+        Requires(Acc(self.State(), 1/100))
+        Ensures(Acc(self.State(), 1/100))
+        Ensures(Acc(list_pred(Result())))
+        Ensures(Forall(cast(List[PCBMarking], Result()), lambda p: (p.State(), [])))
+        ...
 
     @Predicate
     def State(self) -> bool:
