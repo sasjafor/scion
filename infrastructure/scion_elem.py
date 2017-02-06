@@ -234,7 +234,7 @@ class SCIONElement(object):
         except SCIONBaseError:
             log_exception("Error handling message:\n%s" % msg)
 
-    def _get_handler(self, pkt):
+    def _get_handler(self, pkt: SCIONL4Packet) -> Optional[]:
         # FIXME(PSz): needed only by python router.
         if pkt.l4_hdr.TYPE == L4Proto.UDP:
             return self._get_ctrl_handler(pkt.get_payload())
@@ -273,7 +273,7 @@ class SCIONElement(object):
                           scmp.type, scmp_type_name(scmp.type), pkt)
         return None
 
-    def _parse_packet(self, packet):
+    def _parse_packet(self, packet: bytes) -> Optional[SCIONL4Packet]:
         try:
             pkt = SCIONL4Packet(packet)
         except SCMPError as e:

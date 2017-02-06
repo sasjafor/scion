@@ -58,7 +58,6 @@ class PathPolicy(object):
             Acc(self.property_ranges) and Acc(dict_pred(self.property_ranges)) and
             Acc(self.property_weights)) and Acc(dict_pred(self.property_weights))
 
-
     def get_path_policy_dict(self) -> Dict[str, object]:  # pragma: no cover
         Requires(Acc(self.State(), 1/100))
         Ensures(Acc(self.State(), 1/100))
@@ -66,7 +65,7 @@ class PathPolicy(object):
         Ensures('best_set_size' in Result())
         """Return path policy info in a dictionary."""
         Unfold(Acc(self.State(), 1/100))
-        result =  {
+        result = {
             'best_set_size': self.best_set_size,
             'candidates_set_size': self.candidates_set_size,
             'history_limit': self.history_limit,
@@ -188,9 +187,13 @@ class PathPolicy(object):
             pcbms = asm.iter_pcbms()
             for pcbm in pcbms:
                 Invariant(Forall(pcbms, lambda p: (Acc(p.State(), 1 / 4), [])))
-                if pcbm.inIA().to_int() and not Unfolding(Acc(pcbm.State(), 1/8), Unfolding(Acc(pcbm.p.State(), 1/16), pcbm.p.inIF)):
+                if (pcbm.inIA().to_int() and
+                        not Unfolding(Acc(pcbm.State(), 1/8),
+                                      Unfolding(Acc(pcbm.p.State(), 1/16), pcbm.p.inIF))):
                     return pcbm.inIA()
-                if pcbm.outIA().to_int() and not Unfolding(Acc(pcbm.State(), 1/8), Unfolding(Acc(pcbm.p.State(), 1/16), pcbm.p.outIF)):
+                if (pcbm.outIA().to_int() and
+                        not Unfolding(Acc(pcbm.State(), 1/8),
+                                      Unfolding(Acc(pcbm.p.State(), 1/16), pcbm.p.outIF))):
                     return pcbm.outIA()
         return None
 
@@ -208,6 +211,7 @@ class PathPolicy(object):
         Requires(Acc(dict_pred(policy_dict), 1/10))
         Requires(valid_policy(policy_dict))
         Requires(Acc(dict_pred(policy_dict['PropertyRanges'])))
+        Requires(Acc(dict_pred(policy_dict['PropertyWeights'])))
         Ensures(Acc(dict_pred(policy_dict), 1 / 10))
         """
         Create a PathPolicy instance from the dictionary.
@@ -223,6 +227,7 @@ class PathPolicy(object):
         Requires(Acc(dict_pred(path_policy), 1/20))
         Requires(valid_policy(path_policy))
         Requires(Acc(dict_pred(path_policy['PropertyRanges'])))
+        Requires(Acc(dict_pred(path_policy['PropertyWeights'])))
         Ensures(self.State())
         Ensures(Acc(dict_pred(path_policy), 1 / 20))
         """
@@ -261,25 +266,36 @@ class PathPolicy(object):
                          'TotalBandwidth' in self.property_ranges
                          )
 
-DICT_STR_INT_INT = Dict[str, Tuple[int, int]]
+    def __str__(self) -> str:
+        Requires(Acc(self.State(), 1/10))
+        Ensures(Acc(self.State(), 1 / 10))
+        path_policy_dict = self.get_path_policy_dict()
+        path_policy_str = yaml.dump(path_policy_dict)
+        return path_policy_str
+
+DICT_STR_STR = Dict[str, str]
 DICT_STR_INT = Dict[str, int]
+
 
 @Pure
 def valid_policy(path_policy: Dict[str, object]) -> bool:
     Requires(Acc(dict_pred(path_policy), 1 / 1000))
-    return (isinstance(path_policy.get('BestSetSize'), int) and
-        isinstance(path_policy.get('CandidatesSetSize'), int) and
-        isinstance(path_policy.get('HistoryLimit'), int) and
-        isinstance(path_policy.get('UpdateAfterNumber'), int) and
-        isinstance(path_policy.get('UpdateAfterTime'), int) and
-        isinstance(path_policy.get('UnwantedASes'), str) and
-        isinstance(path_policy.get('PropertyRanges'), DICT_STR_INT_INT) and
-        isinstance(path_policy.get('PropertyWeights'), DICT_STR_INT))
-
-    # def __str__(self) -> str:
-    #     path_policy_dict = self.get_path_policy_dict()
-    #     path_policy_str = yaml.dump(path_policy_dict)
-    #     return path_policy_str
+    return ('BestSetSize' in path_policy and
+            'CandidatesSetSize' in path_policy and
+            'HistoryLimit' in path_policy and
+            'UpdateAfterNumber' in path_policy and
+            'UpdateAfterTime' in path_policy and
+            'UnwantedASes' in path_policy and
+            'PropertyRanges' in path_policy and
+            'PropertyWeights' in path_policy and
+            isinstance(path_policy['BestSetSize'], int) and
+            isinstance(path_policy['CandidatesSetSize'], int) and
+            isinstance(path_policy['HistoryLimit'], int) and
+            isinstance(path_policy['UpdateAfterNumber'], int) and
+            isinstance(path_policy['UpdateAfterTime'], int) and
+            isinstance(path_policy['UnwantedASes'], str) and
+            isinstance(path_policy['PropertyRanges'], DICT_STR_STR) and
+            isinstance(path_policy['PropertyWeights'], DICT_STR_INT))
 
 
 # class PathStoreRecord(object):
@@ -313,7 +329,7 @@ def valid_policy(path_policy: Dict[str, object]) -> bool:
 #     """
 #     DEFAULT_OFFSET = 3600 * 24 * 7  # 1 week
 #
-#     def __init__(self, pcb):
+#     def __init__(self, pcb: PathSegment) -> None:
 #         """
 #         :param pcb: beacon to analyze.
 #         :type pcb: :class:`PathSegment`
@@ -328,9 +344,23 @@ def valid_policy(path_policy: Dict[str, object]) -> bool:
 #         self.guaranteed_bandwidth = 0
 #         self.available_bandwidth = 0
 #         self.total_bandwidth = 0
+#         self.last_seen_time = -1
 #         self.update(pcb)
 #
-#     def update(self, pcb):
+#     @Predicate
+#     def State(self) -> bool:
+#         return (Acc(self.id) and
+#                 Acc(self.peer_links) and
+#                 Acc(self.hops_length) and
+#                 Acc(self.fidelity) and
+#                 Acc(self.disjointness) and
+#                 Acc(self.last_sent_time) and
+#                 Acc(self.guaranteed_bandwidth) and
+#                 Acc(self.available_bandwidth) and
+#                 Acc(self.total_bandwidth) and
+#                 Acc(self.last_seen_time))
+#
+#     def update(self, pcb: PathSegment) -> None:
 #         """
 #         Update a candidate entry from a recent PCB.
 #         """
@@ -341,13 +371,15 @@ def valid_policy(path_policy: Dict[str, object]) -> bool:
 #         self.last_seen_time = now
 #         self.expiration_time = pcb.get_expiration_time()
 #
-#     def sending(self):  # pragma: no cover
+#     def sending(self) -> None:  # pragma: no cover
 #         """
 #         Update last_sent_time to now.
 #         """
 #         self.last_sent_time = int(SCIONTime.get_time())
 #
-#     def update_fidelity(self, path_policy):
+#     def update_fidelity(self, path_policy: PathPolicy) -> None:
+#         Requires(Acc(path_policy.State(), 1/100))
+#         Requires(path_policy.valid_ranges())
 #         """
 #         Computes a path fidelity based on all path properties and considering
 #         the corresponding weights, which are stored in the path policy.
@@ -358,34 +390,34 @@ def valid_policy(path_policy: Dict[str, object]) -> bool:
 #         now = SCIONTime.get_time()
 #         self.fidelity += (path_policy.property_weights['PeerLinks'] *
 #                           self.peer_links)
-#         self.fidelity += (path_policy.property_weights['HopsLength'] /
+#         self.fidelity += (path_policy.property_weights['HopsLength'] //
 #                           self.hops_length)
 #         self.fidelity += (path_policy.property_weights['Disjointness'] *
 #                           self.disjointness)
 #         if now != 0:
 #             self.fidelity += (path_policy.property_weights['LastSentTime'] *
-#                               (now - self.last_sent_time) / now)
+#                               (now - self.last_sent_time) // now)
 #             self.fidelity += (path_policy.property_weights['LastSeenTime'] *
-#                               self.last_seen_time / now)
-#         self.fidelity += (path_policy.property_weights['DelayTime'] /
+#                               self.last_seen_time // now)
+#         self.fidelity += (path_policy.property_weights['DelayTime'] //
 #                           self.delay_time)
 #         self.fidelity += (path_policy.property_weights['ExpirationTime'] *
-#                           (self.expiration_time - now) / self.expiration_time)
+#                           (self.expiration_time - now) // self.expiration_time)
 #         self.fidelity += (path_policy.property_weights['GuaranteedBandwidth'] *
 #                           self.guaranteed_bandwidth)
 #         self.fidelity += (path_policy.property_weights['AvailableBandwidth'] *
 #                           self.available_bandwidth)
 #         self.fidelity += (path_policy.property_weights['TotalBandwidth'] *
 #                           self.total_bandwidth)
-#
-#     def __eq__(self, other):  # pragma: no cover
-#         if type(other) is not type(self):
-#             return False
-#         return self.id == other.id
-#
-#     def __str__(self):
-#         return "PathStoreRecord: ID: %s Fidelity: %s" % (
-#             self.id, self.fidelity)
+
+    # def __eq__(self, other):  # pragma: no cover
+    #     if type(other) is not type(self):
+    #         return False
+    #     return self.id == other.id
+    #
+    # def __str__(self):
+    #     return "PathStoreRecord: ID: %s Fidelity: %s" % (
+    #         self.id, self.fidelity)
 #
 #
 # class PathStore(object):

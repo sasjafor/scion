@@ -143,7 +143,7 @@ class UDPSocket(Socket):
         if desc:
             logging.debug("%s bound to %s:%d", desc, addr, self.port)
 
-    def send(self, data, dst=None):
+    def send(self, data: bytes, dst: Tuple[str, int]=None) -> bool:
         """
         Send data to a specified destination.
 

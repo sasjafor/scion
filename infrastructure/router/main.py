@@ -172,7 +172,7 @@ class Router(SCIONElement):
             name="BR.sibra_worker", daemon=True).start()
         SCIONElement.run(self)
 
-    def send(self, spkt, addr, port):
+    def send(self, spkt: SCIONL4Packet, addr: HostAddrBase, port: int) -> None:
         """
         Send a spkt to addr (class of that object must implement
         __str__ which returns IP addr string) using port and local or remote
@@ -191,7 +191,7 @@ class Router(SCIONElement):
         else:
             self._udp_sock.send(spkt.pack(), (str(addr), port))
 
-    def handle_extensions(self, spkt, pre_routing_phase, from_local_as):
+    def handle_extensions(self, spkt: SCIONL4Packet, pre_routing_phase: bool, from_local_as: bool) -> List:
         """
         Handle SCION Packet extensions. Handlers can be defined for pre- and
         post-routing.
@@ -437,7 +437,7 @@ class Router(SCIONElement):
                 raise SCMPUnknownHost
         self.send(spkt, addr, SCION_UDP_EH_DATA_PORT)
 
-    def verify_hof(self, path, ingress=True):
+    def verify_hof(self, path: SCIONPath, ingress: bool = True) -> None:
         """Verify freshness and authentication of an opaque field."""
         ts = path.get_iof().timestamp
         hof = path.get_hof()
@@ -453,7 +453,7 @@ class Router(SCIONElement):
                       self.interface.to_addr, self.interface.to_udp_port)
         self.send(spkt, self.interface.to_addr, self.interface.to_udp_port)
 
-    def handle_data(self, spkt, from_local_as, drop_on_error=False):
+    def handle_data(self, spkt: SCIONL4Packet, from_local_as: bool, drop_on_error: bool=False) -> None:
         """
         Main entry point for data packet handling.
 
@@ -484,7 +484,7 @@ class Router(SCIONElement):
             logging.debug("Dropping packet due to interface being down")
             pass
 
-    def _process_data(self, spkt, ingress, drop_on_error):
+    def _process_data(self, spkt: SCIONL4Packet, ingress: bool, drop_on_error: bool) -> None:
         path = spkt.path
         if len(spkt) > self.topology.mtu:
             # FIXME(kormat): ignore this check for now, as PCB packets are often
@@ -532,7 +532,7 @@ class Router(SCIONElement):
             path.inc_hof_idx()
             self._egress_forward(spkt)
 
-    def _calc_fwding_ingress(self, spkt):
+    def _calc_fwding_ingress(self, spkt: SCIONL4Packet) -> Tuple[int, bool]:
         path = spkt.path
         hof = path.get_hof()
         incd = False
@@ -541,13 +541,13 @@ class Router(SCIONElement):
             incd = True
         return path.get_fwd_if(), incd
 
-    def _needs_local_processing(self, pkt):
+    def _needs_local_processing(self, pkt: SCIONL4Packet) -> bool:
         return pkt.addrs.dst in [
             self.addr,
             SCIONAddr.from_values(self.addr.isd_as, self.interface.addr),
         ]
 
-    def _process_flags(self, flags, pkt, from_local_as):
+    def _process_flags(self, flags: List[Tuple[int, ...]], pkt: SCIONL4Packet, from_local_as: bool) -> Tuple[bool, bool]:
         """
         Go through the flags set by hop-by-hop extensions on this packet.
         :returns:
@@ -608,7 +608,7 @@ class Router(SCIONElement):
         """
         self.handle_request(meta.packet, meta.addr, meta.from_local_as)
 
-    def handle_request(self, packet, _, from_local_socket=True, sock=None):
+    def handle_request(self, packet: bytes, _: object, from_local_socket: bool =True, sock:object =None):
         """
         Main routine to handle incoming SCION packets.
 

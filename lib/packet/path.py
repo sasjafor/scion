@@ -225,13 +225,13 @@ class SCIONPath(Serializable):
         offset = 1 if iof.up_flag else -1
         return self._ofs.get_by_idx(self._hof_idx + offset)
 
-    def get_iof(self):  # pragma: no cover
+    def get_iof(self) -> Optional[InfoOpaqueField]:  # pragma: no cover
         """Get current :any:`InfoOpaqueField`."""
         if self._iof_idx is None:
             return None
         return self._ofs.get_by_idx(self._iof_idx)
 
-    def get_hof(self):  # pragma: no cover
+    def get_hof(self) -> Optional[HopOpaqueField]:  # pragma: no cover
         """Get current :any:`HopOpaqueField`."""
         if self._hof_idx is None:
             return None

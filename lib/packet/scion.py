@@ -227,7 +227,7 @@ class SCIONAddrHdr(Serializable):
         inst.update()
         return inst
 
-    def pack(self):
+    def pack(self) -> bytes:
         self.update()
         packed = []
         packed.append(self.src.pack())
@@ -354,7 +354,7 @@ class SCIONBasePacket(PacketBase):
         assert isinstance(path_hdr, SCIONPath)
         self.path = path_hdr
 
-    def pack(self):
+    def pack(self) -> bytes:
         self.update()
         packed = []
         inner = self._inner_pack()
