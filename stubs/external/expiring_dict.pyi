@@ -1,0 +1,4 @@
+
+
+class ExpiringDict(dict):
+    pass

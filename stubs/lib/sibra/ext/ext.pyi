@@ -1,0 +1,4 @@
+
+
+class SibraExtBase(HopByHopExtension):
+    pass

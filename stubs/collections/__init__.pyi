@@ -1,0 +1,2 @@
+class defaultdict(dict):
+    pass
