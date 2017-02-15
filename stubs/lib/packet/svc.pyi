@@ -1,5 +1,0 @@
-
-
-
-class SVCType:
-    pass

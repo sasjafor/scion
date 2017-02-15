@@ -199,10 +199,10 @@ class SCIONAddrHdr(Serializable):
             Tuple of src addr type, dst addr type, and raw addr bytes.
         """
         super().__init__()
-        self.src = None
-        self.dst = None
-        self._pad_len = None
-        self._total_len = None
+        self.src = None  # type: Optional[SCIONAddr]
+        self.dst = None  # type: Optional[SCIONAddr]
+        self._pad_len = None  # type: Optional[int]
+        self._total_len = None  # type: Optional[int]
         if raw_values:
             self._parse(*raw_values)
 
@@ -466,7 +466,7 @@ class SCIONExtPacket(SCIONBasePacket):
     NAME = "SCIONExtPacket"
 
     def __init__(self, raw=None):  # pragma: no cover
-        self.ext_hdrs = []
+        self.ext_hdrs = []  # type: List[ExtensionHeader]
         self._unknown_exts = {}
         super().__init__(raw)
 

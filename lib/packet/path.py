@@ -44,10 +44,10 @@ class SCIONPath(Serializable):
 
     def __init__(self, raw=None):  # pragma: no cover
         self._ofs = OpaqueFieldList(self.OF_ORDER)
-        self._iof_idx = None
-        self._hof_idx = None
-        self.interfaces = []
-        self.mtu = None
+        self._iof_idx = None  # type: Optional[int]
+        self._hof_idx = None  # type: Optional[int]
+        self.interfaces = []  # type: List[Tuple[ASMarking, int]]
+        self.mtu = None  # type: Optional[int]
         super().__init__(raw)
 
     def _parse(self, raw):

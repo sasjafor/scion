@@ -37,11 +37,11 @@ class PathPolicy(object):
     """Stores a path policy."""
     def __init__(self) -> None:  # pragma: no cover
         Ensures(self.State())
-        self.best_set_size = 5  # type: int
-        self.candidates_set_size = 20  # type: int
-        self.history_limit = 0  # type: int
-        self.update_after_number = 0  # type: int
-        self.update_after_time = 0  # type: int
+        self.best_set_size = 5
+        self.candidates_set_size = 20
+        self.history_limit = 0
+        self.update_after_number = 0
+        self.update_after_time = 0
         self.unwanted_ases = []  # type: List[ISD_AS]
         self.property_ranges = {}  # type: Dict[str, Tuple[int, int]]
         self.property_weights = {}  # type: Dict[str, int]
@@ -50,13 +50,13 @@ class PathPolicy(object):
     @Predicate
     def State(self) -> bool:
         return (Acc(self.best_set_size) and
-            Acc(self.candidates_set_size) and
-            Acc(self.history_limit) and
-            Acc(self.update_after_number) and
-            Acc(self.update_after_time) and
-            Acc(self.unwanted_ases) and Acc(list_pred(self.unwanted_ases)) and
-            Acc(self.property_ranges) and Acc(dict_pred(self.property_ranges)) and
-            Acc(self.property_weights)) and Acc(dict_pred(self.property_weights))
+                Acc(self.candidates_set_size) and
+                Acc(self.history_limit) and
+                Acc(self.update_after_number) and
+                Acc(self.update_after_time) and
+                Acc(self.unwanted_ases) and Acc(list_pred(self.unwanted_ases)) and
+                Acc(self.property_ranges) and Acc(dict_pred(self.property_ranges)) and
+                Acc(self.property_weights)) and Acc(dict_pred(self.property_weights))
 
     def get_path_policy_dict(self) -> Dict[str, object]:  # pragma: no cover
         Requires(Acc(self.State(), 1/100))
@@ -107,7 +107,8 @@ class PathPolicy(object):
         ia = self._check_remote_ifid(pcb)
         if ia:
             logging.error("PathStore: pcb discarded, remote IFID of %s unknown",
-                          ia)
+
+                          )
             return False
         return True
 
@@ -126,6 +127,7 @@ class PathPolicy(object):
         for asm in asms:
             Invariant(Forall(asms, lambda a: (Acc(a.State(), 1 / 4), [])))
             Invariant(Acc(self.State(), 1/9))
+            Invariant(Acc(pcb.State(), 1 / 20))
             isd_as = asm.isd_as()
             Unfold(Acc(self.State(), 1/10))
             if isd_as in self.unwanted_ases:

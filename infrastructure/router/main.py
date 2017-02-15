@@ -89,6 +89,14 @@ from lib.types import (
 from lib.util import SCIONTime, hex_str, sleep_interval
 
 
+from py2viper_contracts.contracts import *
+
+# for type annotations
+from typing import List, Tuple
+from lib.packet.scion import SCIONL4Packet
+from lib.packet.host_addr import HostAddrBase
+from lib.util import Raw
+
 class Router(SCIONElement):
     """
     The SCION Router.
@@ -202,7 +210,7 @@ class Router(SCIONElement):
         else:
             prefix = "post"
             handlers = self.post_ext_handlers
-        flags = []
+        flags = []  # type: List[object]
         # Hop-by-hop extensions must be first (just after path), and process
         # only MAX_HOPBYHOP_EXT number of them. If an SCMP ext header is
         # present, it must be the first hopbyhop extension (and isn't included
@@ -608,7 +616,7 @@ class Router(SCIONElement):
         """
         self.handle_request(meta.packet, meta.addr, meta.from_local_as)
 
-    def handle_request(self, packet: bytes, _: object, from_local_socket: bool =True, sock:object =None):
+    def handle_request(self, packet: Raw, _: object, from_local_socket: bool =True, sock:object =None):
         """
         Main routine to handle incoming SCION packets.
 
@@ -634,7 +642,7 @@ class Router(SCIONElement):
             logging.debug("Stopped processing")
             return
         try:
-            needs_local |= self._needs_local_processing(pkt)
+            needs_local = needs_local or self._needs_local_processing(pkt)
         except SCMPError as e:
             self._scmp_validate_error(pkt, e)
             return

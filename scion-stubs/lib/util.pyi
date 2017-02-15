@@ -16,3 +16,11 @@ def load_yaml_file(file_path: str) -> Dict[str, object]:
 
 class Raw(object):
     pass
+
+
+def sleep_interval(start: float, interval: float, desc: str, quiet: bool =False) -> None:
+    ...
+
+
+def hex_str(raw: Raw) -> str:
+    ...

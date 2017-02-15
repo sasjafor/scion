@@ -31,7 +31,7 @@ from lib.packet.scmp.types import (
 
 class SCMPError(SCIONBaseError):
     """Base exception for all SCMP errors."""
-    INFO = None
+    INFO = None # type: None
 
 
 ############################

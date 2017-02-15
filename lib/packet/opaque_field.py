@@ -114,7 +114,7 @@ class HopOpaqueField(OpaqueField):
             flags |= HopOFFlags.RECURSE
         return flags
 
-    def calc_mac(self, key, ts, prev_hof=None):
+    def calc_mac(self, key, ts, prev_hof=None) -> bytes:
         """Generates MAC for newly created OF."""
         raw = bytearray()
         raw += struct.pack("!I", ts)
@@ -125,7 +125,7 @@ class HopOpaqueField(OpaqueField):
             raw += bytes(self.LEN-1)
         return cbcmac(key, bytes(raw))[:self.MAC_LEN]
 
-    def verify_mac(self, *args, **kwargs):  # pragma: no cover
+    def verify_mac(self, key, ts, prev_hof=None) -> bytes:  # pragma: no cover
         return self.mac == self.calc_mac(*args, **kwargs)
 
     def set_mac(self, *args, **kwargs):  # pragma: no cover
