@@ -1,2 +1,3 @@
 class defaultdict(dict):
-    pass
+    def __init__(self, df: object) -> None:
+        ...

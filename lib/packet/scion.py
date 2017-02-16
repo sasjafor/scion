@@ -466,7 +466,7 @@ class SCIONExtPacket(SCIONBasePacket):
     NAME = "SCIONExtPacket"
 
     def __init__(self, raw=None):  # pragma: no cover
-        self.ext_hdrs = []  # type: List[ExtensionHeader]
+        self.ext_hdrs = []  # type: List[Union[SCMPExt, SibraExtBase]]
         self._unknown_exts = {}
         super().__init__(raw)
 

@@ -40,3 +40,6 @@ class SCIONPath(Serializable, Sized):
 
     def inc_hof_idx(self) -> None:
         ...
+
+    def __len__(self) -> int:
+        ...

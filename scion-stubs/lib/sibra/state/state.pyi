@@ -1,2 +1,3 @@
 class SibraState:
-    pass
+    def __init__(self, bw: int, link_name: str) -> None:
+        ...

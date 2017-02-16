@@ -1,4 +1,4 @@
-from typing import Dict, Optional
+from typing import Dict, Optional, Sized
 from py2viper_contracts.contracts import *
 
 class SCIONTime(object):
@@ -14,8 +14,9 @@ def load_yaml_file(file_path: str) -> Dict[str, object]:
     Ensures(Acc(dict_pred(Result())))
     ...
 
-class Raw(object):
-    pass
+class Raw(Sized):
+    def __len__(self) -> int:
+        ...
 
 
 def sleep_interval(start: float, interval: float, desc: str, quiet: bool =False) -> None:

@@ -27,11 +27,14 @@ from lib.packet.scmp.types import (
     SCMPPathClass,
     SCMPRoutingClass,
 )
+from typing import Optional
 
 
 class SCMPError(SCIONBaseError):
     """Base exception for all SCMP errors."""
-    INFO = None
+    INFO = None  # type: None
+    CLASS = None  # type: Optional[int]
+    TYPE = None # type: Optional[int]
 
 
 ############################

@@ -24,7 +24,6 @@ from lib.flagtypes import FlagBase
 from lib.types import ExtHopByHopType
 from lib.util import Raw
 
-
 _ExtFlags = FlagBase((
     (1, "ERROR", ""),
     (2, "HOPBYHOP", "END2END"),

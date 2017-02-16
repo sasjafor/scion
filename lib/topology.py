@@ -93,7 +93,7 @@ class InterfaceElement(Element):
         self.bandwidth = interface_dict['Bandwidth']
         self.mtu = interface_dict['MTU']
         to_addr = interface_dict['ToAddr']
-        self.to_addr = None
+        self.to_addr = None  # type: Optional[HostAddrBase]
         if to_addr:
             self.to_addr = haddr_parse_interface(to_addr)
         self.to_if_id = 0  # Filled in later by IFID packets

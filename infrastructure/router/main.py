@@ -92,10 +92,11 @@ from lib.util import SCIONTime, hex_str, sleep_interval
 from py2viper_contracts.contracts import *
 
 # for type annotations
-from typing import List, Tuple
+from typing import List, Tuple, Union, Callable, cast
 from lib.packet.scion import SCIONL4Packet
 from lib.packet.host_addr import HostAddrBase
 from lib.util import Raw
+
 
 class Router(SCIONElement):
     """
@@ -108,7 +109,7 @@ class Router(SCIONElement):
     FWD_REVOCATION_TIMEOUT = 5
     IFSTATE_REQ_INTERVAL = 30
 
-    def __init__(self, server_id, conf_dir, ):
+    def __init__(self, server_id: str, conf_dir: str) -> None:
         """
         :param str server_id: server identifier.
         :param str conf_dir: configuration directory.
@@ -206,7 +207,7 @@ class Router(SCIONElement):
         """
         if pre_routing_phase:
             prefix = "pre"
-            handlers = self.pre_ext_handlers
+            handlers = self.pre_ext_handlers  # type: Union[Dict[int, bool], Dict[int, Callable[[object, object, object], list]]]
         else:
             prefix = "post"
             handlers = self.post_ext_handlers
@@ -234,7 +235,7 @@ class Router(SCIONElement):
                               prefix, ext_hdr.EXT_TYPE)
                 raise SCMPBadHopByHop
             if handler:
-                flags.extend(handler(ext_hdr, spkt, from_local_as))
+                flags.extend(cast(Callable[[object, object, object], list], handler)(ext_hdr, spkt, from_local_as))
         return flags
 
     def handle_traceroute(self, hdr, spkt, _):

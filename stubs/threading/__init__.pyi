@@ -1,0 +1,6 @@
+class Event:
+    def set(self) -> None:
+        ...
+
+    def clear(self) -> None:
+        ...

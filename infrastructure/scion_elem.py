@@ -55,7 +55,7 @@ from lib.msg_meta import (
     TCPMetadata,
     UDPMetadata,
 )
-from lib.packet.host_addr import HostAddrNone
+from lib.packet.host_addr import HostAddrNone, HostAddrBase
 from lib.packet.packet_base import PayloadRaw
 from lib.packet.path import SCIONPath
 from lib.packet.scion import (
@@ -81,15 +81,19 @@ from lib.packet.scmp.errors import (
     SCMPUnspecified,
 )
 from lib.packet.scmp.types import SCMPClass
-from lib.packet.scmp.util import scmp_type_name
+# from lib.packet.scmp.util import scmp_type_name
 from lib.socket import ReliableSocket, SocketMgr, TCPSocketWrapper
 from lib.tcp.socket import SCIONTCPSocket, SockOpt
 from lib.thread import thread_safety_net, kill_self
 from lib.trust_store import TrustStore
 from lib.types import AddrType, L4Proto, PayloadClass
 from lib.topology import Topology
-from lib.util import hex_str
+from lib.util import hex_str, Raw
 
+
+from typing import Optional, Tuple, Callable, Dict, Type
+from lib.packet.scion import SCIONExtPacket
+from lib.topology import RouterElement
 
 MAX_QUEUE = 30
 
@@ -105,11 +109,11 @@ class SCIONElement(object):
     :ivar dict ifid2br: map of interface ID to RouterElement.
     :ivar `SCIONAddr` addr: the server's address.
     """
-    SERVICE_TYPE = None
+    SERVICE_TYPE = None  # type: Optional[str]
     STARTUP_QUIET_PERIOD = STARTUP_QUIET_PERIOD
     USE_TCP = False
 
-    def __init__(self, server_id, conf_dir, host_addr=None, port=None):
+    def __init__(self, server_id: str, conf_dir: str, host_addr: HostAddrBase=None, port: int=None) -> None:
         """
         :param str server_id: server identifier.
         :param str conf_dir: configuration directory.
@@ -121,15 +125,15 @@ class SCIONElement(object):
         """
         self.id = server_id
         self.conf_dir = conf_dir
-        self.ifid2br = {}
+        self.ifid2br = {}  # type: Dict[int, RouterElement]
         self._port = port
         self.topology = Topology.from_file(
             os.path.join(self.conf_dir, TOPO_FILE))
         self.config = Config.from_file(
             os.path.join(self.conf_dir, AS_CONF_FILE))
         # Must be over-ridden by child classes:
-        self.CTRL_PLD_CLASS_MAP = {}
-        self.SCMP_PLD_CLASS_MAP = {}
+        self.CTRL_PLD_CLASS_MAP = {}  # type: Dict[str, Dict[Optional[int], Callable[[object, object, object], None]]]
+        self.SCMP_PLD_CLASS_MAP = {}  # type: Dict[int, Dict[Optional[int], Callable[[object, object], None]]]
         if self.SERVICE_TYPE:
             own_config = self.topology.get_own_config(self.SERVICE_TYPE,
                                                       server_id)
@@ -147,12 +151,12 @@ class SCIONElement(object):
         self.run_flag.set()
         self.stopped_flag = threading.Event()
         self.stopped_flag.clear()
-        self._in_buf = queue.Queue(MAX_QUEUE)
+        self._in_buf = queue.Queue(MAX_QUEUE)  # type: queue.Queue[object]
         self._socks = SocketMgr()
         self._setup_sockets(True)
         self._startup = time.time()
         if self.USE_TCP:
-            self.DefaultMeta = TCPMetadata
+            self.DefaultMeta = TCPMetadata  # type: Type[MetadataBase]
         else:
             self.DefaultMeta = UDPMetadata
 
@@ -269,8 +273,9 @@ class SCIONElement(object):
         try:
             return type_map[scmp.type]
         except KeyError:
-            logging.error("SCMP %s type not supported: %s(%s)\n%s",
-                          scmp.type, scmp_type_name(scmp.type), pkt)
+            assert False
+            # logging.error("SCMP %s type not supported: %s(%s)\n%s",
+            #               scmp.type, scmp_type_name(scmp.type), pkt)
         return None
 
     def _parse_packet(self, packet: Raw) -> Optional[SCIONL4Packet]:
@@ -307,7 +312,7 @@ class SCIONElement(object):
         assert isinstance(e, DROP)
         logging.warning("Dropping packet due to parse error: %s", e)
 
-    def _scmp_validate_error(self, pkt: SCIONBasePacket, e: SCMPError) -> None:
+    def _scmp_validate_error(self, pkt: SCIONExtPacket, e: SCMPError) -> None:
         if pkt.cmn_hdr.next_hdr == L4Proto.SCMP and pkt.ext_hdrs[0].error:
             # Never respond to an SCMP error with an SCMP error.
             logging.info(
@@ -319,7 +324,7 @@ class SCIONElement(object):
         else:
             logging.warning("Error: %s", type(e))
             reply = pkt.reversed_copy()
-            args = ()
+            args = ()  # type: Tuple[object, ...]
             if isinstance(e, SCMPUnspecified):
                 args = (str(e),)
             elif isinstance(e, (SCMPOversizePkt, SCMPBadPktLen)):

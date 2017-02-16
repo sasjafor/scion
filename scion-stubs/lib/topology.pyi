@@ -1,17 +1,30 @@
 from lib.packet.host_addr import HostAddrBase
 from lib.packet.scion_addr import ISD_AS
-from typing import Optional
+from typing import Optional, List
+
+
+class Element(object):
+    def __init__(self, port: int=None) -> None:
+        self.addr = None  # type: Optional[HostAddrBase]
+        self.port = port
+        self.name = None  # type: Optional[str]
 
 
 class Topology(object):
     def __init__(self):  # pragma: no cover
         self.is_core_as = False
         self.mtu = None  # type: Optional[int]
+        self.isd_as = None  # type: Optional[ISD_AS]
 
-class Element(object):
-    def __init__(self, port: int=None) -> None:
-        self.addr = None  # type: Optional[HostAddrBase]
-        self.port = port
+    @classmethod
+    def from_file(cls, topology_file: str) -> 'Topology':
+        ...
+
+    def get_own_config(self, server_type: str, server_id: str) -> Element:
+        ...
+
+    def get_all_border_routers(self) -> List[RouterElement]:
+        ...
 
 
 class InterfaceElement(Element):
@@ -31,7 +44,11 @@ class InterfaceElement(Element):
         :param dict interface_dict: contains information about the interface.
         """
         # super().__init__(interface_dict['Addr'], name)
-        self.isd_as = None  # type: ISD_AS
+        self.isd_as = None  # type: Optional[int]
+        self.if_id = None  # type: Optional[int]
+        self.udp_port = None  # type: Optional[int]
+        self.bandwidth = None  # type: Optional[int]
+        self.to_addr = None  # type: Optional[HostAddrBase]
 
 
 class RouterElement(Element):
