@@ -20,6 +20,13 @@
 from lib.errors import SCIONBaseError, SCIONBaseException
 
 
+class SCIONIFVerificationError(SCIONBaseError):
+    """
+    The current hop field (ingress or egress, depending on context) interface
+    does not match the interface of the border router.
+    """
+
+
 class SCIONOFVerificationError(SCIONBaseError):
     """
     Opaque field MAC verification error.
@@ -48,3 +55,9 @@ class SCIONInterfaceDownException(SCIONBaseException):
     def __init__(self, if_id: int) -> None:
         super().__init__()
         self.if_id = if_id
+
+
+class SCIONSegmentSwitchError(SCIONBaseException):
+    """
+    Switching from previous to current segment is disallowed.
+    """

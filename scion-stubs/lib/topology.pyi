@@ -49,6 +49,7 @@ class InterfaceElement(Element):
         self.udp_port = None  # type: Optional[int]
         self.bandwidth = None  # type: Optional[int]
         self.to_addr = None  # type: Optional[HostAddrBase]
+        self.link_type = None  # type: Optional[str]
 
 
 class RouterElement(Element):

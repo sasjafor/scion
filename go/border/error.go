@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// This file contains the router-level handling of packet errors. When
+// possible/allowed, a relevant SCMP error message reply is sent to the sender.
+
 package main
 
 import (
@@ -25,17 +28,24 @@ import (
 	"github.com/netsec-ethz/scion/go/lib/spkt"
 )
 
+// handlePktError is called for protocol-level packet errors. If there's SCMP
+// metadata attached to the error object, then an SCMP error response is
+// generated and sent.
 func (r *Router) handlePktError(rp *rpkt.RtrPkt, perr *common.Error, desc string) {
 	sdata, ok := perr.Data.(*scmp.ErrData)
 	if ok {
 		perr.Ctx = append(perr.Ctx, "SCMP", sdata.CT)
 	}
+	// XXX(kormat): uncomment for debugging:
+	// perr.Ctx = append(perr.Ctx, "raw", rp.Raw)
 	rp.Error(desc, perr.Ctx...)
 	if !ok || perr.Data == nil || rp.DirFrom == rpkt.DirSelf || rp.SCMPError {
 		// No scmp error data, packet is from self, or packet is already an SCMPError, so no reply.
 		return
 	}
-	if sdata.CT.Class == scmp.C_CmnHdr {
+
+	switch sdata.CT.Class {
+	case scmp.C_CmnHdr:
 		switch sdata.CT.Type {
 		case scmp.T_C_BadVersion, scmp.T_C_BadSrcType, scmp.T_C_BadDstType:
 			// For any of these cases, do nothing. A reply would only be
@@ -43,6 +53,26 @@ func (r *Router) handlePktError(rp *rpkt.RtrPkt, perr *common.Error, desc string
 			// deprecated, which hasn't happened yet.
 			return
 		}
+	}
+	srcIA, err := rp.SrcIA()
+	if err != nil {
+		return
+	}
+	// Certain errors are not respondable to if the source lies in a remote AS.
+	if !srcIA.Eq(conf.C.IA) {
+		switch sdata.CT.Class {
+		case scmp.C_CmnHdr:
+			switch sdata.CT.Type {
+			case scmp.T_C_BadHopFOffset, scmp.T_C_BadInfoFOffset:
+				return
+			}
+		case scmp.C_Path:
+			switch sdata.CT.Type {
+			case scmp.T_P_PathRequired:
+				return
+			}
+		}
+
 	}
 	reply, err := r.createSCMPErrorReply(rp, sdata.CT, sdata.Info)
 	if err != nil {
@@ -52,40 +82,76 @@ func (r *Router) handlePktError(rp *rpkt.RtrPkt, perr *common.Error, desc string
 	reply.Route()
 }
 
+// createSCMPErrorReply generates an SCMP error reply to the supplied packet.
 func (r *Router) createSCMPErrorReply(rp *rpkt.RtrPkt, ct scmp.ClassType,
 	info scmp.Info) (*rpkt.RtrPkt, *common.Error) {
+	// Create generic ScnPkt reply
 	sp, err := r.createReplyScnPkt(rp)
 	if err != nil {
 		return nil, err
 	}
-	if len(sp.HBHExt) > 0 && sp.HBHExt[0].Type() == common.ExtnSCMPType {
-		// If there's already an SCMP hbh header, remove it.
-		sp.HBHExt = sp.HBHExt[1:]
-	}
-	if len(sp.HBHExt) > common.ExtnMaxHBH {
-		// Too many HBH extensions, so trim to the excess ones.
-		sp.HBHExt = sp.HBHExt[:common.ExtnMaxHBH]
-	}
+	oldHBH := sp.HBHExt
+	sp.HBHExt = make([]common.Extension, 0, common.ExtnMaxHBH+1)
 	// Add new SCMP HBH extension at the start.
 	ext := &scmp.Extn{Error: true}
 	if ct.Class == scmp.C_Path && ct.Type == scmp.T_P_RevokedIF {
 		// Revocation SCMP errors have to be inspected by intermediate routers.
 		ext.HopByHop = true
 	}
-	sp.HBHExt = append([]common.Extension{ext}, sp.HBHExt...)
+	sp.HBHExt = append(sp.HBHExt, ext)
+	// Filter out any existing SCMP HBH headers, and trim the list to
+	// common.ExtnMaxHBH.
+	for _, e := range oldHBH {
+		if len(sp.HBHExt) < cap(sp.HBHExt) && e.Type() != common.ExtnSCMPType {
+			sp.HBHExt = append(sp.HBHExt, e)
+		}
+	}
 	// Add SCMP l4 header and payload
-	sp.Pld = scmp.PldFromQuotes(ct, info, sp.L4.L4Type(), rp.GetRaw)
+	var l4Type common.L4ProtocolType
+	if sp.L4 != nil {
+		l4Type = sp.L4.L4Type()
+	}
+	sp.Pld = scmp.PldFromQuotes(ct, info, l4Type, rp.GetRaw)
 	sp.L4 = scmp.NewHdr(ct, sp.Pld.Len())
 	// Convert back to RtrPkt
 	reply, err := rpkt.RtrPktFromScnPkt(sp, rp.DirFrom)
 	if err != nil {
 		return nil, err
 	}
-	if rp.DirFrom == rpkt.DirExternal {
-		reply.InfoF()
-		reply.HopF()
-		if err := reply.IncPath(); err != nil {
+	dstIA, err := reply.DstIA()
+	if err != nil {
+		return nil, err
+	}
+	// Only (potentially) call IncPath if the dest is not in the local AS.
+	if !dstIA.Eq(conf.C.IA) {
+		hopF, err := reply.HopF()
+		if err != nil {
 			return nil, err
+		}
+		if hopF != nil && hopF.Xover {
+			reply.InfoF()
+			reply.UpFlag()
+			// Always increment reversed path on a xover point.
+			if _, err := reply.IncPath(); err != nil {
+				return nil, err
+			}
+			// Increment reversed path if it was incremented in the forward direction.
+			// Check
+			// https://github.com/netsec-ethz/scion/blob/master/doc/PathReversal.md
+			// for details.
+			if rp.IncrementedPath {
+				if _, err := reply.IncPath(); err != nil {
+					return nil, err
+				}
+			}
+		} else if rp.DirFrom == rpkt.DirExternal {
+			reply.InfoF()
+			reply.UpFlag()
+			// Increase path if the current HOF is not xover and
+			// this router is an ingress router.
+			if _, err := reply.IncPath(); err != nil {
+				return nil, err
+			}
 		}
 	}
 	egress, err := r.replyEgress(rp)
@@ -96,6 +162,8 @@ func (r *Router) createSCMPErrorReply(rp *rpkt.RtrPkt, ct scmp.ClassType,
 	return reply, nil
 }
 
+// createReplyScnPkt creates a generic ScnPkt reply, by converting the RtrPkt
+// to an ScnPkt, then reversing the ScnPkt, and setting the reply source address.
 func (r *Router) createReplyScnPkt(rp *rpkt.RtrPkt) (*spkt.ScnPkt, *common.Error) {
 	sp, err := rp.ToScnPkt(false)
 	if err != nil {
@@ -110,6 +178,8 @@ func (r *Router) createReplyScnPkt(rp *rpkt.RtrPkt) (*spkt.ScnPkt, *common.Error
 	return sp, nil
 }
 
+// replyEgress calculates the corresponding egress function and destination
+// address to use when replying to a packet.
 func (r *Router) replyEgress(rp *rpkt.RtrPkt) (rpkt.EgressPair, *common.Error) {
 	if rp.DirFrom == rpkt.DirLocal {
 		locIdx := conf.C.Net.LocAddrMap[rp.Ingress.Dst.String()]
@@ -120,8 +190,4 @@ func (r *Router) replyEgress(rp *rpkt.RtrPkt) (rpkt.EgressPair, *common.Error) {
 		return rpkt.EgressPair{}, err
 	}
 	return rpkt.EgressPair{F: r.intfOutFs[*intf], Dst: rp.Ingress.Src}, nil
-}
-
-var validateErrorSCMP = map[string]scmp.ClassType{
-	rpkt.ErrorBadTotalLen: {scmp.C_CmnHdr, scmp.T_C_BadPktLen},
 }

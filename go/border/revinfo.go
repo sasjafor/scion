@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// This file handles Revocation Info (RevInfo) packets.
+
 package main
 
 import (
@@ -30,27 +32,35 @@ import (
 	"github.com/netsec-ethz/scion/go/proto"
 )
 
-func (r *Router) RevTokenCallback(b common.RawBytes) {
+// RevTokenCallback is called to enqueue RevInfos for handling by the
+// RevInfoFwd goroutine.
+func (r *Router) RevTokenCallback(args rpkt.RevTokenCallbackArgs) {
 	select {
-	case r.revInfoQ <- b:
+	case r.revInfoQ <- args:
 	default:
 		log.Debug("Dropping rev token")
 	}
 }
 
+// RevInfoFwd takes RevInfos, and forwards them to the local Beacon Service
+// (BS) and Path Service (PS).
 func (r *Router) RevInfoFwd() {
 	defer liblog.PanicLog()
-	for b := range r.revInfoQ {
-		revInfo := r.decodeRevToken(b)
+	// Run forever.
+	for args := range r.revInfoQ {
+		revInfo := r.decodeRevToken(args.RevInfo)
 		if revInfo == nil {
 			continue
 		}
-		r.fwdRevInfo(revInfo, addr.SvcBS.Multicast())
-		r.fwdRevInfo(revInfo, addr.SvcPS.Multicast())
+		for _, svcAddr := range args.Addrs {
+			log.Debug("Forwarding revocation.", "target", svcAddr, "revInfo", revInfo)
+			r.fwdRevInfo(revInfo, &svcAddr)
+		}
 	}
 
 }
 
+// decodeRevToken decodes RevInfo payloads.
 func (r *Router) decodeRevToken(b common.RawBytes) *proto.RevInfo {
 	buf := bytes.NewBuffer(b)
 	msg, err := capnp.NewPackedDecoder(buf).Decode()
@@ -72,8 +82,9 @@ func (r *Router) decodeRevToken(b common.RawBytes) *proto.RevInfo {
 	return &revInfo
 }
 
+// fwdRevInfo forwards RevInfo payloads to a designated local host.
 func (r *Router) fwdRevInfo(revInfo *proto.RevInfo, dstHost addr.HostAddr) {
-	// Pick first local address as source
+	// Pick first local address from topology as source.
 	srcAddr := conf.C.Net.LocAddr[0].PublicAddr()
 	// Create base packet
 	rp, err := rpkt.RtrPktFromScnPkt(&spkt.ScnPkt{

@@ -55,6 +55,7 @@ from lib.msg_meta import (
     TCPMetadata,
     UDPMetadata,
 )
+from lib.packet.ext.one_hop_path import OneHopPathExt
 from lib.packet.host_addr import HostAddrNone, HostAddrBase
 from lib.packet.packet_base import PayloadRaw
 from lib.packet.path import SCIONPath
@@ -90,12 +91,11 @@ from lib.types import AddrType, L4Proto, PayloadClass
 from lib.topology import Topology
 from lib.util import hex_str, Raw
 
-
 from typing import Optional, Tuple, Callable, Dict, Type
 from lib.packet.scion import SCIONExtPacket
 from lib.topology import RouterElement
 
-MAX_QUEUE = 30
+MAX_QUEUE = 50
 
 
 class SCIONElement(object):
@@ -218,8 +218,6 @@ class SCIONElement(object):
         """
         Main routine to handle incoming SCION messages.
         """
-        logging.debug("handle_msg_meta() started: %s %s" % (msg, meta))
-
         if isinstance(meta, SCMPMetadata):
             handler = self._get_scmp_handler(meta.pkt)
         else:
@@ -228,7 +226,6 @@ class SCIONElement(object):
             logging.error("handler not found: %s", msg)
             return
         try:
-            logging.debug("Calling handler, meta:%s", meta)
             # SIBRA operates on parsed packets.
             if (isinstance(meta, UDPMetadata) and
                     msg.PAYLOAD_CLASS == PayloadClass.SIBRA):
@@ -341,7 +338,6 @@ class SCIONElement(object):
             reply.path = SCIONPath()
         next_hop, port = self.get_first_hop(reply)
         reply.update()
-        logging.warning("Reply:\n%s", reply)
         self.send(reply, next_hop, port)
 
     def _scmp_bad_path_metadata(self, pkt, e):
@@ -546,24 +542,28 @@ class SCIONElement(object):
                           dropped, self.total_dropped)
 
     def _get_msg_meta(self, packet, addr, sock):
-        logging.debug("_get_msg_meta() called")
         pkt = self._parse_packet(packet)
         if not pkt:
             logging.error("Cannot parse packet:\n%s" % packet)
             return None, None
         # Create metadata:
         rev_pkt = pkt.reversed_copy()
+        # Skip OneHopPathExt (if exists)
+        exts = []
+        for e in rev_pkt.ext_hdrs:
+            if not isinstance(e, OneHopPathExt):
+                exts.append(e)
         if rev_pkt.l4_hdr.TYPE == L4Proto.UDP:
             meta = UDPMetadata.from_values(ia=rev_pkt.addrs.dst.isd_as,
                                            host=rev_pkt.addrs.dst.host,
                                            path=rev_pkt.path,
-                                           ext_hdrs=rev_pkt.ext_hdrs,
+                                           ext_hdrs=exts,
                                            port=rev_pkt.l4_hdr.dst_port)
         elif rev_pkt.l4_hdr.TYPE == L4Proto.SCMP:
             meta = SCMPMetadata.from_values(ia=rev_pkt.addrs.dst.isd_as,
                                             host=rev_pkt.addrs.dst.host,
                                             path=rev_pkt.path,
-                                            ext_hdrs=rev_pkt.ext_hdrs)
+                                            ext_hdrs=exts)
 
         else:
             logging.error("Cannot create meta for: %s" % pkt)
@@ -727,14 +727,38 @@ class SCIONElement(object):
             raise SCIONServiceLookupError("No %s servers found" % qname)
         return results
 
-    def verify_asm(self, asm, rev_info):
-        # FIXME(siva): We are removing the PCB only if any of up/downstream
-        # interfaces are down, and not peer interfaces. If you do it for
-        # peer interfaces too, you will end up removing some PCBs which are
-        # still valid but contain that peer interface. So we need to add an
-        # extension to the PCBMarking to identify which peer interfaces are
-        # down
-        hof = asm.pcbm(0).hof()
-        root_verify = ConnectedHashTree.verify(rev_info, asm.p.hashTreeRoot)
-        return ((rev_info.p.ifID in [hof.ingress_if, hof.egress_if]) and
-                root_verify)
+    def _verify_revocation_for_asm(self, rev_info, as_marking, verify_all=True):
+        """
+        Verifies a revocation for a given AS marking.
+
+        :param rev_info: The RevocationInfo object.
+        :param as_marking: The ASMarking object.
+        :param verify_all: If true, verify all PCBMs (including peers),
+            otherwise only verify the up/down hop.
+        :return: True, if the revocation successfully revokes an upstream
+            interface in the AS marking, False otherwise.
+        """
+        if rev_info.isd_as() != as_marking.isd_as():
+            return False
+        if not ConnectedHashTree.verify(rev_info, as_marking.p.hashTreeRoot):
+            return False
+        for pcbm in as_marking.iter_pcbms():
+            if rev_info.p.ifID in [pcbm.hof().ingress_if, pcbm.hof().egress_if]:
+                return True
+            if not verify_all:
+                break
+        return False
+
+    def _validate_revocation(self, rev_info):
+        """
+        Validates a revocation.
+
+        :param rev_info: The RevocationInfo object.
+        :returns: True, if the revocation should be processed further, False
+            otherwise.
+        """
+        if rev_info.p.ifID == 0:
+            logging.warning("Received revocation for ifID 0. Ignoring.\n%s" %
+                            rev_info.short_desc())
+            return False
+        return True

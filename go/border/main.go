@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// This file takes care of parsing command-line flags, setting up logging and
+// signal handling, setting resource limits, and starting a new Router
+// instance.
+
 package main
 
 import (
@@ -27,12 +31,13 @@ import (
 )
 
 var (
-	id       = flag.String("id", "", "Element ID (Required. E.g. 'er1-23er4-21')")
+	id       = flag.String("id", "", "Element ID (Required. E.g. 'br4-21-9')")
 	confDir  = flag.String("confd", ".", "Configuration directory")
 	profFlag = flag.Bool("profile", false, "Enable cpu and memory profiling")
 )
 
 func main() {
+	// Parse and check flags.
 	flag.Parse()
 	if *id == "" {
 		log.Crit("No element ID specified")
@@ -41,15 +46,10 @@ func main() {
 	liblog.Setup(*id)
 	defer liblog.PanicLog()
 	if *profFlag {
+		// Start profiling if requested.
 		profile.Start(*id)
 	}
 	setupSignals()
-	// Set max virtual memory size to 1GiB in bytes.
-	rLimit := &syscall.Rlimit{Max: 1 << 30, Cur: 1 << 30}
-	if err := syscall.Setrlimit(syscall.RLIMIT_AS, rLimit); err != nil {
-		log.Crit("Setting RLIMIT_AS failed", "err", err)
-		os.Exit(1)
-	}
 	r, err := NewRouter(*id, *confDir)
 	if err != nil {
 		log.Crit("Startup failed", err.Ctx...)

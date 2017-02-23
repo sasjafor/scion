@@ -15,6 +15,7 @@
 package topology
 
 import (
+	"fmt"
 	"io/ioutil"
 	"sort"
 
@@ -53,9 +54,17 @@ type BasicElem struct {
 	Port int          `yaml:"Port"`
 }
 
+func (b BasicElem) String() string {
+	return fmt.Sprintf("%s:%d", b.Addr, b.Port)
+}
+
 type TopoBR struct {
 	BasicElem `yaml:",inline"`
 	IF        *TopoIF `yaml:"Interface"`
+}
+
+func (t TopoBR) String() string {
+	return fmt.Sprintf("Loc addrs:\n  %s\nInterfaces:\n  %s", t.BasicElem, t.IF)
 }
 
 type TopoIF struct {
@@ -70,11 +79,26 @@ type TopoIF struct {
 	LinkType  string       `yaml:"LinkType"`
 }
 
+func (t *TopoIF) String() string {
+	return fmt.Sprintf(
+		"IFID: %d Link: %s Local: %s:%d Remote: %s:%d IA: %s MTU: %d BW: %d",
+		t.IFID, t.LinkType, t.Addr, t.UdpPort, t.ToAddr, t.ToUdpPort, t.IA, t.MTU, t.BW,
+	)
+
+}
+
 const CfgName = "topology.yml"
 
 const (
 	ErrorOpen  = "Unable to open topology"
 	ErrorParse = "Unable to parse topology"
+)
+
+const (
+	LinkRouting = "ROUTING"
+	LinkParent  = "PARENT"
+	LinkChild   = "CHILD"
+	LinkPeer    = "PEER"
 )
 
 var Curr *TopoMeta

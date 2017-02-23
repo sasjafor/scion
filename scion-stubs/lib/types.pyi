@@ -112,3 +112,14 @@ class RouterFlag(TypeBase):
 class SIBRAPathType(TypeBase):
     STEADY = 0
     EPHEMERAL = 1
+
+
+class LinkType(TypeBase):
+    #: Link to child AS
+    CHILD = "CHILD"
+    #: Link to parent AS
+    PARENT = "PARENT"
+    #: Link to peer AS
+    PEER = "PEER"
+    #: Link to other core AS
+    ROUTING = "ROUTING"

@@ -23,7 +23,7 @@ import threading
 import time
 from _collections import deque, defaultdict
 from abc import ABCMeta, abstractmethod
-from threading import Lock
+from threading import Lock, RLock
 
 # External packages
 from Crypto.Protocol.KDF import PBKDF2
@@ -32,7 +32,7 @@ from external.expiring_dict import ExpiringDict
 # SCION
 from infrastructure.scion_elem import SCIONElement
 from infrastructure.beacon_server.if_state import InterfaceState
-from lib.crypto.certificate import verify_sig_chain_trc
+from lib.crypto.certificate_chain import verify_sig_chain_trc
 from lib.crypto.hash_tree import ConnectedHashTree
 from lib.defines import (
     BEACON_SERVICE,
@@ -135,7 +135,7 @@ class BeaconServer(SCIONElement, metaclass=ABCMeta):
         self.ifid_state = {}
         for ifid in self.ifid2br:
             self.ifid_state[ifid] = InterfaceState()
-        self.ifid_state_lock = Lock()
+        self.ifid_state_lock = RLock()
         self.CTRL_PLD_CLASS_MAP = {
             PayloadClass.PCB: {None: self.handle_pcb},
             PayloadClass.IFID: {None: self.handle_ifid_packet},
@@ -170,7 +170,8 @@ class BeaconServer(SCIONElement, metaclass=ABCMeta):
 
     def _init_hash_tree(self):
         ifs = list(self.ifid2br.keys())
-        self._hash_tree = ConnectedHashTree(ifs, self.hashtree_gen_key)
+        self._hash_tree = ConnectedHashTree(self.addr.isd_as,
+                                            ifs, self.hashtree_gen_key)
 
     def _get_ht_proof(self, if_id):
         with self._hash_tree_lock:
@@ -408,7 +409,8 @@ class BeaconServer(SCIONElement, metaclass=ABCMeta):
             last_ttl_window = ConnectedHashTree.get_ttl_window()
 
             ifs = list(self.ifid2br.keys())
-            tree = ConnectedHashTree.get_next_tree(ifs, self.hashtree_gen_key)
+            tree = ConnectedHashTree.get_next_tree(self.addr.isd_as, ifs,
+                                                   self.hashtree_gen_key)
             with self._hash_tree_lock:
                 self._next_tree = tree
 
@@ -660,11 +662,14 @@ class BeaconServer(SCIONElement, metaclass=ABCMeta):
 
     def _handle_scmp_revocation(self, pld, meta):
         rev_info = RevocationInfo.from_raw(pld.info.rev_info)
-        logging.info("Received revocation via SCMP:\n%s", rev_info)
+        logging.info("Received revocation via SCMP:\n%s", rev_info.short_desc())
         self._process_revocation(rev_info)
 
     def _handle_revocation(self, rev_info, meta):
-        logging.info("Received revocation via UDP:\n%s", rev_info)
+        logging.info("Received revocation via TCP/UDP:\n%s",
+                     rev_info.short_desc())
+        if not self._validate_revocation(rev_info):
+            return
         self._process_revocation(rev_info)
 
     def handle_rev_objs(self):
@@ -692,7 +697,11 @@ class BeaconServer(SCIONElement, metaclass=ABCMeta):
         logging.info("Storing revocation in ZK.")
         rev_token = rev_info.copy().pack()
         entry_name = "%s:%s" % (hash(rev_token), time.time())
-        self.revobjs_cache.store(entry_name, rev_token)
+        try:
+            self.revobjs_cache.store(entry_name, rev_token)
+        except ZkNoConnection as exc:
+            logging.error("Unable to store revocation in shared cache "
+                          "(no ZK connection): %s" % exc)
         self._remove_revoked_pcbs(rev_info)
 
     @abstractmethod
@@ -731,11 +740,12 @@ class BeaconServer(SCIONElement, metaclass=ABCMeta):
             # matches that in the rev_info
             root_verify = ConnectedHashTree.verify(
                             rev_info, self._get_ht_root())
-            if cand.pcb.p.ifID == rev_info.p.ifID and root_verify:
+            if (self.addr.isd_as == rev_info.isd_as() and
+                    cand.pcb.p.ifID == rev_info.p.ifID and root_verify):
                 to_remove.append(cand.id)
 
             for asm in cand.pcb.iter_asms():
-                if self.verify_asm(asm, rev_info):
+                if self._verify_revocation_for_asm(rev_info, asm, False):
                     to_remove.append(cand.id)
 
         return to_remove

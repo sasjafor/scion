@@ -1,9 +1,10 @@
 from lib.packet.packet_base import Serializable
+from lib.defines import OPAQUE_FIELD_LEN
 from lib.util import Raw
 
 
 class OpaqueField(Serializable):
-    pass
+    LEN = OPAQUE_FIELD_LEN
 
 
 class OpaqueFieldList(object):
@@ -25,10 +26,19 @@ class HopOpaqueField(OpaqueField):
         self.egress_if = 0
         self.mac = bytes(self.MAC_LEN)
 
-    def calc_mac(self, key: bytes, ts: int, prev_hof:'HopOpaqueField'=None) -> bytes:
+    def calc_mac(self, key: bytes, ts: int, prev_hof:'HopOpaqueField'=None) -> None:
+        ...
+
+    def set_mac(self, key: bytes, ts: int, prev_hof:'HopOpaqueField'=None) -> bytes:
         ...
 
     def verify_mac(self, key: bytes, ts: int, prev_hof:'HopOpaqueField'=None) -> bytes:  # pragma: no cover
+        ...
+
+    @classmethod
+    def from_values(cls, exp_time: int, ingress_if: int=0, egress_if: int=0,
+                    mac: bytes=None, xover: bool=False, verify_only: bool=False,
+                    forward_only: bool=False, recurse: bool=False) -> HopOpaqueField:
         ...
 
 

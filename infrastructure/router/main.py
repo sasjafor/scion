@@ -29,10 +29,12 @@ from Crypto.Protocol.KDF import PBKDF2
 from external.expiring_dict import ExpiringDict
 from infrastructure.router.if_state import InterfaceState
 from infrastructure.router.errors import (
+    SCIONIFVerificationError,
     SCIONInterfaceDownException,
     SCIONOFExpiredError,
     SCIONOFVerificationError,
     SCIONPacketHeaderCorruptedError,
+    SCIONSegmentSwitchError,
 )
 from infrastructure.scion_elem import SCIONElement
 from lib.defines import (
@@ -84,6 +86,7 @@ from lib.types import (
     AddrType,
     ExtHopByHopType,
     ExtensionClass,
+    LinkType,
     PathMgmtType as PMT,
     PayloadClass,
     RouterFlag,
@@ -94,7 +97,7 @@ from lib.util import SCIONTime, hex_str, sleep_interval
 from py2viper_contracts.contracts import *
 
 # for type annotations
-from typing import List, Tuple, Union, Callable, cast
+from typing import List, Tuple, Union, Callable, cast, Optional
 from lib.packet.scion import SCIONL4Packet
 from lib.packet.host_addr import HostAddrBase
 from lib.util import Raw
@@ -124,6 +127,7 @@ class Router(SCIONElement):
                 break
         assert self.interface is not None
         logging.info("Interface: %s", self.interface.__dict__)
+        self.is_core_router = self.topology.is_core_as
         self.of_gen_key = PBKDF2(self.config.master_as_key, b"Derive OF Key")
         self.sibra_key = PBKDF2(self.config.master_as_key, b"Derive SIBRA Key")
         self.if_states = defaultdict(InterfaceState)
@@ -240,12 +244,13 @@ class Router(SCIONElement):
                 flags.extend(cast(Callable[[object, object, object], list], handler)(ext_hdr, spkt, from_local_as))
         return flags
 
-    def handle_traceroute(self, hdr: TracerouteExt, spkt: SCIONL4Packet, _: bool) -> List[Tuple[int, str]]:
+    # def handle_traceroute(self, hdr: TracerouteExt, spkt: SCIONL4Packet, _: bool) -> List[Tuple[int, str]]:
+    def handle_traceroute(self, hdr, spkt, _):
         hdr.append_hop(self.addr.isd_as, self.interface.if_id)
         return []
 
-    def handle_one_hop_path(self, hdr: ExtensionHeader, spkt: SCIONL4Packet, from_local_as: bool) -> List[Tuple[int, str]]:
-        if len(spkt.path) != InfoOpaqueField.LEN + 2*HopOpaqueField.LEN:
+    def handle_one_hop_path(self, hdr: ExtensionHeader, spkt: SCIONL4Packet, from_local_as: bool) -> List[Tuple[int]]:
+        if len(spkt.path) != InfoOpaqueField.LEN + 2 * HopOpaqueField.LEN:
             logging.error("OneHopPathExt: incorrect path length.")
             return [(RouterFlag.ERROR,)]
         if not from_local_as:  # Remote packet, create the 2nd Hop Field
@@ -259,13 +264,15 @@ class Router(SCIONElement):
             spkt.path.inc_hof_idx()
         return []
 
-    def handle_sibra(self, hdr: SibraExtBase, spkt: SCIONL4Packet, from_local_as: bool) -> List[Tuple[int, str]]:
+    # def handle_sibra(self, hdr: SibraExtBase, spkt: SCIONL4Packet, from_local_as: bool) -> List[Tuple[int, str]]:
+    def handle_sibra(self, hdr, spkt, from_local_as):
         ret = hdr.process(self.sibra_state, spkt, from_local_as,
                           self.sibra_key)
         logging.debug("Sibra state:\n%s", self.sibra_state)
         return ret
 
-    def handle_scmp(self, hdr: SCMPExt, spkt: SCIONL4Packet, _: bool) -> List[Tuple[int, str]]:
+    # def handle_scmp(self, hdr: SCMPExt, spkt: SCIONL4Packet, _: bool) -> List[Tuple[int, str]]:
+    def handle_scmp(self, hdr, spkt, _):
         if hdr.hopbyhop:
             return [(RouterFlag.PROCESS_LOCAL,)]
         return []
@@ -374,8 +381,17 @@ class Router(SCIONElement):
         rev_info = RevocationInfo.from_raw(pld.info.rev_info)
         if rev_info in self.revocations:
             return
-        snames = [BEACON_SERVICE]
-        if self.topology.path_servers:
+        snames = []
+        # Fork revocation to local BS and PS if router is downstream of the
+        # failed interface.
+        if (spkt.addrs.src.isd_as[0] == self.addr.isd_as[0] and
+                self._is_downstream_router()):
+            snames.append(BEACON_SERVICE)
+            if self.topology.path_servers:
+                snames.append(PATH_SERVICE)
+        # Fork revocation to local PS if router is in the AS of the source.
+        elif (spkt.addrs.dst.isd_as == self.addr.isd_as and
+                self.topology.path_servers):
             snames.append(PATH_SERVICE)
 
         self.revocations[rev_info] = True
@@ -389,6 +405,13 @@ class Router(SCIONElement):
             pkt = self._build_packet(addr, dst_port=port,
                                      payload=rev_info.copy())
             self.send(pkt, addr, SCION_UDP_EH_DATA_PORT)
+
+    def _is_downstream_router(self):
+        """
+        Returns True if this router is connected to an upstream router (via an
+        upstream link), False otherwise.
+        """
+        return self.interface.link_type == LinkType.PARENT
 
     def send_revocation(self, spkt, if_id, ingress, path_incd):
         """
@@ -411,7 +434,7 @@ class Router(SCIONElement):
         if path_incd:
             rev_pkt.path.inc_hof_idx()
         rev_pkt.update()
-        logging.debug("Revocation Packet:\n%s", rev_pkt)
+        logging.debug("Revocation Packet:\n%s" % rev_pkt.short_desc())
         # FIXME(kormat): In some circumstances, this doesn't actually work, as
         # handle_data will try to send the packet to this interface first, and
         # then drop the packet as the interface is down.
@@ -450,9 +473,16 @@ class Router(SCIONElement):
 
     def verify_hof(self, path: SCIONPath, ingress: bool = True) -> None:
         """Verify freshness and authentication of an opaque field."""
-        ts = path.get_iof().timestamp
+        iof = path.get_iof()
+        ts = iof.timestamp
         hof = path.get_hof()
         prev_hof = path.get_hof_ver(ingress=ingress)
+        # Check that the interface in the current hop field matches the
+        # interface in the router.
+
+        if path.get_curr_if(ingress=ingress) != self.interface.if_id:
+            raise SCIONIFVerificationError(hof, iof)
+
         if int(SCIONTime.get_time()) <= ts + hof.exp_time * EXP_TIME_UNIT:
             if not hof.verify_mac(self.of_gen_key, ts, prev_hof):
                 raise SCIONOFVerificationError(hof, prev_hof)
@@ -478,6 +508,11 @@ class Router(SCIONElement):
         ingress = not from_local_as
         try:
             self._process_data(spkt, ingress, drop_on_error)
+        except SCIONIFVerificationError as e:
+            logging.error("Dropping packet due to not matching interfaces.\n"
+                          "Current IOF: %s\nCurrent HOF: %s\n"
+                          "Router Interface: %d" %
+                          (e.args[1], e.args[0], self.interface.if_id))
         except SCIONOFVerificationError as e:
             logging.error("Dropping packet due to incorrect MAC.\n"
                           "Header:\n%s\nInvalid OF: %s\nPrev OF: %s",
@@ -491,8 +526,11 @@ class Router(SCIONElement):
         except SCIONPacketHeaderCorruptedError:
             logging.error("Dropping packet due to invalid header state.\n"
                           "Header:\n%s", spkt)
+        except SCIONSegmentSwitchError as e:
+            logging.error("Dropping packet due to disallowed segment switch: "
+                          "%s" % e.args[0])
         except SCIONInterfaceDownException:
-            logging.debug("Dropping packet due to interface being down")
+            logging.info("Dropping packet due to interface being down.")
             pass
 
     def _process_data(self, spkt: SCIONL4Packet, ingress: bool, drop_on_error: bool) -> None:
@@ -516,7 +554,18 @@ class Router(SCIONElement):
             self.deliver(spkt)
             return
         if ingress:
-            fwd_if, path_incd = self._calc_fwding_ingress(spkt)
+            prev_if = path.get_curr_if()
+            prev_iof = path.get_iof()
+            prev_hof = path.get_hof()
+            prev_iof_idx = path.get_of_idxs()[0]
+            fwd_if, path_incd, skipped_vo = self._calc_fwding_ingress(spkt)
+            cur_iof_idx = path.get_of_idxs()[0]
+            if prev_iof_idx != cur_iof_idx:
+                self._validate_segment_switch(
+                    path, fwd_if, prev_if, prev_iof, prev_hof)
+            elif skipped_vo:
+                raise SCIONSegmentSwitchError("Skipped verify only field, but "
+                                              "did not switch segments.")
         else:
             fwd_if = path.get_fwd_if()
             path_incd = False
@@ -543,14 +592,68 @@ class Router(SCIONElement):
             path.inc_hof_idx()
             self._egress_forward(spkt)
 
-    def _calc_fwding_ingress(self, spkt: SCIONL4Packet) -> Tuple[int, bool]:
+    def _validate_segment_switch(self, path: SCIONPath, fwd_if: int, prev_if: int,
+                                 prev_iof: InfoOpaqueField,
+                                 prev_hof: HopOpaqueField) -> None:
+        """
+        Validates switching of segments according to the following rules:
+
+        1) Never switch from a down-segment to an up-segment
+           (valley-freeness)
+        2) Never switch from an up(down)-segment to an up(down)-segment, if the
+           packet is not forwarded(received) over a ROUTING link.
+        3) Never switch from a core-segment to a core-segment.
+        4) If a packet is received over a peering link, check on ingress that
+           the egress IF is the same for both the current and next hop fields.
+        5) If a packet is to be forwarded over a peering link, check on ingress
+           that the ingress IF is the same for both current and next hop fields.
+        """
+        rcvd_on_link_type = self._link_type(prev_if)
+        fwd_on_link_type = self._link_type(fwd_if)
+        cur_iof = path.get_iof()
+        cur_hof = path.get_hof()
+        if not prev_iof.up_flag and cur_iof.up_flag:
+            raise SCIONSegmentSwitchError(
+                "Switching from down- to up-segment is not allowed.")
+        if (prev_iof.up_flag and cur_iof.up_flag and
+                    fwd_on_link_type != LinkType.ROUTING):
+            raise SCIONSegmentSwitchError(
+                "Switching from up- to up-segment is not allowed "
+                "if the packet is not forwarded over a ROUTING link.")
+        if (not prev_iof.up_flag and not cur_iof.up_flag and
+                    rcvd_on_link_type != LinkType.ROUTING):
+            raise SCIONSegmentSwitchError(
+                "Switching from down- to down-segment is not "
+                "allowed if the packet was not received over a ROUTING link.")
+        if (rcvd_on_link_type == LinkType.ROUTING and
+                    fwd_on_link_type == LinkType.ROUTING):
+            raise SCIONSegmentSwitchError(
+                "Switching from core- to core-segment is not allowed.")
+        if ((rcvd_on_link_type == LinkType.PEER or
+                     fwd_on_link_type == LinkType.PEER) and
+                    prev_hof.egress_if != cur_hof.egress_if):
+            raise SCIONSegmentSwitchError(
+                "Egress IF of peering HOF does not match egress IF of current "
+                "HOF.")
+
+    def _calc_fwding_ingress(self, spkt: SCIONL4Packet) -> Tuple[int, bool, bool]:
         path = spkt.path
         hof = path.get_hof()
         incd = False
+        skipped_vo = False
         if hof.xover:
-            path.inc_hof_idx()
+            skipped_vo = path.inc_hof_idx()
             incd = True
-        return path.get_fwd_if(), incd
+        return path.get_fwd_if(), incd, skipped_vo
+
+    def _link_type(self, if_id: int) -> Optional[str]:
+        """
+        Returns the link type of the link corresponding to 'if_id' or None.
+        """
+        for br in self.topology.get_all_border_routers():
+            if br.interface.if_id == if_id:
+                return br.interface.link_type
+        return None
 
     def _needs_local_processing(self, pkt: SCIONL4Packet) -> bool:
         return pkt.addrs.dst in [
@@ -632,9 +735,6 @@ class Router(SCIONElement):
         pkt = self._parse_packet(packet)
         if not pkt:
             return
-        if pkt.ext_hdrs:
-            logging.debug("Got packet (from_local_as? %s):\n%s",
-                          from_local_as, pkt)
         try:
             flags = self.handle_extensions(pkt, True, from_local_as)
         except SCMPError as e:

@@ -38,8 +38,20 @@ class SCIONPath(Serializable, Sized):
     def get_fwd_if(self) -> int:
         ...
 
-    def inc_hof_idx(self) -> None:
+    def inc_hof_idx(self) -> bool:
+        ...
+
+    def get_of_idxs(self) -> Tuple[int, int]:
         ...
 
     def __len__(self) -> int:
+        ...
+
+    def get_curr_if(self, ingress: bool=True) -> int:
+        ...
+
+    @classmethod
+    def from_values(cls, a_iof: InfoOpaqueField=None, a_hofs: List[HopOpaqueField]=None,
+                    b_iof: InfoOpaqueField=None, b_hofs: List[HopOpaqueField]=None,
+                    c_iof: InfoOpaqueField=None, c_hofs: List[HopOpaqueField]=None) -> SCIONPath:
         ...
