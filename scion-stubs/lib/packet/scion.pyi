@@ -62,7 +62,7 @@ class SCIONExtPacket(SCIONBasePacket):
 class SCIONL4Packet(SCIONExtPacket):
     NAME = "SCIONL4Packet"
 
-    def __init__(self, raw=None):  # pragma: no cover
+    def __init__(self, raw: Raw=None) -> None:  # pragma: no cover
         self.l4_hdr = None  # type: Optional[L4HeaderBase]
 
     def update(self) -> None:

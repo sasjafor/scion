@@ -36,7 +36,7 @@ from lib.defines import (
     SCION_UDP_EH_DATA_PORT,
     SERVICE_TYPES,
     SIBRA_SERVICE,
-    STARTUP_QUIET_PERIOD,
+    STARTUP_QUIET_PERIOD as SQP,
     TCP_ACCEPT_POLLING_TOUT,
     TOPO_FILE,
 )
@@ -110,7 +110,7 @@ class SCIONElement(object):
     :ivar `SCIONAddr` addr: the server's address.
     """
     SERVICE_TYPE = None  # type: Optional[str]
-    STARTUP_QUIET_PERIOD = STARTUP_QUIET_PERIOD
+    STARTUP_QUIET_PERIOD = SQP
     USE_TCP = False
 
     def __init__(self, server_id: str, conf_dir: str, host_addr: HostAddrBase=None, port: int=None) -> None:
@@ -200,7 +200,7 @@ class SCIONElement(object):
             logging.critical("TCP: cannot init TCP socket.")
             kill_self()
 
-    def init_ifid2br(self):
+    def init_ifid2br(self) -> None:
         for br in self.topology.get_all_border_routers():
             self.ifid2br[br.interface.if_id] = br
 

@@ -33,7 +33,7 @@ class HopOpaqueField(OpaqueField):
 
 
 class InfoOpaqueField(OpaqueField):
-    def __init__(self):  # pragma: no cover
+    def __init__(self) -> None:  # pragma: no cover
         self.up_flag = False
         self.shortcut = False
         self.peer = False

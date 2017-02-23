@@ -45,6 +45,6 @@ class SCIONInterfaceDownException(SCIONBaseException):
     """
     The interface to forward the packet to is down.
     """
-    def __init__(self, if_id):
+    def __init__(self, if_id: int) -> None:
         super().__init__()
         self.if_id = if_id

@@ -53,6 +53,7 @@ from lib.msg_meta import RawMetadata
 from lib.sibra.ext.ext import SibraExtBase
 from lib.packet.ext.one_hop_path import OneHopPathExt
 from lib.packet.ext.traceroute import TracerouteExt
+from lib.packet.ext_hdr import ExtensionHeader
 from lib.packet.ifid import IFIDPayload
 from lib.packet.opaque_field import HopOpaqueField, InfoOpaqueField
 from lib.packet.path import SCIONPath
@@ -73,6 +74,7 @@ from lib.packet.scmp.errors import (
     SCMPTooManyHopByHop,
     SCMPUnknownHost,
 )
+from lib.packet.scmp.ext import SCMPExt
 from lib.packet.scmp.types import SCMPClass, SCMPPathClass
 from lib.packet.svc import SVCType, SVC_TO_SERVICE
 from lib.sibra.state.state import SibraState
@@ -238,11 +240,11 @@ class Router(SCIONElement):
                 flags.extend(cast(Callable[[object, object, object], list], handler)(ext_hdr, spkt, from_local_as))
         return flags
 
-    def handle_traceroute(self, hdr, spkt, _):
+    def handle_traceroute(self, hdr: TracerouteExt, spkt: SCIONL4Packet, _: bool) -> List[Tuple[int, str]]:
         hdr.append_hop(self.addr.isd_as, self.interface.if_id)
         return []
 
-    def handle_one_hop_path(self, hdr, spkt, from_local_as):
+    def handle_one_hop_path(self, hdr: ExtensionHeader, spkt: SCIONL4Packet, from_local_as: bool) -> List[Tuple[int, str]]:
         if len(spkt.path) != InfoOpaqueField.LEN + 2*HopOpaqueField.LEN:
             logging.error("OneHopPathExt: incorrect path length.")
             return [(RouterFlag.ERROR,)]
@@ -257,13 +259,13 @@ class Router(SCIONElement):
             spkt.path.inc_hof_idx()
         return []
 
-    def handle_sibra(self, hdr, spkt, from_local_as):
+    def handle_sibra(self, hdr: SibraExtBase, spkt: SCIONL4Packet, from_local_as: bool) -> List[Tuple[int, str]]:
         ret = hdr.process(self.sibra_state, spkt, from_local_as,
                           self.sibra_key)
         logging.debug("Sibra state:\n%s", self.sibra_state)
         return ret
 
-    def handle_scmp(self, hdr, spkt, _):
+    def handle_scmp(self, hdr: SCMPExt, spkt: SCIONL4Packet, _: bool) -> List[Tuple[int, str]]:
         if hdr.hopbyhop:
             return [(RouterFlag.PROCESS_LOCAL,)]
         return []

@@ -11,7 +11,7 @@ class Element(object):
 
 
 class Topology(object):
-    def __init__(self):  # pragma: no cover
+    def __init__(self) -> None:  # pragma: no cover
         self.is_core_as = False
         self.mtu = None  # type: Optional[int]
         self.isd_as = None  # type: Optional[ISD_AS]
