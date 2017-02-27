@@ -3,6 +3,7 @@ from lib.packet.opaque_field import InfoOpaqueField, HopOpaqueField, OpaqueField
 from lib.packet.pcb import ASMarking
 from lib.util import Raw
 from typing import Optional, Sized, List, Tuple
+from py2viper_contracts.contracts import Pure
 
 class SCIONPath(Serializable, Sized):
     NAME = "SCIONPath"
@@ -17,7 +18,7 @@ class SCIONPath(Serializable, Sized):
     HOF_LABELS = A_HOFS, B_HOFS, C_HOFS
 
     def __init__(self, raw:Raw=None) -> None:  # pragma: no cover
-        self._ofs = None  # type: OpaqueFieldList
+        self._ofs = OpaqueFieldList()
         self._iof_idx = None  # type: Optional[int]
         self._hof_idx = None  # type: Optional[int]
         self.interfaces = []  # type: List[Tuple[ASMarking, int]]
@@ -44,6 +45,7 @@ class SCIONPath(Serializable, Sized):
     def get_of_idxs(self) -> Tuple[int, int]:
         ...
 
+    @Pure
     def __len__(self) -> int:
         ...
 

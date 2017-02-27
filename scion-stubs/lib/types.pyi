@@ -2,12 +2,7 @@
 class TypeBase(object):
     @classmethod
     def to_str(cls, type_: int, error: bool=False) -> object:
-        for attr in dir(cls):
-            if getattr(cls, attr) == type_:
-                return attr
-        if not error:
-            return "UNKNOWN (%s)" % type_
-        raise IndexError
+        ...
 
 ############################
 # Basic types

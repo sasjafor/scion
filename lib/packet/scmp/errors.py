@@ -32,7 +32,7 @@ from typing import Optional
 
 class SCMPError(SCIONBaseError):
     """Base exception for all SCMP errors."""
-    INFO = None  # type: None
+    # INFO = None  # type: None
     CLASS = None  # type: Optional[int]
     TYPE = None # type: Optional[int]
 

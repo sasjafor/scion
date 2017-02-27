@@ -1,6 +1,6 @@
 from lib.packet.host_addr import HostAddrBase
 from lib.packet.scion_addr import ISD_AS
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 
 class Element(object):
@@ -39,7 +39,7 @@ class InterfaceElement(Element):
         the port number receiving UDP traffic on the other end of the link.
     :ivar int udp_port: the port number used to send UDP traffic.
     """
-    def __init__(self, interface_dict) -> None:
+    def __init__(self, interface_dict: Dict[str, object]) -> None:
         """
         :param dict interface_dict: contains information about the interface.
         """
@@ -50,15 +50,16 @@ class InterfaceElement(Element):
         self.bandwidth = None  # type: Optional[int]
         self.to_addr = None  # type: Optional[HostAddrBase]
         self.link_type = None  # type: Optional[str]
+        self.to_udp_port = None  # type: Optional[int]
 
 
 class RouterElement(Element):
     """
     The RouterElement class represents one of the border routers.
     """
-    def __init__(self, router_dict) -> None:  # pragma: no cover
+    def __init__(self, router_dict: Dict[str, object]) -> None:  # pragma: no cover
         """
         :param dict router_dict: contains information about an border router.
         :param str name: router element name or id
         """
-        self.interface = None # type: InterfaceElement
+        self.interface = InterfaceElement({})

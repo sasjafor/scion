@@ -16,6 +16,8 @@
 ==============================
 """
 
+from typing import Tuple
+
 
 class SCIONBaseException(Exception):
     """
@@ -23,6 +25,8 @@ class SCIONBaseException(Exception):
 
     It should probably not be raised directly.
     """
+    def __init__(self, *args: object) -> None:
+        self.args_ = args
 
 
 class SCIONBaseError(SCIONBaseException):

@@ -6,10 +6,10 @@ from lib.packet.scion_addr import SCIONAddr
 from lib.packet.scmp.payload import SCMPPayload
 from lib.packet.scmp.ext import SCMPExt
 from lib.sibra.ext.ext import SibraExtBase
-
 from lib.types import L4Proto
 
 from typing import Optional, Sized, Tuple, Union
+from py2viper_contracts.contracts import Pure
 
 
 class SCIONCommonHdr(Serializable):
@@ -71,6 +71,7 @@ class SCIONL4Packet(SCIONExtPacket):
     def parse_payload(self) -> SCMPPayload:
         ...
 
+    @Pure
     def __len__(self) -> int:
         ...
 

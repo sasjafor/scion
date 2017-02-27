@@ -1,12 +1,12 @@
 from lib.types import AddrType
-from typing import Optional, Tuple, Callable
+from typing import Optional, Tuple
 
 class Socket:
     pass
 
 
 class UDPSocket(Socket):
-    def __init__(self, bind: Optional[Tuple[str, int]], addr_type: int=AddrType.IPV6,
+    def __init__(self, bind: Optional[Tuple[str, int]] = None, addr_type: int=AddrType.IPV6,
                  reuse: bool=False) -> None:
         ...
 
@@ -18,7 +18,7 @@ class ReliableSocket(Socket):
 
 
 class SocketMgr(object):
-    def add(self, sock: UDPSocket, callback: Callable[[object], None]) -> None:
+    def add(self, sock: UDPSocket, callback: object) -> None:
         ...
 
 

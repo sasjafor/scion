@@ -13,5 +13,5 @@ class SCIONAddr(object):
         self.host = None  # type: Optional[HostAddrBase]
 
     @classmethod
-    def from_values(cls, isd_as: ISD_AS, host: HostAddrBase) -> 'SCIONAddr':  # pragma: no cover
+    def from_values(cls, isd_as: Optional[ISD_AS], host: Optional[HostAddrBase]) -> 'SCIONAddr':  # pragma: no cover
         ...

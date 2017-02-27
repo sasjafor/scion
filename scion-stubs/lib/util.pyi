@@ -15,6 +15,7 @@ def load_yaml_file(file_path: str) -> Dict[str, object]:
     ...
 
 class Raw(Sized):
+    @Pure
     def __len__(self) -> int:
         ...
 
