@@ -95,6 +95,8 @@ from typing import Optional, Tuple, Callable, Dict, Type, List
 from lib.packet.scion import SCIONExtPacket
 from lib.topology import RouterElement
 
+from py2viper_contracts.contracts import *
+
 MAX_QUEUE = 50
 
 list_object = List[object]
@@ -282,7 +284,10 @@ class SCIONElement(object):
     #         #               scmp.type, scmp_type_name(scmp.type), pkt)
     #     return None
 
-    def _parse_packet(self, packet: Raw) -> Optional[SCIONL4Packet]:
+    def _parse_packet(self, packet: bytes) -> Optional[SCIONL4Packet]:
+        Ensures(Implies(is_wellformed_packet(packet), Result() is not None and
+                                                      Result().State() and
+                                                      Result().matches(packet)))
         try:
             pkt = SCIONL4Packet(packet)
         except SCMPError as e:
@@ -299,9 +304,10 @@ class SCIONElement(object):
             return None
         except SCIONChecksumFailed:
             logging.debug("Dropping packet due to failed checksum:\n%s", pkt)
+            # TODO(marco): Shouldn't we actually return None here??
         return pkt
 
-    def _scmp_parse_error(self, packet: Raw, e: SCMPError) -> None:
+    def _scmp_parse_error(self, packet: bytes, e: SCMPError) -> None:
         # HDR_TYPE_OFFSET = 6
         # if packet[HDR_TYPE_OFFSET] == L4Proto.SCMP:
         #     # Ideally, never respond to an SCMP error with an SCMP error.

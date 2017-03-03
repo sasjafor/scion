@@ -1,5 +1,5 @@
 from typing import Optional
-
+from py2viper_contracts.contracts import *
 
 class Serializable:
     pass
@@ -24,6 +24,14 @@ class PayloadBase(Serializable):  # pragma: no cover
 
 class L4HeaderBase(Serializable):
     TYPE = None  # type: Optional[int]
+
+    @Predicate
+    def State(self) -> bool:
+        return True
+
+    @Pure
+    def matches(self, raw: bytes) -> bool:
+        return True
 
 
 class PayloadRaw(PayloadBase):  # pragma: no cover

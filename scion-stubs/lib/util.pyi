@@ -15,14 +15,32 @@ def load_yaml_file(file_path: str) -> Dict[str, object]:
     ...
 
 class Raw(Sized):
+    def __init__(self, data: bytes, desc:str="", len_:int=None,
+                 min_:bool=False) -> None:  # pragma: no cover
+        self._data = data
+        self._desc = desc
+        self._len = len_
+        self._min = min_
+        self._offset = 0
+
     @Pure
     def __len__(self) -> int:
         ...
+
+    @Predicate
+    def contents(self, data: bytes) -> bool:
+        return (Acc(self._data) and self._data == data and
+                Acc(self._desc) and
+                Acc(self._len) and
+                Acc(self._min) and
+                Acc(self._offset))
+
+
 
 
 def sleep_interval(start: float, interval: float, desc: str, quiet: bool =False) -> None:
     ...
 
 
-def hex_str(raw: Raw) -> str:
+def hex_str(raw: bytes) -> str:
     ...

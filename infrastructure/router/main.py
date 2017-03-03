@@ -727,7 +727,7 @@ class Router(SCIONElement):
     #     """
     #     self.handle_request(meta.packet, meta.addr, meta.from_local_as)
 
-    def handle_request(self, packet: Raw, _: object, from_local_socket: bool =True, sock:object =None) -> None:
+    def handle_request(self, packet: bytes, _: object, from_local_socket: bool =True, sock:object =None) -> None:
         """
         Main routine to handle incoming SCION packets.
 
