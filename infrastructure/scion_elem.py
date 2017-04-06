@@ -63,6 +63,7 @@ from lib.packet.scion import (
     SCIONBasePacket,
     SCIONL4Packet,
     build_base_hdrs,
+    is_wellformed_packet,
 )
 # from lib.packet.svc import SVC_TO_SERVICE, SERVICE_TO_SVC_A
 from lib.packet.scion_addr import SCIONAddr

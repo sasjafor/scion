@@ -216,6 +216,11 @@ class Router(SCIONElement):
         Handle SCION Packet extensions. Handlers can be defined for pre- and
         post-routing.
         """
+        Requires(Acc(spkt.State(), 1/100))
+        Requires(Unfolding(Acc(spkt.State(), 1/100), len(spkt.ext_hdrs) == 0))
+        Ensures(Acc(list_pred(Result())))
+        Ensures(Acc(spkt.State(), 1 / 100))
+        Ensures(len(Result()) == 0)
         if pre_routing_phase:
             prefix = "pre"
             # handlers = self.pre_ext_handlers  # type: Union[Dict[int, bool], Dict[int, Callable[[object, object, object], list]]]
@@ -227,8 +232,11 @@ class Router(SCIONElement):
         # only MAX_HOPBYHOP_EXT number of them. If an SCMP ext header is
         # present, it must be the first hopbyhop extension (and isn't included
         # in the MAX_HOPBYHOP_EXT check).
+        Unfold(Acc(spkt.State(), 1/100))
         count = 0
         for ext_hdr in spkt.ext_hdrs:
+            Invariant(Acc(spkt.ext_hdrs, 1/200))
+            Invariant(len(spkt.ext_hdrs) == 0)
             assert False
             # if ext_hdr.EXT_CLASS != ExtensionClass.HOP_BY_HOP:
             #     break
@@ -248,6 +256,7 @@ class Router(SCIONElement):
             #     raise SCMPBadHopByHop
             # if handler:
             #     flags.extend(cast(Callable[[object, object, object], list], handler)(ext_hdr, spkt, from_local_as))
+        Fold(Acc(spkt.State(), 1 / 100))
         return flags
 
     # def handle_traceroute(self, hdr: TracerouteExt, spkt: SCIONL4Packet, _: bool) -> List[Tuple[int, str]]:
@@ -671,6 +680,10 @@ class Router(SCIONElement):
         Go through the flags set by hop-by-hop extensions on this packet.
         :returns:
         """
+        Requires(Acc(list_pred(flags), 1/100))
+        Requires(len(flags) == 0)
+        Ensures(Acc(list_pred(flags), 1 / 100))
+        Ensures(not Result()[1])
         process = False
         # First check if any error or no_process flags are set
         for (flag, *args) in flags:

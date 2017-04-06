@@ -33,7 +33,7 @@ class SCIONPath(Serializable, Sized):
                 Acc(self.mtu))
 
     @Pure
-    def matches(self, raw: bytes) -> bool:
+    def matches(self, raw: bytes, offset: int) -> bool:
         return True
 
     def get_iof(self) -> Optional[InfoOpaqueField]:  # pragma: no cover

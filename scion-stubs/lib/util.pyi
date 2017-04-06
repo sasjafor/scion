@@ -44,3 +44,10 @@ def sleep_interval(start: float, interval: float, desc: str, quiet: bool =False)
 
 def hex_str(raw: bytes) -> str:
     ...
+
+@Pure
+def calc_padding(length: int, block_size: int) -> int:
+    if length % block_size:
+        return block_size - (length % block_size)
+    else:
+        return 0

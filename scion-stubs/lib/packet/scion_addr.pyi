@@ -4,6 +4,7 @@ from py2viper_contracts.contracts import *
 
 
 class ISD_AS:
+    LEN = 4
     def __init__(self, raw: Optional[str] = None) -> None: ...
     def to_int(self) -> int: ...
 
@@ -16,6 +17,10 @@ class SCIONAddr(object):
     @Predicate
     def State(self) -> bool:
         return Acc(self.isd_as) and Acc(self.host)
+
+    @Pure
+    def matches(self, raw: bytes, offset: int) -> bool:
+        return True
 
     @classmethod
     def from_values(cls, isd_as: Optional[ISD_AS], host: Optional[HostAddrBase]) -> 'SCIONAddr':  # pragma: no cover

@@ -24,3 +24,23 @@ class HostAddrSVC(HostAddrBase):
     LEN = 2
     NAME = "HostAddrSVC"
     MCAST = 0x8000
+
+
+IPV4LENGTH = 32
+IPV6LENGTH = 128
+
+
+class HostAddrIPv4(HostAddrBase):
+    """
+    Host IPv4 address.
+    """
+    TYPE = AddrType.IPV4
+    LEN = IPV4LENGTH // 8
+
+
+class HostAddrIPv6(HostAddrBase):
+    """
+    Host IPv6 address.
+    """
+    TYPE = AddrType.IPV6
+    LEN = IPV6LENGTH // 8

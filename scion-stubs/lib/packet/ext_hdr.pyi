@@ -1,5 +1,6 @@
 from lib.packet.packet_base import Serializable
 from typing import Optional
+from py2viper_contracts.contracts import Acc, Predicate
 
 
 class ExtensionHeader(Serializable):
@@ -11,6 +12,13 @@ class ExtensionHeader(Serializable):
     EXT_TYPE_STR = None  # type: Optional[str] # Name of extension.
     SUBHDR_LEN = 3
     MIN_PAYLOAD_LEN = MIN_LEN - SUBHDR_LEN
+
+    def __init__(self) -> None:  # pragma: no cover
+        self._hdr_len = 0
+
+    @Predicate
+    def State(self) -> bool:
+        return Acc(self._hdr_len)
 
 
 class HopByHopExtension(ExtensionHeader):

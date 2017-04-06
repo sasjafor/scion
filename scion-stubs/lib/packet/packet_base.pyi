@@ -30,7 +30,7 @@ class L4HeaderBase(Serializable):
         return True
 
     @Pure
-    def matches(self, raw: bytes) -> bool:
+    def matches(self, raw: bytes, offset: int) -> bool:
         return True
 
 
