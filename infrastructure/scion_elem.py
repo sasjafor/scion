@@ -96,7 +96,7 @@ from typing import Optional, Tuple, Callable, Dict, Type, List
 from lib.packet.scion import SCIONExtPacket
 from lib.topology import RouterElement
 
-from py2viper_contracts.contracts import *
+from nagini_contracts.contracts import *
 
 MAX_QUEUE = 50
 

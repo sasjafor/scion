@@ -1,7 +1,7 @@
 import lib.packet.scion_addr
 
 from typing import cast, List
-from py2viper_contracts.contracts import *
+from nagini_contracts.contracts import *
 
 class PathSegment:
     def short_desc(self) -> str: ...

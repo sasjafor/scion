@@ -1,5 +1,5 @@
 from typing import Dict, Optional, Sized
-from py2viper_contracts.contracts import *
+from nagini_contracts.contracts import *
 
 class SCIONTime(object):
     #_custom_time = None  # type: None

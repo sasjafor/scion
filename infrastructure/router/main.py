@@ -94,7 +94,7 @@ from lib.types import (
 from lib.util import SCIONTime, hex_str, sleep_interval
 
 
-from py2viper_contracts.contracts import *
+from nagini_contracts.contracts import *
 
 # for type annotations
 from typing import List, Tuple, Union, Callable, cast, Optional

@@ -30,7 +30,7 @@ from lib.packet.pcb import PathSegment
 from lib.packet.scion_addr import ISD_AS
 from lib.util import SCIONTime, load_yaml_file
 from typing import cast, Dict, List, Optional, Tuple
-from py2viper_contracts.contracts import *
+from nagini_contracts.contracts import *
 
 
 class PathPolicy(object):

@@ -13,17 +13,71 @@ from lib.sibra.ext.ext import SibraExtBase
 from lib.types import AddrType, L4Proto
 
 from typing import List, Optional, Sized, Tuple, Union
-from py2viper_contracts.contracts import *
+from nagini_contracts.contracts import *
 
 
 @Pure
+@ContractOnly
 def is_wellformed_packet(packet: bytes) -> bool:
-    return True
+    pass
 
 @Pure
 def is_valid_packet(packet: 'SCIONL4Packet') -> bool:
     Requires(Acc(packet.State(), 1/1000))
     return True
+
+
+@Pure
+@ContractOnly
+def get_version(raw: bytes) -> int:
+    pass
+
+
+@Pure
+@ContractOnly
+def get_source_addr_type(raw: bytes) -> int:
+    pass
+
+@Pure
+@ContractOnly
+def get_dest_addr_type(raw: bytes) -> int:
+    pass
+
+
+@Pure
+@ContractOnly
+def get_addrs_len(raw: bytes) -> int:
+    pass
+
+
+@Pure
+@ContractOnly
+def get_total_len(raw: bytes) -> int:
+    pass
+
+
+@Pure
+@ContractOnly
+def get_iof_idx(raw: bytes) -> int:
+    pass
+
+
+@Pure
+@ContractOnly
+def get_hof_idx(raw: bytes) -> int:
+    pass
+
+
+@Pure
+@ContractOnly
+def get_next_hdr(raw: bytes) -> int:
+    pass
+
+
+@Pure
+@ContractOnly
+def get_hdr_len(raw: bytes) -> int:
+    pass
 
 
 class SCIONCommonHdr(Serializable):
@@ -43,17 +97,29 @@ class SCIONCommonHdr(Serializable):
         self.hdr_len = None  # type: Optional[int]
         Fold(self.State())
 
+    # @Pure
+    # def matches(self, raw: bytes) -> bool:
+    #     Requires(self.State())
+    #     return (self.version == (raw[0] // 16) and
+    #             self.src_addr_type == ((raw[0] % 16) * 16 + (raw[1] // 64)) and
+    #             self.dst_addr_type == (raw[1] % 64) and
+    #             self.total_len == (raw[2] * 256 + raw[3]) and
+    #             self.hdr_len == raw[4] and
+    #             self._iof_idx == raw[5] and
+    #             self._hof_idx == raw[6] and
+    #             self.next_hdr == raw[7])
+
     @Pure
     def matches(self, raw: bytes) -> bool:
         Requires(self.State())
-        return (self.version == (raw[0] // 16) and
-                self.src_addr_type == ((raw[0] % 16) * 16 + (raw[1] // 64)) and
-                self.dst_addr_type == (raw[1] % 64) and
-                self.total_len == (raw[2] * 256 + raw[3]) and
-                self.hdr_len == raw[4] and
-                self._iof_idx == raw[5] and
-                self._hof_idx == raw[6] and
-                self.next_hdr == raw[7])
+        return Unfolding(self.State(), self.version is get_version(raw) and
+                self.src_addr_type is get_source_addr_type(raw) and
+                self.dst_addr_type is get_dest_addr_type(raw) and
+                self.total_len is get_total_len(raw) and
+                self.hdr_len is get_hdr_len(raw) and
+                self._iof_idx is get_iof_idx(raw) and
+                self._hof_idx is get_hof_idx(raw) and
+                self.next_hdr is get_next_hdr(raw))
 
     @Predicate
     def State(self) -> bool:
@@ -83,7 +149,7 @@ class SCIONAddrHdr(Serializable):
     @Pure
     def matches(self, raw: bytes) -> bool:
         Requires(self.State())
-        return (self.src.matches(raw, SCIONCommonHdr.LEN) and
+        return Unfolding(self.State(), self.src.matches(raw, SCIONCommonHdr.LEN) and
                 self.dst.matches(raw, SCIONCommonHdr.LEN + addr_len(self.src)) and
                 self._total_len == self.total_len())
 
@@ -105,7 +171,7 @@ class SCIONAddrHdr(Serializable):
 @Pure
 def addr_len(addr: SCIONAddr) -> int:
     Requires(Acc(addr.State()))
-    Requires(Unfolding(addr.State(), addr.host.TYPE == AddrType.IPV4 or addr.host.TYPE == AddrType.IPV6 or addr.host.TYPE == AddrType.SVC))
+    Requires(Unfolding(addr.State(), addr.host.TYPE is AddrType.IPV4 or addr.host.TYPE is AddrType.IPV6 or addr.host.TYPE is AddrType.SVC))
     type_ = Unfolding(addr.State(), addr.host.TYPE)
     if type_ == AddrType.IPV4:
         return ISD_AS.LEN + HostAddrIPv4.LEN
@@ -155,11 +221,11 @@ class SCIONL4Packet(SCIONExtPacket):
     NAME = "SCIONL4Packet"
 
     def __init__(self, raw: bytes=None) -> None:  # pragma: no cover
-        Ensures(is_wellformed_packet(raw))
+        Ensures(raw is not None and is_wellformed_packet(raw))
         Ensures(self.State())
         Ensures(self.matches(raw))
-        Exsures(SCMPError, not is_wellformed_packet(raw))
-        Exsures(SCIONBaseError, not is_wellformed_packet(raw))
+        Exsures(SCMPError, raw is None or not is_wellformed_packet(raw))
+        Exsures(SCIONBaseError, raw is None or not is_wellformed_packet(raw))
         self.l4_hdr = None  # type: Optional[L4HeaderBase]
 
     @Pure
@@ -217,7 +283,7 @@ def extension_len_rec(hdrs: List[Union[SCMPExt, SibraExtBase]], index: int) -> i
     if index == len(hdrs):
         return 0
     current = hdrs[index]  # type: ExtensionHeader
-    return current._hdr_len + extension_len_rec(hdrs, index + 1)
+    return Unfolding(current.State(), current._hdr_len) + extension_len_rec(hdrs, index + 1)
 
 def build_base_hdrs(src: SCIONAddr, dst: SCIONAddr, l4: int =L4Proto.UDP) -> Tuple[SCIONCommonHdr, SCIONAddrHdr]:
     ...

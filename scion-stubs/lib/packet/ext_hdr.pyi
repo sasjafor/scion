@@ -1,6 +1,6 @@
 from lib.packet.packet_base import Serializable
 from typing import Optional
-from py2viper_contracts.contracts import Acc, Predicate
+from nagini_contracts.contracts import Acc, Predicate
 
 
 class ExtensionHeader(Serializable):

@@ -3,7 +3,7 @@ from lib.packet.opaque_field import InfoOpaqueField, HopOpaqueField, OpaqueField
 from lib.packet.pcb import ASMarking
 from lib.util import Raw
 from typing import Optional, Sized, List, Tuple
-from py2viper_contracts.contracts import *
+from nagini_contracts.contracts import *
 
 class SCIONPath(Serializable, Sized):
     NAME = "SCIONPath"

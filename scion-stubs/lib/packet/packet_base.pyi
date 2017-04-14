@@ -1,5 +1,5 @@
 from typing import Optional
-from py2viper_contracts.contracts import *
+from nagini_contracts.contracts import *
 
 class Serializable:
     pass

@@ -68,6 +68,8 @@ from lib.types import (
 )
 from lib.util import Raw, calc_padding
 
+from nagini_contracts.contracts import *
+
 
 class SCIONCommonHdr(Serializable):
     """

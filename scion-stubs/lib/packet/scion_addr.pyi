@@ -1,6 +1,6 @@
 from lib.packet.host_addr import HostAddrBase
 from typing import Optional
-from py2viper_contracts.contracts import *
+from nagini_contracts.contracts import *
 
 
 class ISD_AS:
