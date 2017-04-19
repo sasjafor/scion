@@ -97,6 +97,7 @@ from lib.packet.scion import SCIONExtPacket
 from lib.topology import RouterElement
 
 from nagini_contracts.contracts import *
+from nagini_contracts.io_builtins import Place, token, IOOperation, IOExists1, Terminates
 
 MAX_QUEUE = 50
 
@@ -431,7 +432,7 @@ class SCIONElement(object):
     #     return SCIONL4Packet.from_values(
     #         cmn_hdr, addr_hdr, path, ext_hdrs, udp_hdr, payload)
 
-    def send(self, packet: SCIONL4Packet, dst: HostAddrBase, dst_port: int) -> None:
+    def send(self, t: Place, packet: SCIONL4Packet, dst: HostAddrBase, dst_port: int) -> Place:
         """
         Send *packet* to *dst* (to port *dst_port*) using the local socket.
         Calling ``packet.pack()`` should return :class:`bytes`, and

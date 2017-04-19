@@ -1,14 +1,70 @@
 from lib.packet.packet_base import Serializable
 from lib.defines import OPAQUE_FIELD_LEN
 from lib.util import Raw
+from typing import Dict, List, Sized, Tuple
+from nagini_contracts.contracts import Acc, ContractOnly, Ensures, Forall, Predicate, Pure, Requires, Result, Sequence
 
 
 class OpaqueField(Serializable):
     LEN = OPAQUE_FIELD_LEN
 
+    @Predicate
+    def State(self) -> bool:
+        return True
 
-class OpaqueFieldList(object):
-    pass
+
+class OpaqueFieldList(Sized):
+    def __init__(self, order: Tuple[str, ...]) -> None:  # pragma: no cover
+        """
+        :param list order:
+            A list of tokens that define the order of the opaque field labels.
+            E.g. ``[UP_IOF, UP_HOFS]`` defines that the up-segment info opaque
+            field comes before the up-segment hop opaque fields.
+        """
+        self._order = order
+        self._labels = {}  # type: Dict[str, List[OpaqueField]]
+        for label in order:
+            self._labels[label] = []
+
+    @Predicate
+    def State(self) -> bool:
+        return Acc(self._order) and Acc(self._labels) and Forall(self.contents(), lambda e: (e.State(), []))
+
+    @Pure
+    @ContractOnly
+    def contents(self) -> Sequence[OpaqueField]:
+        Requires(Acc(self._order) and Acc(self._labels))
+        Ensures(len(Result()) == self.__len__())
+
+    @Pure
+    @ContractOnly
+    def __len__(self) -> int:
+        pass
+
+    @Pure
+    @ContractOnly
+    def get_by_idx(self, idx: int) -> OpaqueField:
+        Requires(idx >= 0 and idx < self.__len__())
+        # """
+        # Get an OF by index. The index follows the order supplied when the
+        # :class:`OpaqueFieldList` object was created.
+        #
+        # :param int idx: The index to fetch.
+        # :returns: The OF at that index.
+        # :rtype: :class:`OpaqueField`
+        # :raises:
+        #     SCIONIndexError: if the index is negative, or too large.
+        # """
+        # if idx < 0:
+        #     raise SCIONIndexError("Requested OF index (%d) is negative" % idx)
+        # offset = idx
+        # for label in self._order:
+        #     group = self._labels[label]
+        #     if offset < len(group):
+        #         return group[offset]
+        #     offset -= len(group)
+        # raise SCIONIndexError("Requested OF index (%d) is out of range (max %d)"
+        #                       % (idx, len(self) - 1))
 
 
 class HopOpaqueField(OpaqueField):
@@ -38,8 +94,19 @@ class HopOpaqueField(OpaqueField):
     @classmethod
     def from_values(cls, exp_time: int, ingress_if: int=0, egress_if: int=0,
                     mac: bytes=None, xover: bool=False, verify_only: bool=False,
-                    forward_only: bool=False, recurse: bool=False) -> HopOpaqueField:
+                    forward_only: bool=False, recurse: bool=False) -> 'HopOpaqueField':
         ...
+
+    @Predicate
+    def State(self) -> bool:
+        return (Acc(self.xover) and
+                Acc(self.verify_only) and
+                Acc(self.forward_only) and
+                Acc(self.recurse) and
+                Acc(self.exp_time) and
+                Acc(self.ingress_if) and
+                Acc(self.egress_if) and
+                Acc(self.mac))
 
 
 class InfoOpaqueField(OpaqueField):
@@ -50,3 +117,12 @@ class InfoOpaqueField(OpaqueField):
         self.timestamp = 0
         self.isd = 0
         self.hops = 0
+
+    @Predicate
+    def State(self) -> bool:
+        return (Acc(self.up_flag) and
+                Acc(self.shortcut) and
+                Acc(self.peer) and
+                Acc(self.timestamp) and
+                Acc(self.isd) and
+                Acc(self.hops))

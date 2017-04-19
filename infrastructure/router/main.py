@@ -80,7 +80,7 @@ from lib.packet.scmp.ext import SCMPExt
 from lib.packet.scmp.types import SCMPClass, SCMPPathClass
 # from lib.packet.svc import SVCType, SVC_TO_SERVICE
 from lib.sibra.state.state import SibraState
-from lib.socket import UDPSocket
+from lib.socket import UDPSocket, udp_send
 from lib.thread import thread_safety_net
 from lib.types import (
     AddrType,
@@ -95,6 +95,8 @@ from lib.util import SCIONTime, hex_str, sleep_interval
 
 
 from nagini_contracts.contracts import *
+from nagini_contracts.io_builtins import Place, token, IOOperation, IOExists1, Terminates
+
 
 # for type annotations
 from typing import List, Tuple, Union, Callable, cast, Optional
@@ -163,6 +165,10 @@ class Router(SCIONElement):
         # self._socks.add(self._remote_sock, self.handle_recv)
         logging.info("IP %s:%d", self.interface.addr, self.interface.udp_port)
 
+    @Predicate
+    def State(self) -> bool:
+        return (Acc(self.interface) and self.interface.State())
+
     def _service_type(self) -> Optional[str]:
         return ROUTER_SERVICE
 
@@ -192,7 +198,7 @@ class Router(SCIONElement):
     #         name="BR.sibra_worker", daemon=True).start()
     #     SCIONElement.run(self)
 
-    def send(self, packet: SCIONL4Packet, dst: HostAddrBase, dst_port: int) -> None:
+    def send(self, t: Place, packet: SCIONL4Packet, dst: HostAddrBase, dst_port: int) -> Place:
         """
         Send a packet to dst (class of that object must implement
         __str__ which returns IP addr string) using port and local or remote
@@ -207,19 +213,20 @@ class Router(SCIONElement):
         from_local_as = dst == self.interface.to_addr
         self.handle_extensions(packet, False, from_local_as)
         if from_local_as:
-            self._remote_sock.send(packet.pack(), (str(dst), dst_port))
+            result = self._remote_sock.send(t, packet.pack(), (str(dst), dst_port))
         else:
-            self._udp_sock.send(packet.pack(), (str(dst), dst_port))
+            result = self._udp_sock.send(t, packet.pack(), (str(dst), dst_port))
+        return result[1]
 
     def handle_extensions(self, spkt: SCIONL4Packet, pre_routing_phase: bool, from_local_as: bool) -> List[Tuple[int, ...]]:
         """
         Handle SCION Packet extensions. Handlers can be defined for pre- and
         post-routing.
         """
-        Requires(Acc(spkt.State(), 1/100))
+        Requires(Acc(spkt.State(), 1/10))
         Requires(Unfolding(Acc(spkt.State(), 1/100), len(spkt.ext_hdrs) == 0))
         Ensures(Acc(list_pred(Result())))
-        Ensures(Acc(spkt.State(), 1 / 100))
+        Ensures(Acc(spkt.State(), 1 / 10))
         Ensures(len(Result()) == 0)
         if pre_routing_phase:
             prefix = "pre"
@@ -232,7 +239,7 @@ class Router(SCIONElement):
         # only MAX_HOPBYHOP_EXT number of them. If an SCMP ext header is
         # present, it must be the first hopbyhop extension (and isn't included
         # in the MAX_HOPBYHOP_EXT check).
-        Unfold(Acc(spkt.State(), 1/100))
+        Unfold(Acc(spkt.State(), 1/10))
         count = 0
         for ext_hdr in spkt.ext_hdrs:
             Invariant(Acc(spkt.ext_hdrs, 1/200))
@@ -264,20 +271,20 @@ class Router(SCIONElement):
     #     hdr.append_hop(self.addr.isd_as, self.interface.if_id)
     #     return []
 
-    def handle_one_hop_path(self, hdr: ExtensionHeader, spkt: SCIONL4Packet, from_local_as: bool) -> List[Tuple[int]]:
-        if len(spkt.path) != InfoOpaqueField.LEN + 2 * HopOpaqueField.LEN:
-            logging.error("OneHopPathExt: incorrect path length.")
-            return [(RouterFlag.ERROR,)]
-        if not from_local_as:  # Remote packet, create the 2nd Hop Field
-            info = spkt.path.get_iof() # type: Optional[InfoOpaqueField]
-            hf1 = spkt.path.get_hof_ver(ingress=True)
-            exp_time = OneHopPathExt.HOF_EXP_TIME
-            hf2 = HopOpaqueField.from_values(exp_time, self.interface.if_id, 0)
-            hf2.set_mac(self.of_gen_key, info.timestamp, hf1)
-            # FIXME(PSz): quite brutal for now:
-            spkt.path = SCIONPath.from_values(info, [hf1, hf2])
-            spkt.path.inc_hof_idx()
-        return []
+    # def handle_one_hop_path(self, hdr: ExtensionHeader, spkt: SCIONL4Packet, from_local_as: bool) -> List[Tuple[int]]:
+    #     if len(spkt.path) != InfoOpaqueField.LEN + 2 * HopOpaqueField.LEN:
+    #         logging.error("OneHopPathExt: incorrect path length.")
+    #         return [(RouterFlag.ERROR,)]
+    #     if not from_local_as:  # Remote packet, create the 2nd Hop Field
+    #         info = spkt.path.get_iof() # type: Optional[InfoOpaqueField]
+    #         hf1 = spkt.path.get_hof_ver(ingress=True)
+    #         exp_time = OneHopPathExt.HOF_EXP_TIME
+    #         hf2 = HopOpaqueField.from_values(exp_time, self.interface.if_id, 0)
+    #         hf2.set_mac(self.of_gen_key, info.timestamp, hf1)
+    #         # FIXME(PSz): quite brutal for now:
+    #         spkt.path = SCIONPath.from_values(info, [hf1, hf2])
+    #         spkt.path.inc_hof_idx()
+    #     return []
 
     # def handle_sibra(self, hdr: SibraExtBase, spkt: SCIONL4Packet, from_local_as: bool) -> List[Tuple[int, str]]:
     # def handle_sibra(self, hdr, spkt, from_local_as):
@@ -429,6 +436,7 @@ class Router(SCIONElement):
     #     return self.interface.link_type == LinkType.PARENT
     #
     def send_revocation(self, spkt: SCIONL4Packet, if_id: int, ingress: bool, path_incd: bool) -> None:
+        Requires(False)
         """
         Sends an interface revocation for 'if_id' along the path in 'spkt'.
         """
@@ -454,8 +462,9 @@ class Router(SCIONElement):
     #     # handle_data will try to send the packet to this interface first, and
     #     # then drop the packet as the interface is down.
     #     self.handle_data(rev_pkt, ingress, drop_on_error=True)
-    #
+
     def deliver(self, spkt: SCIONL4Packet, force: bool=True) -> None:
+        Requires(False)
         """
         Forwards the packet to the end destination within the current AS.
         #     :param spkt: The SCION Packet to forward.
@@ -486,29 +495,45 @@ class Router(SCIONElement):
     #     self.send(spkt, addr, SCION_UDP_EH_DATA_PORT)
 
     def verify_hof(self, path: SCIONPath, ingress: bool = True) -> None:
+        Requires(Acc(path.State(), 1/10))
+        Requires(Acc(self.State(), 1/10))
+        Ensures(Acc(path.State(), 1 / 10))
+        Ensures(Acc(self.State(), 1 / 10))
+        Exsures(SCIONBaseError, Acc(path.State(), 1 / 10))
+        Exsures(SCIONBaseError, Acc(self.State(), 1 / 10))
         """Verify freshness and authentication of an opaque field."""
         iof = path.get_iof()
+        Unfold(Acc(iof.State(), 1/10))
         ts = iof.timestamp
         hof = path.get_hof()
         prev_hof = path.get_hof_ver(ingress=ingress)
         # Check that the interface in the current hop field matches the
         # interface in the router.
 
+        Unfold(Acc(self.State(), 1/10))
         if path.get_curr_if(ingress=ingress) != self.interface.if_id:
+            Fold(Acc(iof.State(), 1 / 10))
+            Fold(Acc(self.State(), 1 / 10))
             raise SCIONIFVerificationError(hof, iof)
 
         if int(SCIONTime.get_time()) <= ts + hof.exp_time * EXP_TIME_UNIT:
             if not hof.verify_mac(self.of_gen_key, ts, prev_hof):
+                Fold(Acc(iof.State(), 1 / 10))
+                Fold(Acc(self.State(), 1 / 10))
                 raise SCIONOFVerificationError(hof, prev_hof)
         else:
+            Fold(Acc(iof.State(), 1 / 10))
+            Fold(Acc(self.State(), 1 / 10))
             raise SCIONOFExpiredError(hof)
+        Fold(Acc(iof.State(), 1 / 10))
+        Fold(Acc(self.State(), 1 / 10))
 
-    def _egress_forward(self, spkt: SCIONL4Packet) -> None:
+    def _egress_forward(self, t: Place, spkt: SCIONL4Packet) -> Place:
         logging.debug("Forwarding to remote interface: %s:%s",
                       self.interface.to_addr, self.interface.to_udp_port)
-        self.send(spkt, self.interface.to_addr, self.interface.to_udp_port)
+        self.send(t, spkt, self.interface.to_addr, self.interface.to_udp_port)
 
-    def handle_data(self, spkt: SCIONL4Packet, from_local_as: bool, drop_on_error: bool=False) -> None:
+    def handle_data(self, t: Place, spkt: SCIONL4Packet, from_local_as: bool, drop_on_error: bool=False) -> Place:
         """
         Main entry point for data packet handling.
 
@@ -521,7 +546,7 @@ class Router(SCIONElement):
             raise SCMPPathRequired()
         ingress = not from_local_as
         try:
-            self._process_data(spkt, ingress, drop_on_error)
+            return self._process_data(t, spkt, ingress, drop_on_error)
         except SCIONIFVerificationError as e:
             logging.error("Dropping packet due to not matching interfaces.\n"
                           "Current IOF: %s\nCurrent HOF: %s\n"
@@ -547,7 +572,7 @@ class Router(SCIONElement):
             logging.info("Dropping packet due to interface being down.")
             pass
 
-    def _process_data(self, spkt: SCIONL4Packet, ingress: bool, drop_on_error: bool) -> None:
+    def _process_data(self, t: Place, spkt: SCIONL4Packet, ingress: bool, drop_on_error: bool) -> Place:
         path = spkt.path
         if len(spkt) > self.topology.mtu:
             # FIXME(kormat): ignore this check for now, as PCB packets are often
@@ -566,7 +591,7 @@ class Router(SCIONElement):
         if (spkt.addrs.dst.isd_as == self.addr.isd_as and
                 spkt.path.is_on_last_segment()):
             self.deliver(spkt)
-            return
+            return t
         if ingress:
             prev_if = path.get_curr_if()
             prev_iof = path.get_iof()
@@ -596,15 +621,15 @@ class Router(SCIONElement):
         if not self.if_states[fwd_if].is_active:
             if drop_on_error:
                 logging.debug("IF is down, but drop_on_error is set, dropping")
-                return
+                return t
             self.send_revocation(spkt, fwd_if, ingress, path_incd)
-            return
+            return t
         if ingress:
             logging.debug("Sending to IF %s (%s:%s)", fwd_if, if_addr, port)
-            self.send(spkt, if_addr, port)
+            return self.send(t, spkt, if_addr, port)
         else:
             path.inc_hof_idx()
-            self._egress_forward(spkt)
+            return self._egress_forward(t, spkt)
 
     def _validate_segment_switch(self, path: SCIONPath, fwd_if: int, prev_if: int,
                                  prev_iof: InfoOpaqueField,
@@ -708,27 +733,29 @@ class Router(SCIONElement):
         return False, process
 
     def _process_fwd_flag(self, pkt: SCIONL4Packet, ifid: int=None) -> None:
-        if ifid is None:
-            logging.debug("Packet forwarded over link by extension")
-            self._egress_forward(pkt)
-            return
-        if ifid == 0:
-            logging.error("Extension asked to forward this to interface 0:\n%s",
-                          pkt)
-            return
-        next_hop = self.ifid2br[ifid]
-        logging.debug("Packet forwarded by extension via %s:%s",
-                      next_hop.addr, next_hop.port)
-        self.send(pkt, next_hop.addr, next_hop.port)
+        Requires(False)
+        # if ifid is None:
+        #     logging.debug("Packet forwarded over link by extension")
+        #     self._egress_forward(pkt)
+        #     return
+        # if ifid == 0:
+        #     logging.error("Extension asked to forward this to interface 0:\n%s",
+        #                   pkt)
+        #     return
+        # next_hop = self.ifid2br[ifid]
+        # logging.debug("Packet forwarded by extension via %s:%s",
+        #               next_hop.addr, next_hop.port)
+        # self.send(pkt, next_hop.addr, next_hop.port)
 
     def _process_deliver_flag(self, pkt: SCIONL4Packet, flag: int) -> None:
-        if (flag == RouterFlag.DELIVER and
-                pkt.addrs.dst.isd_as != self.addr.isd_as):
-            logging.error("Extension tried to deliver this locally, but this "
-                          "is not the destination ISD-AS:\n%s", pkt)
-            return
-        logging.debug("Packet delivered by extension")
-        self.deliver(pkt)
+        Requires(False)
+        # if (flag == RouterFlag.DELIVER and
+        #         pkt.addrs.dst.isd_as != self.addr.isd_as):
+        #     logging.error("Extension tried to deliver this locally, but this "
+        #                   "is not the destination ISD-AS:\n%s", pkt)
+        #     return
+        # logging.debug("Packet delivered by extension")
+        # self.deliver(pkt)
 
     # def _get_msg_meta(self, packet, addr, sock):
     #     meta = RawMetadata.from_values(packet, addr, sock == self._udp_sock)
@@ -740,7 +767,7 @@ class Router(SCIONElement):
     #     """
     #     self.handle_request(meta.packet, meta.addr, meta.from_local_as)
 
-    def handle_request(self, packet: bytes, _: object, from_local_socket: bool =True, sock:object =None) -> None:
+    def handle_request(self, t: Place, packet: bytes, _: object, from_local_socket: bool =True, sock:object =None) -> Place:
         """
         Main routine to handle incoming SCION packets.
 
@@ -752,27 +779,27 @@ class Router(SCIONElement):
         from_local_as = from_local_socket
         pkt = self._parse_packet(packet)
         if not pkt:
-            return
+            return t
         try:
             flags = self.handle_extensions(pkt, True, from_local_as)
         except SCMPError as e:
             self._scmp_validate_error(pkt, e)
-            return
+            return t
         stop, needs_local = self._process_flags(flags, pkt, from_local_as)
         if stop:
             logging.debug("Stopped processing")
-            return
+            return t
         try:
             needs_local = needs_local or self._needs_local_processing(pkt)
         except SCMPError as e:
             self._scmp_validate_error(pkt, e)
-            return
+            return t
         if needs_local:
             try:
                 pkt.parse_payload()
             except SCIONBaseError:
                 log_exception("Error parsing payload:\n%s" % hex_str(packet))
-                return
+                return t
             handler = False  # self._get_handler(pkt)
             assert False
         else:
@@ -782,9 +809,9 @@ class Router(SCIONElement):
                       "\n  %s\n  %s\n  handler: %s",
                       from_local_as, pkt.cmn_hdr, pkt.addrs, handler)
         if not handler:
-            return
+            return t
         try:
-            self.handle_data(pkt, from_local_as)
+            return self.handle_data(t, pkt, from_local_as)
         except SCMPError as e:
             self._scmp_validate_error(pkt, e)
         except SCIONBaseError:

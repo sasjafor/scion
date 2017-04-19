@@ -1,6 +1,7 @@
 from lib.packet.host_addr import HostAddrBase
 from lib.packet.scion_addr import ISD_AS
 from typing import Optional, List, Dict
+from nagini_contracts.contracts import *
 
 
 class Element(object):
@@ -51,6 +52,16 @@ class InterfaceElement(Element):
         self.to_addr = None  # type: Optional[HostAddrBase]
         self.link_type = None  # type: Optional[str]
         self.to_udp_port = None  # type: Optional[int]
+
+    @Predicate
+    def State(self) -> bool:
+        return (Acc(self.isd_as) and
+                Acc(self.if_id) and
+                Acc(self.udp_port) and
+                Acc(self.bandwidth) and
+                Acc(self.to_addr) and
+                Acc(self.link_type) and
+                Acc(self.to_udp_port))
 
 
 class RouterElement(Element):

@@ -18,7 +18,7 @@ class SCIONPath(Serializable, Sized):
     HOF_LABELS = A_HOFS, B_HOFS, C_HOFS
 
     def __init__(self, raw:Raw=None) -> None:  # pragma: no cover
-        self._ofs = OpaqueFieldList()
+        self._ofs = OpaqueFieldList(SCIONPath.OF_ORDER)
         self._iof_idx = None  # type: Optional[int]
         self._hof_idx = None  # type: Optional[int]
         self.interfaces = []  # type: List[Tuple[ASMarking, int]]
@@ -26,9 +26,11 @@ class SCIONPath(Serializable, Sized):
 
     @Predicate
     def State(self) -> bool:
-        return (Acc(self._ofs) and
-                Acc(self._iof_idx) and
-                Acc(self._hof_idx) and
+        return (Acc(self._ofs) and self._ofs.State() and
+                Acc(self._iof_idx) and isinstance(self._iof_idx, int) and
+                0 <= self._iof_idx and self._iof_idx < len(self._ofs) and
+                Acc(self._hof_idx) and isinstance(self._hof_idx, int) and
+                0 <= self._hof_idx and self._hof_idx < len(self._ofs) and
                 Acc(self.interfaces) and Acc(list_pred(self.interfaces)) and
                 Acc(self.mtu))
 
@@ -36,13 +38,21 @@ class SCIONPath(Serializable, Sized):
     def matches(self, raw: bytes, offset: int) -> bool:
         return True
 
+    @Pure
     def get_iof(self) -> Optional[InfoOpaqueField]:  # pragma: no cover
+        Requires(self.State())
+        Ensures(Unfolding(self.State(), Unfolding(self._ofs.State(), Result() is self._ofs.contents()[self._iof_idx])))
         ...
 
+    @Pure
     def get_hof(self) -> Optional[HopOpaqueField]:  # pragma: no cover
+        Requires(self.State())
+        Ensures(Unfolding(self.State(), Unfolding(self._ofs.State(), Result() is self._ofs.contents()[self._hof_idx])))
         ...
 
+    @Pure
     def get_hof_ver(self, ingress: bool =True) -> Optional[HopOpaqueField]:
+        Requires(self.State())
         ...
 
     def is_on_last_segment(self) -> bool:
