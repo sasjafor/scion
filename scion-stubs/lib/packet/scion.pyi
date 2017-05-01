@@ -14,6 +14,7 @@ from lib.types import AddrType, L4Proto
 
 from typing import List, Optional, Sized, Tuple, Union
 from nagini_contracts.contracts import *
+from nagini_contracts.io_builtins import MustTerminate
 
 
 @Pure
@@ -191,6 +192,9 @@ class SCIONBasePacket(PacketBase, Sized):
         self._payload = b""
 
     def pack(self) -> bytes:
+        Requires(Acc(self.State(), 1/100))
+        Requires(MustTerminate(2))
+        Ensures(Acc(self.State(), 1/100) and Result() is packed(self))
         ...
 
     def reversed_copy(self) -> 'SCIONBasePacket':
@@ -260,6 +264,11 @@ class SCIONL4Packet(SCIONExtPacket):
         Exsures(SCMPError, Acc(self.State(), 1/2) and not is_valid_packet(self))
         Exsures(SCIONChecksumFailed, Acc(self.State(), 1/2) and not is_valid_packet(self))
         ...
+
+@Pure
+@ContractOnly
+def packed(spkt: SCIONBasePacket) -> bytes:
+    Requires(Acc(spkt.State(), 1/1000))
 
 @Pure
 def extensions_match(next_hdr: int, hdrs: List[Union[SCMPExt, SibraExtBase]], packet: bytes, offset: int) -> bool:

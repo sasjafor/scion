@@ -18,7 +18,7 @@ class UDPSocket(Socket):
 
     def send(self, t: Place, data: bytes, dst: Tuple[str, int]=None) -> Tuple[bool, Place]:
         IOExists1(Place)(lambda t2: (
-            Requires(dst is not None and token(t) and udp_send(t, data, dst[0], dst[1], t2)),
+            Requires(dst is not None and token(t, 1) and udp_send(t, data, dst[0], dst[1], t2)),
             Ensures(Result()[1] is t2 and token(t2))
         ))
         ...

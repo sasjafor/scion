@@ -45,13 +45,13 @@ class InterfaceElement(Element):
         :param dict interface_dict: contains information about the interface.
         """
         # super().__init__(interface_dict['Addr'], name)
-        self.isd_as = None  # type: Optional[int]
-        self.if_id = None  # type: Optional[int]
-        self.udp_port = None  # type: Optional[int]
-        self.bandwidth = None  # type: Optional[int]
+        self.isd_as = 0
+        self.if_id = 0
+        self.udp_port = 0
+        self.bandwidth = 0
         self.to_addr = None  # type: Optional[HostAddrBase]
         self.link_type = None  # type: Optional[str]
-        self.to_udp_port = None  # type: Optional[int]
+        self.to_udp_port = 0
 
     @Predicate
     def State(self) -> bool:

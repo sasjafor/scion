@@ -58,7 +58,7 @@ from lib.packet.ext.traceroute import TracerouteExt
 from lib.packet.ext_hdr import ExtensionHeader
 from lib.packet.ifid import IFIDPayload
 from lib.packet.opaque_field import HopOpaqueField, InfoOpaqueField
-from lib.packet.path import SCIONPath
+from lib.packet.path import SCIONPath, valid_hof
 from lib.packet.path_mgmt.ifstate import IFStateInfo, IFStateRequest
 from lib.packet.path_mgmt.rev_info import RevocationInfo
 from lib.packet.scion_addr import SCIONAddr
@@ -95,12 +95,12 @@ from lib.util import SCIONTime, hex_str, sleep_interval
 
 
 from nagini_contracts.contracts import *
-from nagini_contracts.io_builtins import Place, token, IOOperation, IOExists1, Terminates
+from nagini_contracts.io_builtins import Place, token, IOOperation, IOExists1, Terminates, MustTerminate
 
 
 # for type annotations
 from typing import List, Tuple, Union, Callable, cast, Optional
-from lib.packet.scion import SCIONL4Packet
+from lib.packet.scion import SCIONL4Packet, packed
 from lib.packet.host_addr import HostAddrBase
 from lib.util import Raw
 from lib.topology import InterfaceElement
@@ -167,7 +167,7 @@ class Router(SCIONElement):
 
     @Predicate
     def State(self) -> bool:
-        return (Acc(self.interface) and self.interface.State())
+        return (Acc(self.interface) and self.interface.State() and Acc(self._remote_sock) and Acc(self._udp_sock))
 
     def _service_type(self) -> Optional[str]:
         return ROUTER_SERVICE
@@ -199,6 +199,11 @@ class Router(SCIONElement):
     #     SCIONElement.run(self)
 
     def send(self, t: Place, packet: SCIONL4Packet, dst: HostAddrBase, dst_port: int) -> Place:
+        IOExists1(Place)(lambda t2: (
+            Requires(Acc(self.State(), 1/9) and Acc(packet.State(), 1/8) and Unfolding(Acc(packet.State(), 1/100), len(packet.ext_hdrs) == 0)),
+            Requires(token(t, 2) and udp_send(t, packed(packet), str(dst), dst_port, t2)),
+            Ensures(Acc(self.State(), 1/9) and Acc(packet.State(), 1/8) and Result() is t2 and token(t2))
+        ))
         """
         Send a packet to dst (class of that object must implement
         __str__ which returns IP addr string) using port and local or remote
@@ -210,12 +215,14 @@ class Router(SCIONElement):
         :type dst: :class:`HostAddrBase`
         :param int dst_port: The port number of the next hop.
         """
-        from_local_as = dst == self.interface.to_addr
+        Unfold(Acc(self.State(), 1 / 9))
+        from_local_as = dst == Unfolding(Acc(self.interface.State(), 1/11), self.interface.to_addr)
         self.handle_extensions(packet, False, from_local_as)
         if from_local_as:
             result = self._remote_sock.send(t, packet.pack(), (str(dst), dst_port))
         else:
             result = self._udp_sock.send(t, packet.pack(), (str(dst), dst_port))
+        Fold(Acc(self.State(), 1 / 9))
         return result[1]
 
     def handle_extensions(self, spkt: SCIONL4Packet, pre_routing_phase: bool, from_local_as: bool) -> List[Tuple[int, ...]]:
@@ -223,10 +230,11 @@ class Router(SCIONElement):
         Handle SCION Packet extensions. Handlers can be defined for pre- and
         post-routing.
         """
-        Requires(Acc(spkt.State(), 1/10))
+        Requires(MustTerminate(2))
+        Requires(Acc(spkt.State(), 1/9))
         Requires(Unfolding(Acc(spkt.State(), 1/100), len(spkt.ext_hdrs) == 0))
         Ensures(Acc(list_pred(Result())))
-        Ensures(Acc(spkt.State(), 1 / 10))
+        Ensures(Acc(spkt.State(), 1 / 9))
         Ensures(len(Result()) == 0)
         if pre_routing_phase:
             prefix = "pre"
@@ -239,11 +247,14 @@ class Router(SCIONElement):
         # only MAX_HOPBYHOP_EXT number of them. If an SCMP ext header is
         # present, it must be the first hopbyhop extension (and isn't included
         # in the MAX_HOPBYHOP_EXT check).
-        Unfold(Acc(spkt.State(), 1/10))
+        assert Unfolding(Acc(spkt.State(), 1/100), len(spkt.ext_hdrs) == 0)
+        Unfold(Acc(spkt.State(), 1/9))
         count = 0
-        for ext_hdr in spkt.ext_hdrs:
-            Invariant(Acc(spkt.ext_hdrs, 1/200))
-            Invariant(len(spkt.ext_hdrs) == 0)
+        ext_hdrs = spkt.ext_hdrs
+        for ext_hdr in ext_hdrs:
+            # Invariant(Acc(spkt.ext_hdrs, 1/1000))
+            Invariant(Acc(list_pred(ext_hdrs), 1/1000))
+            Invariant(len(ext_hdrs) == 0)
             assert False
             # if ext_hdr.EXT_CLASS != ExtensionClass.HOP_BY_HOP:
             #     break
@@ -263,7 +274,7 @@ class Router(SCIONElement):
             #     raise SCMPBadHopByHop
             # if handler:
             #     flags.extend(cast(Callable[[object, object, object], list], handler)(ext_hdr, spkt, from_local_as))
-        Fold(Acc(spkt.State(), 1 / 100))
+        Fold(Acc(spkt.State(), 1 / 9))
         return flags
 
     # def handle_traceroute(self, hdr: TracerouteExt, spkt: SCIONL4Packet, _: bool) -> List[Tuple[int, str]]:
@@ -495,28 +506,30 @@ class Router(SCIONElement):
     #     self.send(spkt, addr, SCION_UDP_EH_DATA_PORT)
 
     def verify_hof(self, path: SCIONPath, ingress: bool = True) -> None:
-        Requires(Acc(path.State(), 1/10))
-        Requires(Acc(self.State(), 1/10))
-        Ensures(Acc(path.State(), 1 / 10))
-        Ensures(Acc(self.State(), 1 / 10))
-        Exsures(SCIONBaseError, Acc(path.State(), 1 / 10))
-        Exsures(SCIONBaseError, Acc(self.State(), 1 / 10))
+        Requires(Acc(path.State(), 1 / 9))
+        Requires(Acc(self.State(), 1 / 9))
+        Requires(Unfolding(Acc(path.State(), 1/9), isinstance(path._iof_idx, int)))
+        Requires(Unfolding(Acc(path.State(), 1 / 9), isinstance(path._hof_idx, int)))
+        Ensures(Acc(path.State(), 1 / 9))
+        Ensures(Acc(self.State(), 1 / 9))
+        Ensures(valid_hof(path))
+        Exsures(SCIONBaseError, Acc(path.State(), 1 / 9))
+        Exsures(SCIONBaseError, Acc(self.State(), 1 / 9))
+        Exsures(SCIONBaseError, not valid_hof(path))
         """Verify freshness and authentication of an opaque field."""
         iof = path.get_iof()
-        Unfold(Acc(iof.State(), 1/10))
-        ts = iof.timestamp
+        ts = Unfolding(Acc(path.State(), 1 / 9), Unfolding(Acc(path._ofs.State(), 1 / 9), Unfolding(Acc(iof.State(), 1 / 9), iof.timestamp)))
         hof = path.get_hof()
         prev_hof = path.get_hof_ver(ingress=ingress)
         # Check that the interface in the current hop field matches the
         # interface in the router.
-
         Unfold(Acc(self.State(), 1/10))
-        if path.get_curr_if(ingress=ingress) != self.interface.if_id:
+        if path.get_curr_if(ingress=ingress) != Unfolding(Acc(self.interface.State(), 1/10), self.interface.if_id):
             Fold(Acc(iof.State(), 1 / 10))
             Fold(Acc(self.State(), 1 / 10))
             raise SCIONIFVerificationError(hof, iof)
 
-        if int(SCIONTime.get_time()) <= ts + hof.exp_time * EXP_TIME_UNIT:
+        if int(SCIONTime.get_time()) <= ts + Unfolding(Acc(path.State(), 1 / 9), Unfolding(Acc(path._ofs.State(), 1 / 9), Unfolding(Acc(hof.State(), 1 / 9), hof.exp_time))) * EXP_TIME_UNIT:
             if not hof.verify_mac(self.of_gen_key, ts, prev_hof):
                 Fold(Acc(iof.State(), 1 / 10))
                 Fold(Acc(self.State(), 1 / 10))
@@ -676,14 +689,22 @@ class Router(SCIONElement):
                 "HOF.")
 
     def _calc_fwding_ingress(self, spkt: SCIONL4Packet) -> Tuple[int, bool, bool]:
+        Requires(Acc(spkt.State(), 1 / 9))
+        Requires(Unfolding(Acc(spkt.State(), 1/9), spkt.path is not None and Unfolding(Acc(spkt.path.State(), 1 / 9), isinstance(spkt.path._iof_idx, int))))
+        Requires(Unfolding(Acc(spkt.State(), 1/9), spkt.path is not None and Unfolding(Acc(spkt.path.State(), 1 / 9), isinstance(spkt.path._hof_idx, int))))
+        Ensures(Acc(spkt.State(), 1 / 9))
+        Unfold(Acc(spkt.State(), 1 / 9))
         path = spkt.path
         hof = path.get_hof()
         incd = False
         skipped_vo = False
-        if hof.xover:
+        if Unfolding(Acc(path.State(), 1/9), Unfolding(Acc(path._ofs.State(), 1/9), Unfolding(Acc(hof.State(), 1/9), hof.xover))):
             skipped_vo = path.inc_hof_idx()
             incd = True
-        return path.get_fwd_if(), incd, skipped_vo
+        result = path.get_fwd_if(), incd, skipped_vo
+        # Fold(Acc(path.State(), 1 / 9))
+        Fold(Acc(spkt.State(), 1 / 9))
+        return result
 
     def _link_type(self, if_id: int) -> Optional[str]:
         """
