@@ -33,22 +33,22 @@ class OpaqueFieldList(Sized):
     @Pure
     @ContractOnly
     def contents(self) -> Sequence[OpaqueField]:
-        Requires(Acc(self._order, 1/1000) and Acc(self._labels, 1/1000))
+        Requires(Acc(self._order) and Acc(self._labels))
         Ensures(len(Result()) == self.__len__())
 
     @Pure
     @ContractOnly
     def __len__(self) -> int:
-        Requires(Acc(self._order, 1/1000) and Acc(self._labels, 1/1000))
+        Requires(Acc(self._order) and Acc(self._labels))
         Ensures(Result() >= 0)
 
     @Pure
     @ContractOnly
     def get_by_idx(self, idx: int) -> OpaqueField:
-        Requires(Acc(self.State(), 1/1000))
-        Requires(idx >= 0 and idx < Unfolding(Acc(self.State(), 1/1000), len(self)))
-        Ensures(Result() is Unfolding(Acc(self.State(), 1/1000), self.contents()[idx]))
-        Ensures(Result() in Unfolding(Acc(self.State(), 1/1000), self.contents()))
+        Requires(self.State())
+        Requires(idx >= 0 and idx < Unfolding(self.State(), len(self)))
+        Ensures(Result() is Unfolding(self.State(), self.contents()[idx]))
+        Ensures(Result() in Unfolding(self.State(), self.contents()))
         # """
         # Get an OF by index. The index follows the order supplied when the
         # :class:`OpaqueFieldList` object was created.

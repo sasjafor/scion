@@ -167,7 +167,7 @@ class Router(SCIONElement):
 
     @Predicate
     def State(self) -> bool:
-        return (Acc(self.interface) and self.interface.State() and Acc(self._remote_sock) and Acc(self._udp_sock))
+        return (Acc(self.interface) and self.interface.State() and Acc(self._remote_sock) and Acc(self._udp_sock)) and Acc(self.topology) and Acc(self.topology.State())
 
     def _service_type(self) -> Optional[str]:
         return ROUTER_SERVICE
@@ -508,8 +508,8 @@ class Router(SCIONElement):
     def verify_hof(self, path: SCIONPath, ingress: bool = True) -> None:
         Requires(Acc(path.State(), 1 / 9))
         Requires(Acc(self.State(), 1 / 9))
-        Requires(Unfolding(Acc(path.State(), 1/9), isinstance(path._iof_idx, int)))
-        Requires(Unfolding(Acc(path.State(), 1 / 9), isinstance(path._hof_idx, int)))
+        Requires(Unfolding(Rd(path.State()), isinstance(path._iof_idx, int)))
+        Requires(Unfolding(Rd(path.State()), isinstance(path._hof_idx, int)))
         Ensures(Acc(path.State(), 1 / 9))
         Ensures(Acc(self.State(), 1 / 9))
         Ensures(valid_hof(path))
@@ -518,18 +518,19 @@ class Router(SCIONElement):
         Exsures(SCIONBaseError, not valid_hof(path))
         """Verify freshness and authentication of an opaque field."""
         iof = path.get_iof()
-        ts = Unfolding(Acc(path.State(), 1 / 9), Unfolding(Acc(path._ofs.State(), 1 / 9), Unfolding(Acc(iof.State(), 1 / 9), iof.timestamp)))
+        assert isinstance(iof, InfoOpaqueField)
+        ts = Unfolding(Rd(path.State()), Unfolding(Rd(path._ofs.State()), Unfolding(Rd(iof.State()), iof.timestamp)))
         hof = path.get_hof()
         prev_hof = path.get_hof_ver(ingress=ingress)
         # Check that the interface in the current hop field matches the
         # interface in the router.
         Unfold(Acc(self.State(), 1/10))
-        if path.get_curr_if(ingress=ingress) != Unfolding(Acc(self.interface.State(), 1/10), self.interface.if_id):
+        if path.get_curr_if(ingress=ingress) != Unfolding(Rd(self.interface.State()), self.interface.if_id):
             Fold(Acc(iof.State(), 1 / 10))
             Fold(Acc(self.State(), 1 / 10))
             raise SCIONIFVerificationError(hof, iof)
 
-        if int(SCIONTime.get_time()) <= ts + Unfolding(Acc(path.State(), 1 / 9), Unfolding(Acc(path._ofs.State(), 1 / 9), Unfolding(Acc(hof.State(), 1 / 9), hof.exp_time))) * EXP_TIME_UNIT:
+        if int(SCIONTime.get_time()) <= ts + Unfolding(Rd(path.State()), Unfolding(Rd(path._ofs.State()), Unfolding(Rd(hof.State()), hof.exp_time))) * EXP_TIME_UNIT:
             if not hof.verify_mac(self.of_gen_key, ts, prev_hof):
                 Fold(Acc(iof.State(), 1 / 10))
                 Fold(Acc(self.State(), 1 / 10))
@@ -586,8 +587,20 @@ class Router(SCIONElement):
             pass
 
     def _process_data(self, t: Place, spkt: SCIONL4Packet, ingress: bool, drop_on_error: bool) -> Place:
-        path = spkt.path
-        if len(spkt) > self.topology.mtu:
+        Requires(Acc(spkt.State(), 1 / 2))
+        Requires(Acc(self.State(), 1 / 2))
+        Requires(Unfolding(Rd(self.State()), Unfolding(Rd(self.topology.State()), isinstance(self.topology.mtu, int))))
+        Requires(Unfolding(Rd(spkt.State()), spkt.path != None))
+        Requires(Unfolding(Rd(spkt.State()), Unfolding(Rd(spkt.path.State()), isinstance(spkt.path._iof_idx, int))))
+        Requires(Unfolding(Rd(spkt.State()), Unfolding(Rd(spkt.path.State()), isinstance(spkt.path._hof_idx, int))))
+        Ensures(Acc(spkt.State(), 1 / 2))
+        Ensures(Acc(self.State(), 1 / 2))
+        Exsures(SCIONBaseError, Acc(spkt.State(), 1 / 2))
+        Exsures(SCIONBaseError, Acc(self.State(), 1 / 2))
+        Exsures(SCIONBaseError, Unfolding(Rd(spkt.State()), spkt.path != None))
+        Exsures(SCIONBaseError, Unfolding(Rd(spkt.State()), Unfolding(Rd(spkt.path.State()), not valid_hof(spkt.path))))
+        path = Unfolding(Rd(spkt.State()), spkt.path)
+        if len(spkt) > Unfolding(Rd(self.State()), Unfolding(Rd(self.topology.State()), self.topology.mtu)):
             # FIXME(kormat): ignore this check for now, as PCB packets are often
             # over MTU, it's just that udp-overlay handles fragmentation for us.
             # Once we have TCP/SCION, this check should be re-instated.
@@ -595,6 +608,7 @@ class Router(SCIONElement):
             # if on egress.
             #  raise SCMPOversizePkt("Packet larger than mtu", mtu)
             pass
+        Unfold(Acc(spkt.State(), 1 / 4))
         self.verify_hof(path, ingress=ingress)
         hof = spkt.path.get_hof()
         if hof.verify_only:
@@ -619,6 +633,7 @@ class Router(SCIONElement):
                 raise SCIONSegmentSwitchError("Skipped verify only field, but "
                                               "did not switch segments.")
         else:
+            assert False
             fwd_if = path.get_fwd_if()
             path_incd = False
         try:
@@ -627,6 +642,7 @@ class Router(SCIONElement):
         except KeyError:
             # So that the error message will show the current state of the
             # packet.
+            assert False
             spkt.update()
             logging.error("Cannot forward packet, fwd_if is invalid (%s):\n%s",
                           fwd_if, spkt)
@@ -647,6 +663,7 @@ class Router(SCIONElement):
     def _validate_segment_switch(self, path: SCIONPath, fwd_if: int, prev_if: int,
                                  prev_iof: InfoOpaqueField,
                                  prev_hof: HopOpaqueField) -> None:
+        Requires(False)
         """
         Validates switching of segments according to the following rules:
 
@@ -696,6 +713,7 @@ class Router(SCIONElement):
         Unfold(Acc(spkt.State(), 1 / 9))
         path = spkt.path
         hof = path.get_hof()
+        assert isinstance(hof, HopOpaqueField)
         incd = False
         skipped_vo = False
         if Unfolding(Acc(path.State(), 1/9), Unfolding(Acc(path._ofs.State(), 1/9), Unfolding(Acc(hof.State(), 1/9), hof.xover))):

@@ -17,6 +17,10 @@ class Topology(object):
         self.mtu = None  # type: Optional[int]
         self.isd_as = None  # type: Optional[ISD_AS]
 
+    @Predicate
+    def State(self) -> bool:
+        return Acc(self.is_core_as) and Acc(self.mtu) and Acc(self.isd_as)
+
     @classmethod
     def from_file(cls, topology_file: str) -> 'Topology':
         ...

@@ -24,7 +24,7 @@ def is_wellformed_packet(packet: bytes) -> bool:
 
 @Pure
 def is_valid_packet(packet: 'SCIONL4Packet') -> bool:
-    Requires(Acc(packet.State(), 1/1000))
+    Requires(packet.State())
     return True
 
 
@@ -268,26 +268,26 @@ class SCIONL4Packet(SCIONExtPacket):
 @Pure
 @ContractOnly
 def packed(spkt: SCIONBasePacket) -> bytes:
-    Requires(Acc(spkt.State(), 1/1000))
+    Requires(spkt.State())
 
 @Pure
 def extensions_match(next_hdr: int, hdrs: List[Union[SCMPExt, SibraExtBase]], packet: bytes, offset: int) -> bool:
-    Requires(Acc(list_pred(hdrs), 1/200))
-    Requires(Forall(hdrs, lambda e: (Acc(e.State(), 1/200), [])))
+    Requires(Acc(list_pred(hdrs)))
+    Requires(Forall(hdrs, lambda e: (e.State(), [])))
     if len(hdrs) == 0:
         return next_hdr not in L4Proto.L4
     return False
 
 @Pure
 def extension_len(hdrs: List[Union[SCMPExt, SibraExtBase]]) -> int:
-    Requires(Acc(list_pred(hdrs), 1/200))
-    Requires(Forall(hdrs, lambda e: (Acc(e.State(), 1/200), [])))
+    Requires(Acc(list_pred(hdrs)))
+    Requires(Forall(hdrs, lambda e: (e.State(), [])))
     return extension_len_rec(hdrs, 0)
 
 @Pure
 def extension_len_rec(hdrs: List[Union[SCMPExt, SibraExtBase]], index: int) -> int:
-    Requires(Acc(list_pred(hdrs), 1/200))
-    Requires(Forall(hdrs, lambda e: (Acc(e.State(), 1/200), [])))
+    Requires(Acc(list_pred(hdrs)))
+    Requires(Forall(hdrs, lambda e: (e.State(), [])))
     Requires(index >= 0 and index <= len(hdrs))
     if index == len(hdrs):
         return 0
