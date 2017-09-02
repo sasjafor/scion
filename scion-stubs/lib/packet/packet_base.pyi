@@ -1,5 +1,4 @@
 from typing import Optional
-from nagini_contracts.contracts import *
 
 class Serializable:
     pass
@@ -25,11 +24,6 @@ class PayloadBase(Serializable):  # pragma: no cover
 class L4HeaderBase(Serializable):
     TYPE = None  # type: Optional[int]
 
-    @Predicate
-    def State(self) -> bool:
-        return True
-
-    @Pure
     def matches(self, raw: bytes, offset: int) -> bool:
         return True
 

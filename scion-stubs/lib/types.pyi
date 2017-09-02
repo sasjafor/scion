@@ -1,7 +1,7 @@
 
 class TypeBase(object):
-    @classmethod
-    def to_str(cls, type_: int, error: bool=False) -> object:
+    @staticmethod
+    def to_str(type_: int, error: bool=False) -> object:
         ...
 
 ############################

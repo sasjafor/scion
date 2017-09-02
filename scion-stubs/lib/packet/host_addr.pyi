@@ -1,15 +1,12 @@
 from lib.types import AddrType
 from lib.packet.packet_base import Serializable
 from typing import Optional
-from nagini_contracts.contracts import ContractOnly, Pure
 
 
 class HostAddrBase(Serializable):
     TYPE = None  # type: Optional[int]
     LEN = None  # type: Optional[int]
 
-    @Pure
-    @ContractOnly
     def __str__(self) -> str:
         ...
 

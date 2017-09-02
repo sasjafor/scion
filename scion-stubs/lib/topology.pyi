@@ -1,7 +1,6 @@
 from lib.packet.host_addr import HostAddrBase
 from lib.packet.scion_addr import ISD_AS
 from typing import Optional, List, Dict
-from nagini_contracts.contracts import *
 
 
 class Element(object):
@@ -17,12 +16,9 @@ class Topology(object):
         self.mtu = None  # type: Optional[int]
         self.isd_as = None  # type: Optional[ISD_AS]
 
-    @Predicate
-    def State(self) -> bool:
-        return Acc(self.is_core_as) and Acc(self.mtu) and Acc(self.isd_as)
 
-    @classmethod
-    def from_file(cls, topology_file: str) -> 'Topology':
+    @staticmethod
+    def from_file(topology_file: str) -> 'Topology':
         ...
 
     def get_own_config(self, server_type: str, server_id: str) -> Element:
@@ -56,16 +52,6 @@ class InterfaceElement(Element):
         self.to_addr = None  # type: Optional[HostAddrBase]
         self.link_type = None  # type: Optional[str]
         self.to_udp_port = 0
-
-    @Predicate
-    def State(self) -> bool:
-        return (Acc(self.isd_as) and
-                Acc(self.if_id) and
-                Acc(self.udp_port) and
-                Acc(self.bandwidth) and
-                Acc(self.to_addr) and
-                Acc(self.link_type) and
-                Acc(self.to_udp_port))
 
 
 class RouterElement(Element):

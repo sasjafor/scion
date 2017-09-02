@@ -1,6 +1,5 @@
 from lib.packet.packet_base import Serializable
 from typing import Optional
-from nagini_contracts.contracts import Acc, Predicate
 
 
 class ExtensionHeader(Serializable):
@@ -16,9 +15,6 @@ class ExtensionHeader(Serializable):
     def __init__(self) -> None:  # pragma: no cover
         self._hdr_len = 0
 
-    @Predicate
-    def State(self) -> bool:
-        return Acc(self._hdr_len)
 
 
 class HopByHopExtension(ExtensionHeader):

@@ -96,13 +96,8 @@ from typing import Optional, Tuple, Callable, Dict, Type, List
 from lib.packet.scion import SCIONExtPacket
 from lib.topology import RouterElement
 
-from nagini_contracts.contracts import *
-from nagini_contracts.io_builtins import Place, token, IOOperation, IOExists1, Terminates
 
 MAX_QUEUE = 50
-
-list_object = List[object]
-
 
 class SCIONElement(object):
     """
@@ -151,7 +146,7 @@ class SCIONElement(object):
         self.init_ifid2br()
         self.trust_store = TrustStore(self.conf_dir)
         self.total_dropped = 0
-        self._core_ases = defaultdict(list_object)  # type: defaultdict[int, List[object]] # Mapping ISD_ID->list of core ASes
+        self._core_ases = defaultdict(2, [object()])  # type: defaultdict[int, List[object]] # Mapping ISD_ID->list of core ASes
         self.init_core_ases()
         self.run_flag = threading.Event()
         self.run_flag.set()
@@ -287,9 +282,6 @@ class SCIONElement(object):
     #     return None
 
     def _parse_packet(self, packet: bytes) -> Optional[SCIONL4Packet]:
-        Ensures(Implies(is_wellformed_packet(packet), Result() is not None and
-                                                      Result().State() and
-                                                      Result().matches(packet)))
         try:
             pkt = SCIONL4Packet(packet)
         except SCMPError as e:
@@ -432,7 +424,7 @@ class SCIONElement(object):
     #     return SCIONL4Packet.from_values(
     #         cmn_hdr, addr_hdr, path, ext_hdrs, udp_hdr, payload)
 
-    def send(self, t: Place, packet: SCIONL4Packet, dst: HostAddrBase, dst_port: int) -> Place:
+    def send(self, packet: SCIONL4Packet, dst: HostAddrBase, dst_port: int):
         """
         Send *packet* to *dst* (to port *dst_port*) using the local socket.
         Calling ``packet.pack()`` should return :class:`bytes`, and

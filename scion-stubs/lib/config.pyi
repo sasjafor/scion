@@ -6,6 +6,6 @@ class Config(object):
         self.registers_paths = 0
         self.cert_ver = 0
 
-    @classmethod
-    def from_file(cls, config_file: str) -> 'Config':
+    @staticmethod
+    def from_file(config_file: str) -> 'Config':
         ...

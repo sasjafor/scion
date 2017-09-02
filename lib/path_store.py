@@ -17,9 +17,9 @@
 """
 # Stdlib
 import copy
-import heapq
+# import heapq
 import logging
-import math
+# import math
 ###from collections import defaultdict, deque
 
 # External
@@ -30,13 +30,11 @@ from lib.packet.pcb import PathSegment
 from lib.packet.scion_addr import ISD_AS
 from lib.util import SCIONTime, load_yaml_file
 from typing import cast, Dict, List, Optional, Tuple
-from nagini_contracts.contracts import *
 
 
 class PathPolicy(object):
     """Stores a path policy."""
-    def __init__(self) -> None:  # pragma: no cover
-        Ensures(self.State())
+    def __init__(self):  # pragma: no cover
         self.best_set_size = 5
         self.candidates_set_size = 20
         self.history_limit = 0
@@ -45,26 +43,10 @@ class PathPolicy(object):
         self.unwanted_ases = []  # type: List[ISD_AS]
         self.property_ranges = {}  # type: Dict[str, Tuple[int, int]]
         self.property_weights = {}  # type: Dict[str, int]
-        Fold(self.State())
 
-    @Predicate
-    def State(self) -> bool:
-        return (Acc(self.best_set_size) and
-                Acc(self.candidates_set_size) and
-                Acc(self.history_limit) and
-                Acc(self.update_after_number) and
-                Acc(self.update_after_time) and
-                Acc(self.unwanted_ases) and Acc(list_pred(self.unwanted_ases)) and
-                Acc(self.property_ranges) and Acc(dict_pred(self.property_ranges)) and
-                Acc(self.property_weights)) and Acc(dict_pred(self.property_weights))
 
-    def get_path_policy_dict(self) -> Dict[str, object]:  # pragma: no cover
-        Requires(Acc(self.State(), 1/100))
-        Ensures(Acc(self.State(), 1/100))
-        Ensures(Acc(dict_pred(Result())))
-        Ensures('best_set_size' in Result())
-        """Return path policy info in a dictionary."""
-        Unfold(Acc(self.State(), 1/100))
+
+    def get_path_policy_dict(self):  # pragma: no cover
         result = {
             'best_set_size': self.best_set_size,
             'candidates_set_size': self.candidates_set_size,
@@ -75,15 +57,9 @@ class PathPolicy(object):
             'property_ranges': self.property_ranges,
             'property_weights': self.property_weights
         }
-        Fold(Acc(self.State(), 1/100))
         return result
 
-    def check_filters(self, pcb: PathSegment) -> bool:
-        Requires(Acc(pcb.State(), 1/10))
-        Requires(Acc(self.State(), 1 / 7))
-        Requires(self.valid_ranges())
-        Ensures(Acc(pcb.State(), 1 / 10))
-        Ensures(Acc(self.State(), 1 / 7))
+    def check_filters(self, pcb):
         """
         Runs some checks, including: unwanted ASes and min/max property values.
 
@@ -107,16 +83,12 @@ class PathPolicy(object):
         ia = self._check_remote_ifid(pcb)
         if ia:
             logging.error("PathStore: pcb discarded, remote IFID of %s unknown",
-
+"", ""
                           )
             return False
         return True
 
-    def _check_unwanted_ases(self, pcb: PathSegment) -> Optional[ISD_AS]:  # pragma: no cover
-        Requires(Acc(pcb.State(), 1/20))
-        Requires(Acc(self.State(), 1/8))
-        Ensures(Acc(pcb.State(), 1 / 20))
-        Ensures(Acc(self.State(), 1 / 8))
+    def _check_unwanted_ases(self, pcb):  # pragma: no cover
         """
         Checks whether any of the ASes in the path belong to the black list.
 
@@ -125,35 +97,19 @@ class PathPolicy(object):
         """
         asms = pcb.iter_asms()
         for asm in asms:
-            Invariant(Forall(asms, lambda a: (Acc(a.State(), 1 / 4), [])))
-            Invariant(Acc(self.State(), 1/9))
-            Invariant(Acc(pcb.State(), 1 / 20))
             isd_as = asm.isd_as()
-            Unfold(Acc(self.State(), 1/10))
             if isd_as in self.unwanted_ases:
-                Fold(Acc(self.State(), 1 / 10))
                 return isd_as
-            Fold(Acc(self.State(), 1 / 10))
 
-    def _check_range(self, reasons: List[str], name: str, actual: int) -> None:
-        Requires(Acc(list_pred(reasons)))
-        Requires(Acc(self.State(), 1/200))
-        Requires(Unfolding(Acc(self.State(), 1/400), name in self.property_ranges))
-        Ensures(Acc(list_pred(reasons)))
-        Ensures(Acc(self.State(), 1 / 200))
-
-        range_ = Unfolding(Acc(self.State(), 1/300), self.property_ranges[name])
+    def _check_range(self, reasons, name, actual):
+        range_ = self.property_ranges[name]
         if not range_:
             return
         if (actual < range_[0] or actual > range_[1]):
             reasons.append("%s: %d <= %d <= %d" % (
                 name, range_[0], actual, range_[1]))
 
-    def _check_property_ranges(self, pcb: PathSegment) -> List[str]:
-        Requires(Acc(self.State(), 1 / 100))
-        Requires(self.valid_ranges())
-        Ensures(Acc(self.State(), 1 / 100))
-        Ensures(Acc(list_pred(Result())))
+    def _check_property_ranges(self, pcb):
         """
         Checks whether any of the path properties has a value outside the
         predefined min-max range.
@@ -162,7 +118,7 @@ class PathPolicy(object):
         :type pcb: :class:`PathSegment`
         """
 
-        reasons = []  # type: List[str]
+        reasons = []
         self._check_range(reasons, "PeerLinks", pcb.get_n_peer_links())
         self._check_range(reasons, "HopsLength", pcb.get_n_hops())
         self._check_range(reasons, "DelayTime",
@@ -172,9 +128,7 @@ class PathPolicy(object):
         self._check_range(reasons, "TotalBandwidth", 10)
         return reasons
 
-    def _check_remote_ifid(self, pcb: PathSegment) -> Optional[ISD_AS]:
-        Requires(Acc(pcb.State(), 1 / 20))
-        Ensures(Acc(pcb.State(), 1 / 20))
+    def _check_remote_ifid(self, pcb):
         """
         Checkes whether any PCB markings have unset remote IFID values for
         up/downstream ASes. This can happen during normal startup depending
@@ -185,59 +139,42 @@ class PathPolicy(object):
         """
         asms = pcb.iter_asms()
         for asm in asms:
-            Invariant(Forall(asms, lambda a: (Acc(a.State(), 1 / 4), [])))
             pcbms = asm.iter_pcbms()
             for pcbm in pcbms:
-                Invariant(Forall(pcbms, lambda p: (Acc(p.State(), 1 / 4), [])))
                 if (pcbm.inIA().to_int() and
-                        not Unfolding(Acc(pcbm.State(), 1/8),
-                                      Unfolding(Acc(pcbm.p.State(), 1/16), pcbm.p.inIF))):
+                        not pcbm.p.inIF):
                     return pcbm.inIA()
                 if (pcbm.outIA().to_int() and
-                        not Unfolding(Acc(pcbm.State(), 1/8),
-                                      Unfolding(Acc(pcbm.p.State(), 1/16), pcbm.p.outIF))):
+                        not pcbm.p.outIF):
                     return pcbm.outIA()
         return None
 
-    @classmethod
-    def from_file(cls, policy_file: str) -> 'PathPolicy':  # pragma: no cover
+    @staticmethod
+    def from_file(policy_file):  # pragma: no cover
         """
         Create a PathPolicy instance from the file.
 
         :param str policy_file: path to the path policy file
         """
-        return cls.from_dict(load_yaml_file(policy_file))
+        return PathPolicy.from_dict(load_yaml_file(policy_file))
 
-    @classmethod
-    def from_dict(cls, policy_dict: Dict[str, object]) -> 'PathPolicy':  # pragma: no cover
-        Requires(Acc(dict_pred(policy_dict), 1/10))
-        Requires(valid_policy(policy_dict))
-        Requires(Acc(dict_pred(policy_dict['PropertyRanges'])))
-        Requires(Acc(dict_pred(policy_dict['PropertyWeights'])))
-        Ensures(Acc(dict_pred(policy_dict), 1 / 10))
+    @staticmethod
+    def from_dict(policy_dict):  # pragma: no cover
         """
         Create a PathPolicy instance from the dictionary.
 
         :param dict policy_dict: dictionary representation of path policy
         """
-        path_policy = cls()
+        path_policy = PathPolicy()
         path_policy.parse_dict(policy_dict)
         return path_policy
 
-    def parse_dict(self, path_policy: Dict[str, object]) -> None:
-        Requires(self.State())
-        Requires(Acc(dict_pred(path_policy), 1/20))
-        Requires(valid_policy(path_policy))
-        Requires(Acc(dict_pred(path_policy['PropertyRanges'])))
-        Requires(Acc(dict_pred(path_policy['PropertyWeights'])))
-        Ensures(self.State())
-        Ensures(Acc(dict_pred(path_policy), 1 / 20))
+    def parse_dict(self, path_policy):
         """
         Parses the policies from the dictionary.
 
         :param dict path_policy: path policy.
         """
-        Unfold(self.State())
         self.best_set_size = cast(int, path_policy['BestSetSize'])
         self.candidates_set_size = cast(int, path_policy['CandidatesSetSize'])
         self.history_limit = cast(int, path_policy['HistoryLimit'])
@@ -245,183 +182,128 @@ class PathPolicy(object):
         self.update_after_time = cast(int, path_policy['UpdateAfterTime'])
         unwanted_ases = cast(str, path_policy['UnwantedASes']).split(',')
         for unwanted in unwanted_ases:
-            Invariant(Acc(self.unwanted_ases, 1/2) and Acc(list_pred(self.unwanted_ases)))
             self.unwanted_ases.append(ISD_AS(unwanted))
         property_ranges = cast(Dict[str, str], path_policy['PropertyRanges'])
         for key in property_ranges:
-            Invariant(Acc(self.property_ranges, 1/2) and Acc(dict_pred(self.property_ranges)))
             property_range = property_ranges[key].split('-')
             property_range_temp = int(property_range[0]), int(property_range[1])
             self.property_ranges[key] = property_range_temp
         self.property_weights = cast(Dict[str, int], path_policy['PropertyWeights'])
-        Fold(self.State())
 
-    @Pure
-    def valid_ranges(self) -> bool:
-        Requires(Acc(self.State(), 1/200))
-        return Unfolding(Acc(self.State(), 1/200),
-                         'PeerLinks' in self.property_ranges and
-                         'HopsLength' in self.property_ranges and
-                         'DelayTime' in self.property_ranges and
-                         'GuaranteedBandwidth' in self.property_ranges and
-                         'AvailableBandwidth' in self.property_ranges and
-                         'TotalBandwidth' in self.property_ranges
-                         )
-
-    def __str__(self) -> str:
-        Requires(Acc(self.State(), 1/10))
-        Ensures(Acc(self.State(), 1 / 10))
+    def __str__(self):
         path_policy_dict = self.get_path_policy_dict()
         path_policy_str = yaml.dump(path_policy_dict)
         return path_policy_str
 
-DICT_STR_STR = Dict[str, str]
-DICT_STR_INT = Dict[str, int]
 
 
-@Pure
-def valid_policy(path_policy: Dict[str, object]) -> bool:
-    Requires(Acc(dict_pred(path_policy), 1 / 1000))
-    return ('BestSetSize' in path_policy and
-            'CandidatesSetSize' in path_policy and
-            'HistoryLimit' in path_policy and
-            'UpdateAfterNumber' in path_policy and
-            'UpdateAfterTime' in path_policy and
-            'UnwantedASes' in path_policy and
-            'PropertyRanges' in path_policy and
-            'PropertyWeights' in path_policy and
-            isinstance(path_policy['BestSetSize'], int) and
-            isinstance(path_policy['CandidatesSetSize'], int) and
-            isinstance(path_policy['HistoryLimit'], int) and
-            isinstance(path_policy['UpdateAfterNumber'], int) and
-            isinstance(path_policy['UpdateAfterTime'], int) and
-            isinstance(path_policy['UnwantedASes'], str) and
-            isinstance(path_policy['PropertyRanges'], DICT_STR_STR) and
-            isinstance(path_policy['PropertyWeights'], DICT_STR_INT))
+class PathStoreRecord(object):
+    """
+    Path record that gets stored in the the PathStore.
+
+    :cvar int DEFAULT_OFFSET:
+        the amount of time subtracted from the current time when the path's
+        initial last sent time is set.
+    :ivar pcb: the PCB representing the record.
+    :vartype pcb: :class:`lib.packet.pcb.PathSegment`
+    :ivar bytes id: the path segment identifier stored in the record's PCB.
+    :ivar float fidelity: the fidelity of the path record.
+    :ivar float peer_links:
+        the normalized number of peer links in the path segment.
+    :ivar float hops_length: the normalized length of the path segment.
+    :ivar float disjointness:
+        the normalized disjointness of the path segment compared to the other
+        paths in the PathStore.
+    :ivar int last_sent_time:
+        the Unix time at which the path segment was last sent.
+    :ivar int last_seen_time:
+        the Unix time at which the path segment was last seen.
+    :ivar float delay_time:
+        the normalized time in seconds between the PCB's creation and the time
+        it was last seen by the path server.
+    :ivar int expiration_time: the Unix time at which the path segment expires.
+    :ivar int guaranteed_bandwidth: the path segment's guaranteed bandwidth.
+    :ivar int available_bandwidth: the path segment's available bandwidth.
+    :ivar int total_bandwidth: the path segment's total bandwidth.
+    """
+    DEFAULT_OFFSET = 3600 * 24 * 7  # 1 week
+
+    def __init__(self, pcb):
+        """
+        :param pcb: beacon to analyze.
+        :type pcb: :class:`PathSegment`
+        """
+        assert isinstance(pcb, PathSegment)
+        self.id = pcb.get_hops_hash(hex=True)
+        self.peer_links = pcb.get_n_peer_links()
+        self.hops_length = pcb.get_n_hops()
+        self.fidelity = 0
+        self.disjointness = 0
+        self.last_sent_time = int(SCIONTime.get_time()) - self.DEFAULT_OFFSET
+        self.guaranteed_bandwidth = 0
+        self.available_bandwidth = 0
+        self.total_bandwidth = 0
+        self.last_seen_time = -1
+        self.update(pcb)
+
+    def update(self, pcb):
+        """
+        Update a candidate entry from a recent PCB.
+        """
+        assert self.id == pcb.get_hops_hash(hex=True)
+        now = int(SCIONTime.get_time())
+        self.pcb = copy.deepcopy(pcb)
+        self.delay_time = now - pcb.get_timestamp()
+        self.last_seen_time = now
+        self.expiration_time = pcb.get_expiration_time()
+
+    def sending(self):  # pragma: no cover
+        """
+        Update last_sent_time to now.
+        """
+        self.last_sent_time = int(SCIONTime.get_time())
+
+    def update_fidelity(self, path_policy):
+        """
+        Computes a path fidelity based on all path properties and considering
+        the corresponding weights, which are stored in the path policy.
+
+        :param dict path_policy: path policy.
+        """
+        self.fidelity = 0
+        now = SCIONTime.get_time()
+        self.fidelity += (path_policy.property_weights['PeerLinks'] *
+                          self.peer_links)
+        self.fidelity += (path_policy.property_weights['HopsLength'] //
+                          self.hops_length)
+        self.fidelity += (path_policy.property_weights['Disjointness'] *
+                          self.disjointness)
+        if now != 0:
+            self.fidelity += (path_policy.property_weights['LastSentTime'] *
+                              (now - self.last_sent_time) // now)
+            self.fidelity += (path_policy.property_weights['LastSeenTime'] *
+                              self.last_seen_time // now)
+        self.fidelity += (path_policy.property_weights['DelayTime'] //
+                          self.delay_time)
+        self.fidelity += (path_policy.property_weights['ExpirationTime'] *
+                          (self.expiration_time - now) // self.expiration_time)
+        self.fidelity += (path_policy.property_weights['GuaranteedBandwidth'] *
+                          self.guaranteed_bandwidth)
+        self.fidelity += (path_policy.property_weights['AvailableBandwidth'] *
+                          self.available_bandwidth)
+        self.fidelity += (path_policy.property_weights['TotalBandwidth'] *
+                          self.total_bandwidth)
+
+    def __eq__(self, other):  # pragma: no cover
+        if isinstance(other, PathStoreRecord):
+            return self.id == other.id
+        return False
+
+    def __str__(self):
+        return "PathStoreRecord: ID: %s Fidelity: %s" % (
+            self.id, self.fidelity)
 
 
-# class PathStoreRecord(object):
-#     """
-#     Path record that gets stored in the the PathStore.
-#
-#     :cvar int DEFAULT_OFFSET:
-#         the amount of time subtracted from the current time when the path's
-#         initial last sent time is set.
-#     :ivar pcb: the PCB representing the record.
-#     :vartype pcb: :class:`lib.packet.pcb.PathSegment`
-#     :ivar bytes id: the path segment identifier stored in the record's PCB.
-#     :ivar float fidelity: the fidelity of the path record.
-#     :ivar float peer_links:
-#         the normalized number of peer links in the path segment.
-#     :ivar float hops_length: the normalized length of the path segment.
-#     :ivar float disjointness:
-#         the normalized disjointness of the path segment compared to the other
-#         paths in the PathStore.
-#     :ivar int last_sent_time:
-#         the Unix time at which the path segment was last sent.
-#     :ivar int last_seen_time:
-#         the Unix time at which the path segment was last seen.
-#     :ivar float delay_time:
-#         the normalized time in seconds between the PCB's creation and the time
-#         it was last seen by the path server.
-#     :ivar int expiration_time: the Unix time at which the path segment expires.
-#     :ivar int guaranteed_bandwidth: the path segment's guaranteed bandwidth.
-#     :ivar int available_bandwidth: the path segment's available bandwidth.
-#     :ivar int total_bandwidth: the path segment's total bandwidth.
-#     """
-#     DEFAULT_OFFSET = 3600 * 24 * 7  # 1 week
-#
-#     def __init__(self, pcb: PathSegment) -> None:
-#         """
-#         :param pcb: beacon to analyze.
-#         :type pcb: :class:`PathSegment`
-#         """
-#         assert isinstance(pcb, PathSegment)
-#         self.id = pcb.get_hops_hash(hex=True)
-#         self.peer_links = pcb.get_n_peer_links()
-#         self.hops_length = pcb.get_n_hops()
-#         self.fidelity = 0
-#         self.disjointness = 0
-#         self.last_sent_time = int(SCIONTime.get_time()) - self.DEFAULT_OFFSET
-#         self.guaranteed_bandwidth = 0
-#         self.available_bandwidth = 0
-#         self.total_bandwidth = 0
-#         self.last_seen_time = -1
-#         self.update(pcb)
-#
-#     @Predicate
-#     def State(self) -> bool:
-#         return (Acc(self.id) and
-#                 Acc(self.peer_links) and
-#                 Acc(self.hops_length) and
-#                 Acc(self.fidelity) and
-#                 Acc(self.disjointness) and
-#                 Acc(self.last_sent_time) and
-#                 Acc(self.guaranteed_bandwidth) and
-#                 Acc(self.available_bandwidth) and
-#                 Acc(self.total_bandwidth) and
-#                 Acc(self.last_seen_time))
-#
-#     def update(self, pcb: PathSegment) -> None:
-#         """
-#         Update a candidate entry from a recent PCB.
-#         """
-#         assert self.id == pcb.get_hops_hash(hex=True)
-#         now = int(SCIONTime.get_time())
-#         self.pcb = copy.deepcopy(pcb)
-#         self.delay_time = now - pcb.get_timestamp()
-#         self.last_seen_time = now
-#         self.expiration_time = pcb.get_expiration_time()
-#
-#     def sending(self) -> None:  # pragma: no cover
-#         """
-#         Update last_sent_time to now.
-#         """
-#         self.last_sent_time = int(SCIONTime.get_time())
-#
-#     def update_fidelity(self, path_policy: PathPolicy) -> None:
-#         Requires(Acc(path_policy.State(), 1/100))
-#         Requires(path_policy.valid_ranges())
-#         """
-#         Computes a path fidelity based on all path properties and considering
-#         the corresponding weights, which are stored in the path policy.
-#
-#         :param dict path_policy: path policy.
-#         """
-#         self.fidelity = 0
-#         now = SCIONTime.get_time()
-#         self.fidelity += (path_policy.property_weights['PeerLinks'] *
-#                           self.peer_links)
-#         self.fidelity += (path_policy.property_weights['HopsLength'] //
-#                           self.hops_length)
-#         self.fidelity += (path_policy.property_weights['Disjointness'] *
-#                           self.disjointness)
-#         if now != 0:
-#             self.fidelity += (path_policy.property_weights['LastSentTime'] *
-#                               (now - self.last_sent_time) // now)
-#             self.fidelity += (path_policy.property_weights['LastSeenTime'] *
-#                               self.last_seen_time // now)
-#         self.fidelity += (path_policy.property_weights['DelayTime'] //
-#                           self.delay_time)
-#         self.fidelity += (path_policy.property_weights['ExpirationTime'] *
-#                           (self.expiration_time - now) // self.expiration_time)
-#         self.fidelity += (path_policy.property_weights['GuaranteedBandwidth'] *
-#                           self.guaranteed_bandwidth)
-#         self.fidelity += (path_policy.property_weights['AvailableBandwidth'] *
-#                           self.available_bandwidth)
-#         self.fidelity += (path_policy.property_weights['TotalBandwidth'] *
-#                           self.total_bandwidth)
-
-    # def __eq__(self, other):  # pragma: no cover
-    #     if type(other) is not type(self):
-    #         return False
-    #     return self.id == other.id
-    #
-    # def __str__(self):
-    #     return "PathStoreRecord: ID: %s Fidelity: %s" % (
-    #         self.id, self.fidelity)
-#
-#
 # class PathStore(object):
 #     """Path Store class."""
 #     def __init__(self, path_policy):  # pragma: no cover

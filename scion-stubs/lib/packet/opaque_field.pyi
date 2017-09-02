@@ -2,19 +2,16 @@ from lib.packet.packet_base import Serializable
 from lib.defines import OPAQUE_FIELD_LEN
 from lib.util import Raw
 from typing import Dict, List, Sized, Tuple
-from nagini_contracts.contracts import Acc, ContractOnly, Ensures, Forall, Implies, Predicate, Pure, Requires, Result, Sequence, Unfolding
 
 
 class OpaqueField(Serializable):
     LEN = OPAQUE_FIELD_LEN
 
-    @Predicate
-    def State(self) -> bool:
-        return True
 
 
-class OpaqueFieldList(Sized):
-    def __init__(self, order: Tuple[str, ...]) -> None:  # pragma: no cover
+
+class OpaqueFieldList():
+    def __init__(self, order: Tuple[str, str, str, str, str, str]) -> None:  # pragma: no cover
         """
         :param list order:
             A list of tokens that define the order of the opaque field labels.
@@ -26,29 +23,13 @@ class OpaqueFieldList(Sized):
         for label in order:
             self._labels[label] = []
 
-    @Predicate
-    def State(self) -> bool:
-        return Acc(self._order) and Acc(self._labels) and Forall(self.contents(), lambda e: (e.State(), [[e in self.contents()]]))
 
-    @Pure
-    @ContractOnly
-    def contents(self) -> Sequence[OpaqueField]:
-        Requires(Acc(self._order) and Acc(self._labels))
-        Ensures(len(Result()) == self.__len__())
-
-    @Pure
-    @ContractOnly
     def __len__(self) -> int:
-        Requires(Acc(self._order) and Acc(self._labels))
-        Ensures(Result() >= 0)
+        ...
 
-    @Pure
-    @ContractOnly
+
     def get_by_idx(self, idx: int) -> OpaqueField:
-        Requires(self.State())
-        Requires(idx >= 0 and idx < Unfolding(self.State(), len(self)))
-        Ensures(Result() is Unfolding(self.State(), self.contents()[idx]))
-        Ensures(Result() in Unfolding(self.State(), self.contents()))
+        ...
         # """
         # Get an OF by index. The index follows the order supplied when the
         # :class:`OpaqueFieldList` object was created.
@@ -92,27 +73,16 @@ class HopOpaqueField(OpaqueField):
     def set_mac(self, key: bytes, ts: int, prev_hof:'HopOpaqueField'=None) -> bytes:
         ...
 
-    @Pure
-    @ContractOnly
-    def verify_mac(self, key: bytes, ts: int, prev_hof:'HopOpaqueField'=None) -> bool:  # pragma: no cover
-        Requires(Implies(prev_hof is not None, Acc(prev_hof.State(), 1/1000)))
 
-    @classmethod
-    def from_values(cls, exp_time: int, ingress_if: int=0, egress_if: int=0,
+    def verify_mac(self, key: bytes, ts: int, prev_hof:'HopOpaqueField'=None) -> bool:  # pragma: no cover
+        ...
+
+    @staticmethod
+    def from_values(exp_time: int, ingress_if: int=0, egress_if: int=0,
                     mac: bytes=None, xover: bool=False, verify_only: bool=False,
                     forward_only: bool=False, recurse: bool=False) -> 'HopOpaqueField':
         ...
 
-    @Predicate
-    def State(self) -> bool:
-        return (Acc(self.xover) and
-                Acc(self.verify_only) and
-                Acc(self.forward_only) and
-                Acc(self.recurse) and
-                Acc(self.exp_time) and
-                Acc(self.ingress_if) and
-                Acc(self.egress_if) and
-                Acc(self.mac))
 
 
 class InfoOpaqueField(OpaqueField):
@@ -124,11 +94,3 @@ class InfoOpaqueField(OpaqueField):
         self.isd = 0
         self.hops = 0
 
-    @Predicate
-    def State(self) -> bool:
-        return (Acc(self.up_flag) and
-                Acc(self.shortcut) and
-                Acc(self.peer) and
-                Acc(self.timestamp) and
-                Acc(self.isd) and
-                Acc(self.hops))
