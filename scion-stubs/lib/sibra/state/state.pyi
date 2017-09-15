@@ -1,3 +1,6 @@
 class SibraState:
     def __init__(self, bw: int, link_name: str) -> None:
         ...
+
+    def update_tick(self) -> None:
+        ...

@@ -15,6 +15,15 @@ class Topology(object):
         self.is_core_as = False
         self.mtu = None  # type: Optional[int]
         self.isd_as = None  # type: Optional[ISD_AS]
+        self.beacon_servers = []
+        self.certificate_servers = []
+        self.path_servers = []
+        self.sibra_servers = []
+        self.parent_border_routers = []
+        self.child_border_routers = []
+        self.peer_border_routers = []
+        self.routing_border_routers = []
+        self.zookeepers = []
 
 
     @staticmethod

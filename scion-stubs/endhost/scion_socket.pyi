@@ -1,0 +1,6 @@
+class ScionBaseSocket(object):
+    def recv(self, bufsize: int) -> bytes:
+        ...
+
+    def close(self) -> None:
+        ...

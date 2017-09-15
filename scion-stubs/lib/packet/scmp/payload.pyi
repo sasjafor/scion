@@ -1,3 +1,4 @@
+from lib.packet.scmp.info import SCMPInfoRevocation
 from lib.packet.packet_base import PayloadBase
 from lib.util import Raw
 
@@ -14,3 +15,4 @@ class SCMPPayload(PayloadBase):
         self._path = b""
         self._exts = b""
         self._l4_hdr = b""
+        self.info = SCMPInfoRevocation()

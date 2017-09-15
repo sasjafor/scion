@@ -180,6 +180,7 @@ from lib.packet.scion import SCIONL4Packet
 from lib.packet.host_addr import HostAddrBase
 from lib.util import Raw
 from lib.topology import InterfaceElement
+from endhost.scion_socket import *
 
 
 class Router(SCIONElement):
@@ -413,7 +414,7 @@ class Router(SCIONElement):
         ifid_pld = pkt.get_payload().copy()
         # Forward 'alive' packet to all BSes (to inform that neighbor is alive).
         # BS must determine interface.
-        ifid_pld.p.relayIF = self.interface.if_id
+        # MARCOTI: ifid_pld.p.relayIF = self.interface.if_id
         try:
             bs_addrs = self.dns_query_topo(BEACON_SERVICE)
         except SCIONServiceLookupError as e:
@@ -453,8 +454,8 @@ class Router(SCIONElement):
             # handle state update
             logging.debug("Received IFState update:\n%s",
                           str(mgmt_pkt.get_payload()))
-            for p in payload.p.infos:
-                self.if_states[p.ifID].update(IFStateInfo(p))
+            # MARCOTIfor p in payload.p.infos:
+            # MARCOTI    self.if_states[p.ifID].update(IFStateInfo(p))
             return
         self.handle_data(mgmt_pkt, from_local_as)
 
@@ -620,7 +621,7 @@ class Router(SCIONElement):
             logging.info("Dropping packet due to interface being down.")
             pass
 
-    def _process_data(self, spkt: SCIONL4Packet, ingress: bool, drop_on_error: bool):
+    def _process_data(self, spkt, ingress, drop_on_error):
         path = spkt.path
         if len(spkt) > self.topology.mtu:
             # FIXME(kormat): ignore this check for now, as PCB packets are often

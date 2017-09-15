@@ -140,10 +140,13 @@ class SCIONBasePacket(PacketBase):
     def reversed_copy(self) -> 'SCIONBasePacket':
         ...
 
+    def update(self) -> None:
+        ...
+
 
 class SCIONExtPacket(SCIONBasePacket):
     def __init__(self, raw: bytes=None) -> None:  # pragma: no cover
-        self.ext_hdrs = []  # type: List[Union[SCMPExt, SibraExtBase]]
+        self.ext_hdrs = []  # type: List[ExtensionHeader]
         super().__init__(raw)
 
 
@@ -165,6 +168,10 @@ class SCIONL4Packet(SCIONExtPacket):
         ...
 
     def validate(self, pkt_len: int) -> None:
+        ...
+
+    @staticmethod
+    def from_values(cmn_hdr: SCIONCommonHdr, addr_hdr: SCIONAddrHdr, path_hdr: SCIONPath, ext_hdrs: List[ExtensionHeader], l4_hdr: L4HeaderBase, payload : SCMPPayload =None) -> 'SCIONL4Packet':
         ...
 
 

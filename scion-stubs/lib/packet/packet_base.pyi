@@ -1,7 +1,8 @@
 from typing import Optional
 
 class Serializable:
-    pass
+    def __init__(self, raw=None):
+        pass
 
 
 class Cerealizable:
@@ -9,16 +10,20 @@ class Cerealizable:
 
 
 class SCIONPayloadBaseProto(Cerealizable):
-    pass
+    PAYLOAD_TYPE = None
 
 
 class PacketBase(Serializable):
     def get_payload(self) -> bytes:
         ...
 
+    def set_payload(self, new_payload: SCIONPayloadBaseProto) -> None:
+        ...
+
 
 class PayloadBase(Serializable):  # pragma: no cover
     METADATA_LEN = 0
+
 
 
 class L4HeaderBase(Serializable):

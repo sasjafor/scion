@@ -4,3 +4,6 @@ class Event:
 
     def clear(self) -> None:
         ...
+
+    def is_set(self) -> bool:
+        ...
