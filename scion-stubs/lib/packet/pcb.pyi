@@ -1,6 +1,7 @@
 import lib.packet.scion_addr
 
 from typing import cast, List
+from lib.packet.opaque_field import HopOpaqueField
 
 class PathSegment:
     def short_desc(self) -> str: ...
@@ -28,6 +29,9 @@ class PCBMarking:
 
     def outIA(self) -> 'lib.packet.scion_addr.ISD_AS': ...
 
+    def hof(self) -> HopOpaqueField:
+        ...
+
 
 class PPCBMarking:
     """
@@ -52,5 +56,6 @@ class PPCBMarking:
 class ASMarking:
     def isd_as(self) -> 'lib.packet.scion_addr.ISD_AS': ...
     def iter_pcbms(self, start: int=0) -> List[PCBMarking]:
-
+        ...
+    def pcbm(self, idx: int) -> PCBMarking:
         ...

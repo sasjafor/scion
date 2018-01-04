@@ -1,6 +1,6 @@
 from lib.types import AddrType
 from lib.packet.packet_base import Serializable
-from typing import Optional
+from typing import Optional, Type
 
 
 class HostAddrBase(Serializable):
@@ -8,6 +8,13 @@ class HostAddrBase(Serializable):
     LEN = None  # type: Optional[int]
 
     def __str__(self) -> str:
+        ...
+
+    @staticmethod
+    def name() -> str:
+        ...
+
+    def pack(self) -> bytes:
         ...
 
 
@@ -47,3 +54,6 @@ class HostAddrIPv6(HostAddrBase):
     """
     TYPE = AddrType.IPV6
     LEN = IPV6LENGTH // 8
+
+def haddr_get_type(type_: int) -> Type[HostAddrBase]:  # pragma: no cover
+    ...

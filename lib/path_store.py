@@ -17,10 +17,10 @@
 """
 # Stdlib
 import copy
-# import heapq
+import heapq
 import logging
-# import math
-###from collections import defaultdict, deque
+import math
+from collections import defaultdict, deque
 
 # External
 import yaml
@@ -304,210 +304,210 @@ class PathStoreRecord(object):
             self.id, self.fidelity)
 
 
-# class PathStore(object):
-#     """Path Store class."""
-#     def __init__(self, path_policy):  # pragma: no cover
-#         """
-#         :param dict path_policy: path policy.
-#         """
-#         self.path_policy = path_policy
-#         self.candidates = []
-#         self.best_paths_history = deque(maxlen=self.path_policy.history_limit)
-#         self.disjointness = defaultdict(float)
-#         self.last_dj_update = 0
-#
-#     def add_segment(self, pcb):
-#         """
-#         Possibly add a new path to the candidates list.
-#
-#         Attempt to add a path (which is an instance of PathSegment) to the set
-#         of candidate paths. If successfully added, the candidate path is stored
-#         in the PathStore as a PathStoreRecord.
-#
-#         Before adding the path, the candidate PathSegment is first checked
-#         against the PathStore's filter criteria, listed in PathPolicy.  If the
-#         path's properties do not meet the filter criteria, the path is not
-#         added and the set of candidate paths remains unchanged.
-#
-#         If the path passes the filter checks but is already in the candidate
-#         set (as determined by its identifier), then the path is not added to
-#         the candidate set. Instead, the delay and arrival times are updated in
-#         the existing record.
-#
-#         If the path passes the filter checks and is not already in the
-#         candidate set, it is added to the list of candidate paths.  If upon
-#         adding the path, the candidate path set is too large (i.e., larger than
-#         candidates_set_size), the lowest-fidelity path is removed.
-#
-#         :param pcb: The PCB representing the potential path.
-#         :type pcb: PathSegment
-#         """
-#         assert isinstance(pcb, PathSegment)
-#         pcb_hash = pcb.get_hops_hash(hex=True)
-#         if not self.path_policy.check_filters(pcb):
-#             return
-#         for candidate in self.candidates:
-#             if candidate.id == pcb_hash:
-#                 candidate.update(pcb)
-#                 return
-#         record = PathStoreRecord(pcb)
-#         self.candidates.append(record)
-#         self._trim_candidates()
-#
-#     def _trim_candidates(self):
-#         """
-#         Trims the set of candidate set if necessary.
-#         """
-#         if len(self.candidates) > self.path_policy.candidates_set_size:
-#             self._remove_expired_segments()
-#         if len(self.candidates) > self.path_policy.candidates_set_size:
-#             self._update_all_fidelity()
-#             self.candidates = sorted(self.candidates, key=lambda x: x.fidelity,
-#                                      reverse=True)[:-1]
-#
-#     def _update_disjointness_db(self):
-#         """
-#         Update the disjointness database.
-#
-#         Based on the current time, update the disjointness database keeping
-#         track of each path, AS, and interface previously sent.
-#         """
-#         now = SCIONTime.get_time()
-#         for k, v in self.disjointness.items():
-#             self.disjointness[k] = v * math.exp(self.last_dj_update - now)
-#         self.last_dj_update = now
-#
-#     def _update_all_disjointness(self):
-#         """
-#         Update the disjointness of all path candidates.
-#
-#         The disjointness of a candidate path is measured with respect to
-#         previously sent paths and is calculated as follows:
-#
-#         Each time a path is sent, its ASes and AS-interface pairs are added to
-#         the (data structure). The exact path itself is also added to a list of
-#         previously sent paths.
-#
-#         The disjointness is then calculated as the inverse of the sum of the
-#         following: the entire path, each AS on the path, and each AS-interface
-#         pair on the path.
-#
-#         The disjointness is normalized by the highest-scoring path's
-#         disjointness.
-#         """
-#         self._update_disjointness_db()
-#         max_disjointness = 0.0
-#         for candidate in self.candidates:
-#             path_disjointness = self.disjointness[candidate.id]
-#             as_disjointness = 0.0
-#             if_disjointness = 0.0
-#             for asm in candidate.pcb.iter_asms():
-#                 as_disjointness += self.disjointness[asm.isd_as()[1]]
-#                 if_disjointness += self.disjointness[
-#                     asm.pcbm(0).hof().egress_if]
-#             candidate.disjointness = (path_disjointness + as_disjointness +
-#                                       if_disjointness)
-#             if candidate.disjointness > max_disjointness:
-#                 max_disjointness = candidate.disjointness
-#         if max_disjointness > 0.0:
-#             for candidate in self.candidates:
-#                 candidate.disjointness /= max_disjointness
-#
-#     def _update_all_delay_time(self):
-#         """Update the delay time property of all path candidates."""
-#         max_delay_time = 0
-#         for candidate in self.candidates:
-#             candidate.delay_time = (candidate.last_seen_time -
-#                                     candidate.pcb.get_timestamp() + 1)
-#             if candidate.delay_time > max_delay_time:
-#                 max_delay_time = candidate.delay_time
-#         for candidate in self.candidates:
-#             candidate.delay_time /= max_delay_time
-#
-#     def _update_all_fidelity(self):
-#         """Update the fidelity of all path candidates."""
-#         self._update_disjointness_db()
-#         self._update_all_disjointness()
-#         self._update_all_delay_time()
-#         for candidate in self.candidates:
-#             candidate.update_fidelity(self.path_policy)
-#
-#     def get_best_segments(self, k=None, sending=True):
-#         """
-#         Return the k best paths from the temporary buffer.
-#
-#         Select the k best paths from the set of candidate paths. At the time of
-#         selection, the PathStore computes the fidelity of all candidate path
-#         segments and returns the k paths with the highest fidelity.
-#
-#         When computing the fidelity, only the path properties that vary in time
-#         need to be recomputed: the freshness, delay, and disjointness. The
-#         length and number of peering links is constant.
-#
-#         :param int k: default best set size.
-#         """
-#         if k is None:
-#             k = self.path_policy.best_set_size
-#         self._remove_expired_segments()
-#         self._update_all_fidelity()
-#         best_candidates = heapq.nlargest(k, self.candidates,
-#                                          key=lambda y: y.fidelity)
-#         if sending:
-#             for candidate in best_candidates:
-#                 candidate.sending()
-#         return [x.pcb for x in best_candidates]
-#
-#     def get_latest_history_snapshot(self, k=None):
-#         """
-#         Return the latest k best paths from the history.
-#
-#         :param int k: default best set size.
-#         """
-#         if k is None:
-#             k = self.path_policy.best_set_size
-#         best_paths = []
-#         if self.best_paths_history:
-#             for candidate in self.best_paths_history[0][:k]:
-#                 best_paths.append(candidate.pcb)
-#         return best_paths
-#
-#     def _remove_expired_segments(self):
-#         """Remove candidates if their expiration_time is up."""
-#         rec_ids = []
-#         now = SCIONTime.get_time()
-#         for candidate in self.candidates:
-#             if candidate.expiration_time <= now:
-#                 rec_ids.append(candidate.id)
-#         self.remove_segments(rec_ids)
-#
-#     def remove_segments(self, rec_ids):
-#         """
-#         Remove segments in 'rec_ids' from the candidates.
-#
-#         :param list rec_ids: list of record IDs to remove.
-#         """
-#         self.candidates[:] = [c for c in self.candidates if c.id not in rec_ids]
-#         if self.candidates:
-#             self._update_all_fidelity()
-#             self.candidates = sorted(self.candidates, key=lambda x: x.fidelity,
-#                                      reverse=True)
-#
-#     def get_segment(self, rec_id):
-#         """
-#         Return the segment for the corresponding record ID or None.
-#
-#         :param str rec_id: ID of the segment to return.
-#         """
-#         for record in self.candidates:
-#             if record.id == rec_id:
-#                 return record.pcb
-#         return None
-#
-#     def __str__(self):
-#         """
-#         Return a string with the path store data.
-#         """
-#         ret = ["PathStore:"]
-#         for candidate in self.candidates:
-#             ret.append("  %s" % candidate)
-#         return "\n".join(ret)
+class PathStore(object):
+    """Path Store class."""
+    def __init__(self, path_policy):  # pragma: no cover
+        """
+        :param dict path_policy: path policy.
+        """
+        self.path_policy = path_policy
+        self.candidates = []
+        self.best_paths_history = deque(maxlen=self.path_policy.history_limit)
+        self.disjointness = defaultdict(lambda : float())
+        self.last_dj_update = 0
+
+    def add_segment(self, pcb):
+        """
+        Possibly add a new path to the candidates list.
+
+        Attempt to add a path (which is an instance of PathSegment) to the set
+        of candidate paths. If successfully added, the candidate path is stored
+        in the PathStore as a PathStoreRecord.
+
+        Before adding the path, the candidate PathSegment is first checked
+        against the PathStore's filter criteria, listed in PathPolicy.  If the
+        path's properties do not meet the filter criteria, the path is not
+        added and the set of candidate paths remains unchanged.
+
+        If the path passes the filter checks but is already in the candidate
+        set (as determined by its identifier), then the path is not added to
+        the candidate set. Instead, the delay and arrival times are updated in
+        the existing record.
+
+        If the path passes the filter checks and is not already in the
+        candidate set, it is added to the list of candidate paths.  If upon
+        adding the path, the candidate path set is too large (i.e., larger than
+        candidates_set_size), the lowest-fidelity path is removed.
+
+        :param pcb: The PCB representing the potential path.
+        :type pcb: PathSegment
+        """
+        assert isinstance(pcb, PathSegment)
+        pcb_hash = pcb.get_hops_hash(hex=True)
+        if not self.path_policy.check_filters(pcb):
+            return
+        for candidate in self.candidates:
+            if candidate.id == pcb_hash:
+                candidate.update(pcb)
+                return
+        record = PathStoreRecord(pcb)
+        self.candidates.append(record)
+        self._trim_candidates()
+
+    def _trim_candidates(self):
+        """
+        Trims the set of candidate set if necessary.
+        """
+        if len(self.candidates) > self.path_policy.candidates_set_size:
+            self._remove_expired_segments()
+        if len(self.candidates) > self.path_policy.candidates_set_size:
+            self._update_all_fidelity()
+            self.candidates = sorted(self.candidates, key=lambda x: x.fidelity,
+                                     reverse=True)[:-1]
+
+    def _update_disjointness_db(self):
+        """
+        Update the disjointness database.
+
+        Based on the current time, update the disjointness database keeping
+        track of each path, AS, and interface previously sent.
+        """
+        now = SCIONTime.get_time()
+        for k, v in self.disjointness.items():
+            self.disjointness[k] = v * math.exp(self.last_dj_update - now)
+        self.last_dj_update = now
+
+    def _update_all_disjointness(self):
+        """
+        Update the disjointness of all path candidates.
+
+        The disjointness of a candidate path is measured with respect to
+        previously sent paths and is calculated as follows:
+
+        Each time a path is sent, its ASes and AS-interface pairs are added to
+        the (data structure). The exact path itself is also added to a list of
+        previously sent paths.
+
+        The disjointness is then calculated as the inverse of the sum of the
+        following: the entire path, each AS on the path, and each AS-interface
+        pair on the path.
+
+        The disjointness is normalized by the highest-scoring path's
+        disjointness.
+        """
+        self._update_disjointness_db()
+        max_disjointness = 0.0
+        for candidate in self.candidates:
+            path_disjointness = self.disjointness[candidate.id]
+            as_disjointness = 0.0
+            if_disjointness = 0.0
+            for asm in candidate.pcb.iter_asms():
+                as_disjointness += self.disjointness[asm.isd_as()[1]]
+                if_disjointness += self.disjointness[
+                    asm.pcbm(0).hof().egress_if]
+            candidate.disjointness = (path_disjointness + as_disjointness +
+                                      if_disjointness)
+            if candidate.disjointness > max_disjointness:
+                max_disjointness = candidate.disjointness
+        if max_disjointness > 0.0:
+            for candidate in self.candidates:
+                candidate.disjointness /= max_disjointness
+
+    def _update_all_delay_time(self):
+        """Update the delay time property of all path candidates."""
+        max_delay_time = 0
+        for candidate in self.candidates:
+            candidate.delay_time = (candidate.last_seen_time -
+                                    candidate.pcb.get_timestamp() + 1)
+            if candidate.delay_time > max_delay_time:
+                max_delay_time = candidate.delay_time
+        for candidate in self.candidates:
+            candidate.delay_time /= max_delay_time
+
+    def _update_all_fidelity(self):
+        """Update the fidelity of all path candidates."""
+        self._update_disjointness_db()
+        self._update_all_disjointness()
+        self._update_all_delay_time()
+        for candidate in self.candidates:
+            candidate.update_fidelity(self.path_policy)
+
+    def get_best_segments(self, k=None, sending=True):
+        """
+        Return the k best paths from the temporary buffer.
+
+        Select the k best paths from the set of candidate paths. At the time of
+        selection, the PathStore computes the fidelity of all candidate path
+        segments and returns the k paths with the highest fidelity.
+
+        When computing the fidelity, only the path properties that vary in time
+        need to be recomputed: the freshness, delay, and disjointness. The
+        length and number of peering links is constant.
+
+        :param int k: default best set size.
+        """
+        if k is None:
+            k = self.path_policy.best_set_size
+        self._remove_expired_segments()
+        self._update_all_fidelity()
+        best_candidates = heapq.nlargest(k, self.candidates,
+                                         key=lambda y: y.fidelity)
+        if sending:
+            for candidate in best_candidates:
+                candidate.sending()
+        return [x.pcb for x in best_candidates]
+
+    def get_latest_history_snapshot(self, k=None):
+        """
+        Return the latest k best paths from the history.
+
+        :param int k: default best set size.
+        """
+        if k is None:
+            k = self.path_policy.best_set_size
+        best_paths = []
+        if self.best_paths_history:
+            for candidate in self.best_paths_history[0][:k]:
+                best_paths.append(candidate.pcb)
+        return best_paths
+
+    def _remove_expired_segments(self):
+        """Remove candidates if their expiration_time is up."""
+        rec_ids = []
+        now = SCIONTime.get_time()
+        for candidate in self.candidates:
+            if candidate.expiration_time <= now:
+                rec_ids.append(candidate.id)
+        self.remove_segments(rec_ids)
+
+    def remove_segments(self, rec_ids):
+        """
+        Remove segments in 'rec_ids' from the candidates.
+
+        :param list rec_ids: list of record IDs to remove.
+        """
+        self.candidates[:] = [c for c in self.candidates if c.id not in rec_ids]
+        if self.candidates:
+            self._update_all_fidelity()
+            self.candidates = sorted(self.candidates, key=lambda x: x.fidelity,
+                                     reverse=True)
+
+    def get_segment(self, rec_id):
+        """
+        Return the segment for the corresponding record ID or None.
+
+        :param str rec_id: ID of the segment to return.
+        """
+        for record in self.candidates:
+            if record.id == rec_id:
+                return record.pcb
+        return None
+
+    def __str__(self):
+        """
+        Return a string with the path store data.
+        """
+        ret = ["PathStore:"]
+        for candidate in self.candidates:
+            ret.append("  %s" % candidate)
+        return "\n".join(ret)

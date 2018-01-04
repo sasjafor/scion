@@ -80,9 +80,9 @@ class ISD_AS(Serializable):
         self._isd = raw >> 20
         self._as = raw & 0x000fffff
 
-    @classmethod
-    def from_values(cls, isd, as_):  # pragma: no cover
-        inst = cls()
+    @staticmethod
+    def from_values(isd, as_):  # pragma: no cover
+        inst = ISD_AS()
         inst._isd = isd
         inst._as = as_
         return inst
@@ -169,16 +169,15 @@ class SCIONAddr(object):
         self.isd_as = ISD_AS(data.pop(ISD_AS.LEN))
         self.host = haddr_type(data.pop(haddr_type.LEN))
 
-    @classmethod
-    def from_values(cls, isd_as, host):  # pragma: no cover
+    @staticmethod
+    def from_values(isd_as, host):  # pragma: no cover
         """
         Create an instance of the class SCIONAddr.
 
         :param ISD_AS isd_as: ISD-AS identifier.
         :param HostAddrBase host: host address
         """
-        assert isinstance(host, HostAddrBase)
-        addr = cls()
+        addr = SCIONAddr()
         addr.isd_as = isd_as
         addr.host = host
         return addr
@@ -192,8 +191,8 @@ class SCIONAddr(object):
         """
         return self.isd_as.pack() + self.host.pack()
 
-    @classmethod
-    def calc_len(cls, type_):  # pragma: no cover
+    @staticmethod
+    def calc_len(type_):  # pragma: no cover
         class_ = haddr_get_type(type_)
         return ISD_AS.LEN + class_.LEN
 

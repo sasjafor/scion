@@ -23,6 +23,9 @@ class Raw:
         self._min = min_
         self._offset = 0
 
+    def pop(self) -> bytes:
+        ...
+
     def __len__(self) -> int:
         ...
 
