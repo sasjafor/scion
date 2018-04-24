@@ -47,6 +47,8 @@ def hex_str(raw: bytes) -> str:
 
 @Pure
 def calc_padding(length: int, block_size: int) -> int:
+    Requires(block_size != 0)
+
     if length % block_size:
         return block_size - (length % block_size)
     else:

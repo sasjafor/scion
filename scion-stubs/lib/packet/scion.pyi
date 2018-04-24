@@ -150,6 +150,8 @@ class SCIONAddrHdr(Serializable):
     @Pure
     def matches(self, raw: bytes) -> bool:
         Requires(self.State())
+        Requires(Acc(self.src.State()))
+        Requires(AddressType(self.src))
         return Unfolding(self.State(), self.src.matches(raw, SCIONCommonHdr.LEN) and
                 self.dst.matches(raw, SCIONCommonHdr.LEN + addr_len(self.src)) and
                 self._total_len == self.total_len())
@@ -157,6 +159,8 @@ class SCIONAddrHdr(Serializable):
     @Pure
     def total_len(self) -> int:
         Requires(self.State())
+        Requires(Acc(self.dst.State()))
+        Requires(AddressType(self.dst))
         data_len = Unfolding(self.State(), addr_len(self.src) + addr_len(self.dst))
         return calc_padding(data_len, SCIONAddrHdr.BLK_SIZE)
 
@@ -169,10 +173,14 @@ class SCIONAddrHdr(Serializable):
                 Acc(self._pad_len) and
                 Acc(self._total_len))
 
+@Predicate
+def AddressType(addr: SCIONAddr) -> bool:
+    return Acc(addr.State()) and Unfolding(addr.State(), addr.host.TYPE is AddrType.IPV4 or addr.host.TYPE is AddrType.IPV6 or addr.host.TYPE is AddrType.SVC)
+
 @Pure
 def addr_len(addr: SCIONAddr) -> int:
     Requires(Acc(addr.State()))
-    Requires(Unfolding(addr.State(), addr.host.TYPE is AddrType.IPV4 or addr.host.TYPE is AddrType.IPV6 or addr.host.TYPE is AddrType.SVC))
+    Requires(AddressType(addr))
     type_ = Unfolding(addr.State(), addr.host.TYPE)
     if type_ == AddrType.IPV4:
         return ISD_AS.LEN + HostAddrIPv4.LEN
@@ -251,7 +259,7 @@ class SCIONL4Packet(SCIONExtPacket):
         ...
 
     def parse_payload(self) -> SCMPPayload:
-        ...
+        pass
 
     @Pure
     def __len__(self) -> int:

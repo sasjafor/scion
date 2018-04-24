@@ -167,7 +167,7 @@ class Router(SCIONElement):
 
     @Predicate
     def State(self) -> bool:
-        return (Acc(self.interface) and self.interface.State() and Acc(self._remote_sock) and Acc(self._udp_sock)) and Acc(self.topology) and Acc(self.topology.State())
+        return Acc(self.interface) and self.interface.State() and Acc(self._remote_sock) and Acc(self._udp_sock)
 
     def _service_type(self) -> Optional[str]:
         return ROUTER_SERVICE
@@ -230,7 +230,7 @@ class Router(SCIONElement):
         Handle SCION Packet extensions. Handlers can be defined for pre- and
         post-routing.
         """
-        Requires(MustTerminate(2))
+        #Requires(MustTerminate(2))
         Requires(Acc(spkt.State(), 1/9))
         Requires(Unfolding(Acc(spkt.State(), 1/100), len(spkt.ext_hdrs) == 0))
         Ensures(Acc(list_pred(Result())))
@@ -238,24 +238,25 @@ class Router(SCIONElement):
         Ensures(len(Result()) == 0)
         if pre_routing_phase:
             prefix = "pre"
-            # handlers = self.pre_ext_handlers  # type: Union[Dict[int, bool], Dict[int, Callable[[object, object, object], list]]]
+            #handlers = self.pre_ext_handlers  # type: Union[Dict[int, bool], Dict[int, Callable[[object, object, object], list]]]
         else:
             prefix = "post"
-            # handlers = self.post_ext_handlers
+            #handlers = self.post_ext_handlers
         flags = []  # type: List[Tuple[int, ...]]
         # Hop-by-hop extensions must be first (just after path), and process
         # only MAX_HOPBYHOP_EXT number of them. If an SCMP ext header is
         # present, it must be the first hopbyhop extension (and isn't included
         # in the MAX_HOPBYHOP_EXT check).
-        assert Unfolding(Acc(spkt.State(), 1/100), len(spkt.ext_hdrs) == 0)
+        #assert Unfolding(Acc(spkt.State(), 1/100), len(spkt.ext_hdrs) == 0)
         Unfold(Acc(spkt.State(), 1/9))
         count = 0
         ext_hdrs = spkt.ext_hdrs
         for ext_hdr in ext_hdrs:
-            # Invariant(Acc(spkt.ext_hdrs, 1/1000))
-            Invariant(Acc(list_pred(ext_hdrs), 1/1000))
+            #Invariant(Acc(spkt.ext_hdrs, 1/1000))
+            #Invariant(Acc(list_pred(ext_hdrs), 1/1000))
             Invariant(len(ext_hdrs) == 0)
             assert False
+
             # if ext_hdr.EXT_CLASS != ExtensionClass.HOP_BY_HOP:
             #     break
             # if ext_hdr.EXT_TYPE == ExtHopByHopType.SCMP:
@@ -509,7 +510,7 @@ class Router(SCIONElement):
         Requires(Acc(path.State(), 1 / 9))
         Requires(Acc(self.State(), 1 / 9))
         Requires(Unfolding(Rd(path.State()), isinstance(path._iof_idx, int)))
-        Requires(Unfolding(Rd(path.State()), isinstance(path._hof_idx, int)))
+        # Requires(Unfolding(Rd(path.State()), isinstance(path._hof_idx, int)))
         Ensures(Acc(path.State(), 1 / 9))
         Ensures(Acc(self.State(), 1 / 9))
         Ensures(valid_hof(path))
@@ -519,7 +520,8 @@ class Router(SCIONElement):
         """Verify freshness and authentication of an opaque field."""
         iof = path.get_iof()
         assert isinstance(iof, InfoOpaqueField)
-        ts = Unfolding(Rd(path.State()), Unfolding(Rd(path._ofs.State()), Unfolding(Rd(iof.State()), iof.timestamp)))
+        #ts = Unfolding(Rd(path.State()), Unfolding(Rd(path._ofs.State()), Unfolding(Rd(iof.State()), iof.timestamp)))
+        ts = Unfolding(Rd(iof.State()), iof.timestamp)
         hof = path.get_hof()
         prev_hof = path.get_hof_ver(ingress=ingress)
         # Check that the interface in the current hop field matches the
@@ -548,6 +550,13 @@ class Router(SCIONElement):
         self.send(t, spkt, self.interface.to_addr, self.interface.to_udp_port)
 
     def handle_data(self, t: Place, spkt: SCIONL4Packet, from_local_as: bool, drop_on_error: bool=False) -> Place:
+        Requires(Acc(spkt.State(), 1/2))
+        Requires(Acc(self.State(), 1/2))
+        Requires(Unfolding(Acc(spkt.State(), 1/2), spkt.path is not None))
+        Requires(Unfolding(Rd(self.State()), Unfolding(Rd(self.topology.State()), isinstance(self.topology.mtu, int))))
+        Ensures(Acc(spkt.State(), 1/2))
+        Ensures(Acc(self.State(), 1/2))
+        Exsures(SCMPPathRequired, Acc(spkt.State(), 1/2))
         """
         Main entry point for data packet handling.
 
@@ -556,7 +565,7 @@ class Router(SCIONElement):
         :param from_local_as:
             Whether or not the packet is from the local AS.
         """
-        if len(spkt.path) == 0:
+        if Unfolding(Acc(spkt.State(), 1/2), len(spkt.path)) == 0:
             raise SCMPPathRequired()
         ingress = not from_local_as
         try:
@@ -591,14 +600,14 @@ class Router(SCIONElement):
         Requires(Acc(self.State(), 1 / 2))
         Requires(Unfolding(Rd(self.State()), Unfolding(Rd(self.topology.State()), isinstance(self.topology.mtu, int))))
         Requires(Unfolding(Rd(spkt.State()), spkt.path != None))
-        Requires(Unfolding(Rd(spkt.State()), Unfolding(Rd(spkt.path.State()), isinstance(spkt.path._iof_idx, int))))
-        Requires(Unfolding(Rd(spkt.State()), Unfolding(Rd(spkt.path.State()), isinstance(spkt.path._hof_idx, int))))
+        # Requires(Unfolding(Rd(spkt.State()), Unfolding(Rd(spkt.path.State()), isinstance(spkt.path._iof_idx, int))))
+        # Requires(Unfolding(Rd(spkt.State()), Unfolding(Rd(spkt.path.State()), isinstance(spkt.path._hof_idx, int))))
         Ensures(Acc(spkt.State(), 1 / 2))
         Ensures(Acc(self.State(), 1 / 2))
         Exsures(SCIONBaseError, Acc(spkt.State(), 1 / 2))
         Exsures(SCIONBaseError, Acc(self.State(), 1 / 2))
-        Exsures(SCIONBaseError, Unfolding(Rd(spkt.State()), spkt.path != None))
-        Exsures(SCIONBaseError, Unfolding(Rd(spkt.State()), Unfolding(Rd(spkt.path.State()), not valid_hof(spkt.path))))
+        # Exsures(SCIONBaseError, Unfolding(Rd(spkt.State()), spkt.path != None))
+        # Exsures(SCIONBaseError, Unfolding(Rd(spkt.State()), Unfolding(Rd(spkt.path.State()), not valid_hof(spkt.path))))
         path = Unfolding(Rd(spkt.State()), spkt.path)
         if len(spkt) > Unfolding(Rd(self.State()), Unfolding(Rd(self.topology.State()), self.topology.mtu)):
             # FIXME(kormat): ignore this check for now, as PCB packets are often
@@ -734,9 +743,13 @@ class Router(SCIONElement):
         return None
 
     def _needs_local_processing(self, pkt: SCIONL4Packet) -> bool:
-        return pkt.addrs.dst in [
-            self.addr,
-            SCIONAddr.from_values(self.addr.isd_as, self.interface.addr),
+        Requires(Acc(self.State(), 1/40))
+        Requires(Acc(pkt.State(), 1/40))
+        Requires(Unfolding(Acc(pkt.State(), 1/40), pkt.addrs is not None))
+        return Unfolding(Acc(pkt.State(), 1/40), Unfolding(Acc(pkt.addrs.State(), 1/40), pkt.addrs.dst)) in [
+            Unfolding(Acc(self.State(), 1/40), self.addr),
+            SCIONAddr.from_values(Unfolding(Acc(self.State(), 1/40), Unfolding(Acc(self.addr.State(), 1/40), self.addr.isd_as)),
+                                  Unfolding(Acc(self.State(), 1/40), Unfolding(Acc(self.interface.State(), 1/40), self.interface.addr))),
         ]
 
     def _process_flags(self, flags: List[Tuple[int, ...]], pkt: SCIONL4Packet, from_local_as: bool) -> Tuple[bool, bool]:
@@ -744,31 +757,38 @@ class Router(SCIONElement):
         Go through the flags set by hop-by-hop extensions on this packet.
         :returns:
         """
-        Requires(Acc(list_pred(flags), 1/100))
+        Requires(Acc(list_pred(flags), 1/9))
+        #Requires(list_pred(flags))
         Requires(len(flags) == 0)
-        Ensures(Acc(list_pred(flags), 1 / 100))
+        Ensures(Acc(list_pred(flags), 1/9))
+        #Ensures(list_pred(flags))
         Ensures(not Result()[1])
         process = False
         # First check if any error or no_process flags are set
         for (flag, *args) in flags:
+            Invariant(len(flags) == 0)
             if flag == RouterFlag.ERROR:
                 logging.error("%s", args[0])
                 return True, False
             elif flag == RouterFlag.NO_PROCESS:
                 return True, False
+        assert process == False
         # Now check for other flags
         for (flag, *args) in flags:
-            if flag == RouterFlag.FORWARD:
-                if from_local_as:
-                    self._process_fwd_flag(pkt)
-                else:
-                    self._process_fwd_flag(pkt, args[0])
-                return True, False
-            elif flag in (RouterFlag.DELIVER, RouterFlag.FORCE_DELIVER):
-                self._process_deliver_flag(pkt, flag)
-                return True, False
-            elif flag == RouterFlag.PROCESS_LOCAL:
-                process = True
+            Invariant(len(flags) == 0)
+            assert False
+            # if flag == RouterFlag.FORWARD:
+            #     if from_local_as:
+            #         self._process_fwd_flag(pkt)
+            #     else:
+            #         self._process_fwd_flag(pkt, args[0])
+            #     return True, False
+            # elif flag in (RouterFlag.DELIVER, RouterFlag.FORCE_DELIVER):
+            #     self._process_deliver_flag(pkt, flag)
+            #     return True, False
+            # elif flag == RouterFlag.PROCESS_LOCAL:
+            #     process = True
+        assert process == False
         return False, process
 
     def _process_fwd_flag(self, pkt: SCIONL4Packet, ifid: int=None) -> None:
@@ -806,7 +826,8 @@ class Router(SCIONElement):
     #     """
     #     self.handle_request(meta.packet, meta.addr, meta.from_local_as)
 
-    def handle_request(self, t: Place, packet: bytes, _: object, from_local_socket: bool =True, sock:object =None) -> Place:
+    def handle_request(self, t: Place, packet: bytes, _: object, from_local_socket: bool = True, sock: object = None) -> Place:
+
         """
         Main routine to handle incoming SCION packets.
 

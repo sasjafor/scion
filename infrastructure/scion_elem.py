@@ -147,7 +147,7 @@ class SCIONElement(object):
                 host_addr = own_config.addr
             if self._port is None:
                 self._port = own_config.port
-        self.addr = SCIONAddr.from_values(self.topology.isd_as, host_addr)
+        self.addr = SCIONAddr.from_values(self.topology.isd_as, host_addr) # type: SCIONAddr
         self.init_ifid2br()
         self.trust_store = TrustStore(self.conf_dir)
         self.total_dropped = 0
@@ -271,6 +271,7 @@ class SCIONElement(object):
     #     return None
     #
     # def _get_scmp_handler(self, pkt):
+    #Requires(Acc(addr.State()))
     #     scmp = pkt.l4_hdr
     #     try:
     #         type_map = self.SCMP_PLD_CLASS_MAP[scmp.class_]
@@ -286,28 +287,32 @@ class SCIONElement(object):
     #         #               scmp.type, scmp_type_name(scmp.type), pkt)
     #     return None
 
-    def _parse_packet(self, packet: bytes) -> Optional[SCIONL4Packet]:
-        Ensures(Implies(is_wellformed_packet(packet), Result() is not None and
-                                                      Result().State() and
-                                                      Result().matches(packet)))
-        try:
-            pkt = SCIONL4Packet(packet)
-        except SCMPError as e:
-            self._scmp_parse_error(packet, e)
-            return None
-        except SCIONBaseError:
-            log_exception("Error parsing packet: %s" % hex_str(packet),
-                          level=logging.ERROR)
-            return None
-        try:
-            pkt.validate(len(packet))
-        except SCMPError as e:
-            self._scmp_validate_error(pkt, e)
-            return None
-        except SCIONChecksumFailed:
-            logging.debug("Dropping packet due to failed checksum:\n%s", pkt)
-            # TODO(marco): Shouldn't we actually return None here??
-        return pkt
+    def _parse_packet(self, packet: bytes) -> SCIONL4Packet:
+        # Ensures(Result() is not None) # assuming well formed packet, not necessary, just return packet type for sure
+        Ensures(Acc(Result().State()))
+        Ensures(Unfolding(Result().State(), len(Result().ext_hdrs) == 0))
+        # Ensures(Implies(is_wellformed_packet(packet), Result() is not None and
+        #                                               Result().State() and
+        #                                               Result().matches(packet)))
+        # try:
+        #     pkt = SCIONL4Packet(packet)
+        # except SCMPError as e:
+        #     self._scmp_parse_error(packet, e)
+        #     return None
+        # except SCIONBaseError:
+        #     log_exception("Error parsing packet: %s" % hex_str(packet),
+        #                   level=logging.ERROR)
+        #     return None
+        # try:
+        #     pkt.validate(len(packet))
+        # except SCMPError as e:
+        #     self._scmp_validate_error(pkt, e)
+        #     return None
+        # except SCIONChecksumFailed:
+        #     logging.debug("Dropping packet due to failed checksum:\n%s", pkt)
+        #     # TODO(marco): Shouldn't we actually return None here??
+        # return pkt
+        pass
 
     def _scmp_parse_error(self, packet: bytes, e: SCMPError) -> None:
         # HDR_TYPE_OFFSET = 6
@@ -779,3 +784,7 @@ class SCIONElement(object):
     #                         rev_info.short_desc())
     #         return False
     #     return True
+
+    @Predicate
+    def State(self) -> bool:
+        return Acc(self.addr) and Acc(self.addr.State()) and Acc(self.topology) and Acc(self.topology.State())

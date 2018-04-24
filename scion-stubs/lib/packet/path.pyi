@@ -18,7 +18,7 @@ class SCIONPath(Serializable, Sized):
     HOF_LABELS = A_HOFS, B_HOFS, C_HOFS
 
     def __init__(self, raw:Raw=None) -> None:  # pragma: no cover
-        self._ofs = OpaqueFieldList(SCIONPath.OF_ORDER)
+        self._ofs = OpaqueFieldList(SCIONPath.OF_ORDER) # type: OpaqueFieldList
         self._iof_idx = None  # type: Optional[int]
         self._hof_idx = None  # type: Optional[int]
         self.interfaces = []  # type: List[Tuple[ASMarking, int]]
@@ -27,11 +27,11 @@ class SCIONPath(Serializable, Sized):
     @Predicate
     def State(self) -> bool:
         return (Acc(self._ofs) and self._ofs.State() and
-                Acc(self._iof_idx) and (Implies(isinstance(self._iof_idx, int),
-                                                0 <= self._iof_idx and self._iof_idx < Unfolding(self._ofs.State(), len(self._ofs)) and
-                                                isinstance(self._ofs.get_by_idx(self._iof_idx), InfoOpaqueField))) and
+                Acc(self._iof_idx) and Implies(isinstance(self._iof_idx, int),
+                                                self._iof_idx >= 0 and self._iof_idx < Unfolding(self._ofs.State(), len(self._ofs)) and
+                                                isinstance(self._ofs.get_by_idx(self._iof_idx), InfoOpaqueField)) and
                 Acc(self._hof_idx) and (Implies(isinstance(self._hof_idx, int),
-                                                0 <= self._hof_idx and self._hof_idx < Unfolding(self._ofs.State(), len(self._ofs)) and
+                                                self._hof_idx >= 0 and self._hof_idx < Unfolding(self._ofs.State(), len(self._ofs)) and
                                                 isinstance(self._ofs.get_by_idx(self._hof_idx), HopOpaqueField))) and
                 Acc(self.interfaces) and Acc(list_pred(self.interfaces)) and
                 Acc(self.mtu))
@@ -63,7 +63,8 @@ class SCIONPath(Serializable, Sized):
         """Return the :any:`HopOpaqueField` needed to verify the current HOF."""
         iof = self.get_iof()
         hof = self.get_hof()
-        if Unfolding(self.State(), Unfolding(self._ofs.State(), Unfolding(hof.State(), Unfolding(iof.State(), not hof.xover or (iof.shortcut and not iof.peer))))):
+        #if Unfolding(self.State(), Unfolding(self._ofs.State(), Unfolding(hof.State(), Unfolding(iof.State(), not hof.xover or (iof.shortcut and not iof.peer))))):
+        if Unfolding(hof.State(), Unfolding(iof.State(), not hof.xover or (iof.shortcut and not iof.peer))):
             # For normal hops on any type of segment, or cross-over hops on
             # non-peer shortcut hops, just use next/prev HOF.
             return self._get_hof_ver_normal(iof)

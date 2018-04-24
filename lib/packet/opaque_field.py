@@ -217,6 +217,9 @@ class InfoOpaqueField(OpaqueField):
                 (self.NAME, self.LEN, InfoOFFlags.to_str(flags),
                  iso_timestamp(self.timestamp), self.isd, self.hops))
 
+    def State(self):
+        pass
+
 
 class OpaqueFieldList(object):
     """

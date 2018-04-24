@@ -20,6 +20,10 @@ import copy
 import logging
 
 # SCION
+from typing import Optional
+
+from nagini_contracts.contracts import Predicate
+
 from lib.crypto.hash_tree import ConnectedHashTree
 from lib.defines import SCION_MIN_MTU
 from lib.packet.opaque_field import (
@@ -345,6 +349,10 @@ class SCIONPath(Serializable):
 
     def __eq__(self, other):  # pragma: no cover
         return self.interfaces == other.interfaces
+
+    @Predicate
+    def State(self):
+        pass
 
 
 def valid_mtu(mtu):

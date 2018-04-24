@@ -1,8 +1,10 @@
+from lib.errors import SCIONIndexError
 from lib.packet.packet_base import Serializable
 from lib.defines import OPAQUE_FIELD_LEN
 from lib.util import Raw
 from typing import Dict, List, Sized, Tuple
-from nagini_contracts.contracts import Acc, ContractOnly, Ensures, Forall, Implies, Predicate, Pure, Requires, Result, Sequence, Unfolding
+from nagini_contracts.contracts import Acc, ContractOnly, Ensures, Forall, Implies, Predicate, Pure, Requires, Result, \
+    Sequence, Unfolding, Assert, dict_pred
 
 
 class OpaqueField(Serializable):
@@ -28,19 +30,24 @@ class OpaqueFieldList(Sized):
 
     @Predicate
     def State(self) -> bool:
-        return Acc(self._order) and Acc(self._labels) and Forall(self.contents(), lambda e: (e.State(), [[e in self.contents()]]))
+        return (Acc(self._order) and Acc(self._labels) and Acc(dict_pred(self._labels)) and
+                Forall(self.contents(), lambda e: (e.State())))
+               #Forall(self.contents(), lambda e: (e.State(), [[e in self.contents()]])))
 
     @Pure
     @ContractOnly
     def contents(self) -> Sequence[OpaqueField]:
         Requires(Acc(self._order) and Acc(self._labels))
+        Requires(dict_pred(self._labels))
         Ensures(len(Result()) == self.__len__())
 
     @Pure
     @ContractOnly
     def __len__(self) -> int:
-        Requires(Acc(self._order) and Acc(self._labels))
+        Requires(Acc(self._labels))
+        Requires(dict_pred(self._labels))
         Ensures(Result() >= 0)
+
 
     @Pure
     @ContractOnly

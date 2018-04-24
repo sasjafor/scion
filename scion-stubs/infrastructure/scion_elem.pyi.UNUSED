@@ -1,13 +1,13 @@
+from nagini_contracts.contracts import Ensures, Acc, Result, Unfolding, Predicate
+
 from lib.topology import Topology
 from lib.config import Config
 from lib.packet.host_addr import HostAddrBase
 from lib.packet.scion_addr import SCIONAddr
 from lib.packet.scion import SCIONL4Packet, SCIONBasePacket
 from lib.packet.scmp.errors import SCMPError
-from lib.util import Raw
 from lib.topology import RouterElement
-from typing import Optional, Callable
-
+from typing import Optional, Callable, Dict
 
 
 class SCIONElement(object):
@@ -30,7 +30,10 @@ class SCIONElement(object):
         self.config = None  # type: Config
         self.addr = None  # type: SCIONAddr
 
-    def _parse_packet(self, packet: Raw) -> Optional[SCIONL4Packet]:
+    def _parse_packet(self, packet: bytes) -> SCIONL4Packet:
+        # Ensures(Result() is not None) # assuming well formed packet, not necessary, just return packet type for sure
+        Ensures(Acc(Result().State()))
+        Ensures(Unfolding(Result().State(), len(Result().ext_hdrs) == 0))
         pass
 
     def _scmp_validate_error(self, pkt: SCIONBasePacket, e: SCMPError) -> None:
@@ -38,3 +41,7 @@ class SCIONElement(object):
 
     def _get_handler(self, pkt: SCIONL4Packet) -> Optional[Callable[[SCIONL4Packet, bool], None]]:
         ...
+
+    @Predicate
+    def State(self) -> bool:
+        return Acc(self.addr) and Acc(self.addr.State()) and Acc(self.topology) and Acc(self.topology.State())

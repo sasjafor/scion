@@ -19,6 +19,8 @@
 import struct
 
 # SCION
+from nagini_contracts.contracts import Acc, Requires, Ensures, Result
+
 from lib.errors import SCIONIndexError, SCIONParseError
 from lib.packet.packet_base import Serializable
 from lib.packet.host_addr import (
@@ -170,7 +172,8 @@ class SCIONAddr(object):
         self.host = haddr_type(data.pop(haddr_type.LEN))
 
     @classmethod
-    def from_values(cls, isd_as, host):  # pragma: no cover
+    def from_values(cls, isd_as, host) -> 'SCIONAddr':  # pragma: no cover
+        Ensures(Result().State())
         """
         Create an instance of the class SCIONAddr.
 
@@ -209,3 +212,6 @@ class SCIONAddr(object):
         Return a string containing ISD-AS, and host address.
         """
         return "(%s (%s) %s)" % (self.isd_as, self.host.name(), self.host)
+
+    def State(self) -> bool:
+        return Acc(self.isd_as)

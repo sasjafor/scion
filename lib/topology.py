@@ -19,6 +19,10 @@
 import logging
 
 # SCION
+from typing import Optional
+
+from nagini_contracts.contracts import Predicate, Acc
+
 from lib.defines import (
     BEACON_SERVICE,
     CERTIFICATE_SERVICE,
@@ -27,7 +31,7 @@ from lib.defines import (
     SIBRA_SERVICE,
 )
 from lib.errors import SCIONKeyError
-from lib.packet.host_addr import haddr_parse_interface
+from lib.packet.host_addr import haddr_parse_interface, HostAddrBase
 from lib.packet.scion_addr import ISD_AS
 from lib.types import LinkType
 from lib.util import load_yaml_file
@@ -53,7 +57,6 @@ class Element(object):
         self.name = None
         if name is not None:
             self.name = str(name)
-
 
 class ServerElement(Element):
     """The ServerElement class represents one of the servers in the AS."""
@@ -94,6 +97,10 @@ class InterfaceElement(Element):
         if to_addr:
             self.to_addr = haddr_parse_interface(to_addr)
         self.to_if_id = 0  # Filled in later by IFID packets
+
+    # @Predicate
+    # def State(self) -> bool:
+    #     return Acc(self.addr)
 
 
 class RouterElement(Element):
@@ -240,3 +247,7 @@ class Topology(object):
         else:
             logging.critical("Could not find server: %s", server_id)
             raise SCIONKeyError from None
+
+    def State(self):
+        # TODO
+        pass

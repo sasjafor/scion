@@ -10,6 +10,10 @@ class Element(object):
         self.port = port
         self.name = None  # type: Optional[str]
 
+    @Predicate
+    def State(self) -> bool:
+        return Acc(self.addr)
+
 
 class Topology(object):
     def __init__(self) -> None:  # pragma: no cover
