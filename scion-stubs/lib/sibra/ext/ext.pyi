@@ -13,6 +13,6 @@ class SibraExtBase(HopByHopExtension):
         self.accepted = True
         self.error = False
 
-    @ContractOnly
-    def process(self, state: SibraState, spkt: SCIONL4Packet, from_local_as: bool, key: bytes) -> List[Tuple[int, str]]:
-        pass
+    # @ContractOnly
+    # def process(self, state: SibraState, spkt: SCIONL4Packet, from_local_as: bool, key: bytes) -> List[Tuple[int, str]]:
+    #     pass

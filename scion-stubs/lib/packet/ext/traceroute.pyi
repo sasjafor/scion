@@ -6,6 +6,6 @@ from lib.packet.scion_addr import ISD_AS
 
 class TracerouteExt(HopByHopExtension):
 
-    @ContractOnly
-    def append_hop(self, isd_as: ISD_AS, if_id: int, timestamp: int=None) -> None:  # pragma: no cover
+    # @ContractOnly
+    # def append_hop(self, isd_as: ISD_AS, if_id: int, timestamp: int=None) -> None:  # pragma: no cover
         pass

@@ -136,16 +136,16 @@ class Router(SCIONElement):
         self.sibra_key = PBKDF2(self.config.master_as_key, b"Derive SIBRA Key")
         self.if_states = defaultdict(InterfaceState)  # type: defaultdict[int, InterfaceState]
         self.revocations = ExpiringDict(1000, self.FWD_REVOCATION_TIMEOUT)  # type: ExpiringDict[RevocationInfo, bool]
-        self.pre_ext_handlers = {
-            SibraExtBase.EXT_TYPE: self.handle_sibra,
-            TracerouteExt.EXT_TYPE: self.handle_traceroute,
-            OneHopPathExt.EXT_TYPE: self.handle_one_hop_path,
-            ExtHopByHopType.SCMP: self.handle_scmp,
-        }
-        self.post_ext_handlers = {
-            SibraExtBase.EXT_TYPE: False, TracerouteExt.EXT_TYPE: False,
-            ExtHopByHopType.SCMP: False, OneHopPathExt.EXT_TYPE: False,
-        }
+        # self.pre_ext_handlers = {
+        #     SibraExtBase.EXT_TYPE: self.handle_sibra,
+        #     TracerouteExt.EXT_TYPE: self.handle_traceroute,
+        #     OneHopPathExt.EXT_TYPE: self.handle_one_hop_path,
+        #     ExtHopByHopType.SCMP: self.handle_scmp,
+        # }
+        # self.post_ext_handlers = {
+        #     SibraExtBase.EXT_TYPE: False, TracerouteExt.EXT_TYPE: False,
+        #     ExtHopByHopType.SCMP: False, OneHopPathExt.EXT_TYPE: False,
+        # }
         self.sibra_state = SibraState(
             self.interface.bandwidth,
             "%s#%s -> %s" % (self.addr.isd_as, self.interface.if_id,
@@ -238,10 +238,10 @@ class Router(SCIONElement):
         Ensures(len(Result()) == 0)
         if pre_routing_phase:
             prefix = "pre"
-            handlers = self.pre_ext_handlers  #type: Union[Dict[int, function], Dict[int, bool]]## type: Union[Dict[int, bool], Dict[int, Callable[[object, object, object], list]]]
+            # handlers = self.pre_ext_handlers  #type: Union[Dict[int, function], Dict[int, bool]]## type: Union[Dict[int, bool], Dict[int, Callable[[object, object, object], list]]]
         else:
             prefix = "post"
-            handlers = self.post_ext_handlers
+            # handlers = self.post_ext_handlers
         flags = []  # type: List[Tuple[int, ...]]
         # Hop-by-hop extensions must be first (just after path), and process
         # only MAX_HOPBYHOP_EXT number of them. If an SCMP ext header is
@@ -254,57 +254,57 @@ class Router(SCIONElement):
             #Invariant(Acc(spkt.ext_hdrs, 1/1000))
             #Invariant(Acc(list_pred(ext_hdrs), 1/1000))
             Invariant(len(ext_hdrs) == 0)
-
-            if ext_hdr.EXT_CLASS != ExtensionClass.HOP_BY_HOP:
-                break
-            if ext_hdr.EXT_TYPE == ExtHopByHopType.SCMP:
-                if i != 0:
-                    logging.error("SCMP ext header not first.")
-                    raise SCMPBadExtOrder(i)
-            else:
-                count += 1
-            if count > MAX_HOPBYHOP_EXT:
-                logging.error("Too many hop-by-hop extensions.")
-                raise SCMPTooManyHopByHop(i)
-            handler = handlers.get(ext_hdr.EXT_TYPE) # type: Optional[Union[function, bool]]
-            if handler is None:
-                logging.debug("No %s-handler for extension type %s",
-                              prefix, ext_hdr.EXT_TYPE)
-                raise SCMPBadHopByHop
-            if handler:
-                flags.extend(cast(Callable[[object, object, object], list], handler)(ext_hdr, spkt, from_local_as))
+            assert False
+            # if ext_hdr.EXT_CLASS != ExtensionClass.HOP_BY_HOP:
+            #     break
+            # if ext_hdr.EXT_TYPE == ExtHopByHopType.SCMP:
+            #     if i != 0:
+            #         logging.error("SCMP ext header not first.")
+            #         raise SCMPBadExtOrder(i)
+            # else:
+            #     count += 1
+            # if count > MAX_HOPBYHOP_EXT:
+            #     logging.error("Too many hop-by-hop extensions.")
+            #     raise SCMPTooManyHopByHop(i)
+            # handler = handlers.get(ext_hdr.EXT_TYPE) # type: Optional[Union[function, bool]]
+            # if handler is None:
+            #     logging.debug("No %s-handler for extension type %s",
+            #                   prefix, ext_hdr.EXT_TYPE)
+            #     raise SCMPBadHopByHop
+            # if handler:
+            #     flags.extend(cast(Callable[[object, object, object], list], handler)(ext_hdr, spkt, from_local_as))
         Fold(Acc(spkt.State(), 1 / 9))
         return flags
 
-    def handle_traceroute(self, hdr: TracerouteExt, spkt: SCIONL4Packet, _: bool) -> List[Tuple[int, str]]:
-        hdr.append_hop(self.addr.isd_as, self.interface.if_id)
-        return []
-
-    def handle_one_hop_path(self, hdr: ExtensionHeader, spkt: SCIONL4Packet, from_local_as: bool) -> List[Tuple[int]]:
-        if len(spkt.path) != InfoOpaqueField.LEN + 2 * HopOpaqueField.LEN:
-            logging.error("OneHopPathExt: incorrect path length.")
-            return [(RouterFlag.ERROR,)]
-        if not from_local_as:  # Remote packet, create the 2nd Hop Field
-            info = spkt.path.get_iof() # type: Optional[InfoOpaqueField]
-            hf1 = spkt.path.get_hof_ver(ingress=True)
-            exp_time = OneHopPathExt.HOF_EXP_TIME
-            hf2 = HopOpaqueField.from_values(exp_time, self.interface.if_id, 0)
-            hf2.set_mac(self.of_gen_key, info.timestamp, hf1)
-            # FIXME(PSz): quite brutal for now:
-            spkt.path = SCIONPath.from_values(info, [hf1, hf2])
-            spkt.path.inc_hof_idx()
-        return []
-
-    def handle_sibra(self, hdr: SibraExtBase, spkt: SCIONL4Packet, from_local_as: bool) -> List[Tuple[int, str]]:
-        ret = hdr.process(self.sibra_state, spkt, from_local_as,
-                          self.sibra_key)
-        logging.debug("Sibra state:\n%s", self.sibra_state)
-        return ret
-
-    def handle_scmp(self, hdr: SCMPExt, spkt: SCIONL4Packet, _: bool) -> List[Tuple[int]]:
-        if hdr.hopbyhop:
-            return [(RouterFlag.PROCESS_LOCAL,)]
-        return []
+    # def handle_traceroute(self, hdr: TracerouteExt, spkt: SCIONL4Packet, _: bool) -> List[Tuple[int, str]]:
+    #     hdr.append_hop(self.addr.isd_as, self.interface.if_id)
+    #     return []
+    #
+    # def handle_one_hop_path(self, hdr: ExtensionHeader, spkt: SCIONL4Packet, from_local_as: bool) -> List[Tuple[int]]:
+    #     if len(spkt.path) != InfoOpaqueField.LEN + 2 * HopOpaqueField.LEN:
+    #         logging.error("OneHopPathExt: incorrect path length.")
+    #         return [(RouterFlag.ERROR,)]
+    #     if not from_local_as:  # Remote packet, create the 2nd Hop Field
+    #         info = spkt.path.get_iof() # type: Optional[InfoOpaqueField]
+    #         hf1 = spkt.path.get_hof_ver(ingress=True)
+    #         exp_time = OneHopPathExt.HOF_EXP_TIME
+    #         hf2 = HopOpaqueField.from_values(exp_time, self.interface.if_id, 0)
+    #         hf2.set_mac(self.of_gen_key, info.timestamp, hf1)
+    #         # FIXME(PSz): quite brutal for now:
+    #         spkt.path = SCIONPath.from_values(info, [hf1, hf2])
+    #         spkt.path.inc_hof_idx()
+    #     return []
+    #
+    # def handle_sibra(self, hdr: SibraExtBase, spkt: SCIONL4Packet, from_local_as: bool) -> List[Tuple[int, str]]:
+    #     ret = hdr.process(self.sibra_state, spkt, from_local_as,
+    #                       self.sibra_key)
+    #     logging.debug("Sibra state:\n%s", self.sibra_state)
+    #     return ret
+    #
+    # def handle_scmp(self, hdr: SCMPExt, spkt: SCIONL4Packet, _: bool) -> List[Tuple[int]]:
+    #     if hdr.hopbyhop:
+    #         return [(RouterFlag.PROCESS_LOCAL,)]
+    #     return []
 
     # def sync_interface(self):
     #     """
@@ -770,18 +770,19 @@ class Router(SCIONElement):
         # Now check for other flags
         for (flag, *args) in flags:
             Invariant(len(flags) == 0)
-            assert False
-            # if flag == RouterFlag.FORWARD:
-            #     if from_local_as:
-            #         self._process_fwd_flag(pkt)
-            #     else:
-            #         self._process_fwd_flag(pkt, args[0])
-            #     return True, False
-            # elif flag in (RouterFlag.DELIVER, RouterFlag.FORCE_DELIVER):
-            #     self._process_deliver_flag(pkt, flag)
-            #     return True, False
-            # elif flag == RouterFlag.PROCESS_LOCAL:
-            #     process = True
+            Invariant(process == False)
+            #assert False
+            if flag == RouterFlag.FORWARD:
+                if from_local_as:
+                    self._process_fwd_flag(pkt)
+                else:
+                    self._process_fwd_flag(pkt, args[0])
+                return True, False
+            elif flag in (RouterFlag.DELIVER, RouterFlag.FORCE_DELIVER):
+                self._process_deliver_flag(pkt, flag)
+                return True, False
+            elif flag == RouterFlag.PROCESS_LOCAL:
+                process = True
         assert process == False
         return False, process
 
