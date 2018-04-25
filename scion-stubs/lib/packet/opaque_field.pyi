@@ -32,30 +32,30 @@ class OpaqueFieldList(Sized):
     def State(self) -> bool:
         return (Acc(self._order) and Acc(self._labels) and Acc(dict_pred(self._labels)) and
                 Forall(self.contents(), lambda e: (e.State())))
-               #Forall(self.contents(), lambda e: (e.State(), [[e in self.contents()]])))
+                # Forall(self.contents(), lambda e: (e.State(), [[e in self.contents()]])))
 
     @Pure
     @ContractOnly
     def contents(self) -> Sequence[OpaqueField]:
-        Requires(Acc(self._order) and Acc(self._labels))
-        Requires(dict_pred(self._labels))
+        Requires(Acc(self._order, 1/10) and Acc(self._labels, 1/10))
+        Requires(Acc(dict_pred(self._labels), 1/10))
         Ensures(len(Result()) == self.__len__())
 
     @Pure
     @ContractOnly
     def __len__(self) -> int:
-        Requires(Acc(self._labels))
-        Requires(dict_pred(self._labels))
+        Requires(Acc(self._labels, 1/10))
+        Requires(Acc(dict_pred(self._labels), 1/10))
         Ensures(Result() >= 0)
 
 
     @Pure
     @ContractOnly
     def get_by_idx(self, idx: int) -> OpaqueField:
-        Requires(self.State())
-        Requires(idx >= 0 and idx < Unfolding(self.State(), len(self)))
-        Ensures(Result() is Unfolding(self.State(), self.contents()[idx]))
-        Ensures(Result() in Unfolding(self.State(), self.contents()))
+        Requires(Acc(self.State(), 1/10))
+        Requires(idx >= 0 and idx < Unfolding(Acc(self.State(), 1/10), len(self)))
+        Ensures(Result() is Unfolding(Acc(self.State(), 1/10), self.contents()[idx]))
+        Ensures(Result() in Unfolding(Acc(self.State(), 1/10), self.contents()))
         # """
         # Get an OF by index. The index follows the order supplied when the
         # :class:`OpaqueFieldList` object was created.
@@ -102,7 +102,7 @@ class HopOpaqueField(OpaqueField):
     @Pure
     @ContractOnly
     def verify_mac(self, key: bytes, ts: int, prev_hof:'HopOpaqueField'=None) -> bool:  # pragma: no cover
-        Requires(Implies(prev_hof is not None, Acc(prev_hof.State(), 1/1000)))
+        Requires(Implies(prev_hof is not None, Acc(prev_hof.State(), 1/10)))
 
     @classmethod
     def from_values(cls, exp_time: int, ingress_if: int=0, egress_if: int=0,

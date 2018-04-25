@@ -42,41 +42,40 @@ class SCIONPath(Serializable, Sized):
 
     @Pure
     def get_iof(self) -> Optional[InfoOpaqueField]:  # pragma: no cover
-        Requires(self.State())
-        idx = Unfolding(self.State(), self._iof_idx)
+        Requires(Acc(self.State(), 1/10))
+        idx = Unfolding(Acc(self.State(), 1/10), self._iof_idx)
         if not isinstance(idx, int):
             return None
-        return cast(InfoOpaqueField, Unfolding(self.State(), self._ofs.get_by_idx(idx)))
+        return cast(InfoOpaqueField, Unfolding(Acc(self.State(), 1/10), self._ofs.get_by_idx(idx)))
 
     @Pure
     def get_hof(self) -> Optional[HopOpaqueField]:  # pragma: no cover
-        Requires(self.State())
-        idx = Unfolding(self.State(), self._hof_idx)
+        Requires(Acc(self.State(), 1/10))
+        idx = Unfolding(Acc(self.State(), 1/10), self._hof_idx)
         if not isinstance(idx, int):
             return None
-        return cast(HopOpaqueField, Unfolding(self.State(), self._ofs.get_by_idx(idx)))
+        return cast(HopOpaqueField, Unfolding(Acc(self.State(), 1/10), self._ofs.get_by_idx(idx)))
 
     @Pure
     def get_hof_ver(self, ingress: bool =True) -> Optional[HopOpaqueField]:
-        Requires(self.State())
-        Requires(Unfolding(self.State(), isinstance(self._iof_idx, int) and isinstance(self._hof_idx, int)))
+        Requires(Acc(self.State(), 1/10))
+        Requires(Unfolding(Acc(self.State(), 1/10), isinstance(self._iof_idx, int) and isinstance(self._hof_idx, int)))
         """Return the :any:`HopOpaqueField` needed to verify the current HOF."""
         iof = self.get_iof()
         hof = self.get_hof()
-        #if Unfolding(self.State(), Unfolding(self._ofs.State(), Unfolding(hof.State(), Unfolding(iof.State(), not hof.xover or (iof.shortcut and not iof.peer))))):
-        if Unfolding(hof.State(), Unfolding(iof.State(), not hof.xover or (iof.shortcut and not iof.peer))):
+        if Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self._ofs.State(), 1/10), Unfolding(Acc(hof.State(), 1/10), Unfolding(Acc(iof.State(), 1/10), not hof.xover or (iof.shortcut and not iof.peer))))):
             # For normal hops on any type of segment, or cross-over hops on
             # non-peer shortcut hops, just use next/prev HOF.
             return self._get_hof_ver_normal(iof)
-        iof_peer = Unfolding(self.State(), Unfolding(self._ofs.State(), Unfolding(iof.State(), iof.peer)))
-        iof_up_flag = Unfolding(self.State(), Unfolding(self._ofs.State(), Unfolding(iof.State(), iof.up_flag)))
+        iof_peer = Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self._ofs.State(), 1/10), Unfolding(Acc(iof.State(), 1/10), iof.peer)))
+        iof_up_flag = Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self._ofs.State(), 1/10), Unfolding(Acc(iof.State(), 1/10), iof.up_flag)))
         if iof_peer:
             # Peer shortcut paths have two extra HOFs; 1 for the peering
             # interface, and another from the upstream interface, used for
             # verification only.
             if ingress:
                 if iof_up_flag:
-                    offset = 2  # type: Optional[int]
+                    offset = 2  ## type: Optional[int]
                 else:
                     offset = 1
             else:
@@ -101,22 +100,21 @@ class SCIONPath(Serializable, Sized):
         # offset of the verification HOF (or None, if there's no relevant HOF).
         if not isinstance(offset, int):
             return None
-        return cast(HopOpaqueField, Unfolding(self.State(), self._ofs.get_by_idx(self._hof_idx + offset)))
+        return cast(HopOpaqueField, Unfolding(Acc(self.State(), 1/10), self._ofs.get_by_idx(self._hof_idx + offset)))
 
     @Pure
-    @ContractOnly
     def _get_hof_ver_normal(self, iof: InfoOpaqueField) -> Optional[HopOpaqueField]:
-        Requires(self.State())
-        Requires(Unfolding(self.State(), Unfolding(self._ofs.State(), iof in self._ofs.contents())))
-        # # Requires iof in bla
-        # # If this is the last hop of an Up path, or the first hop of a Down
-        # # path, there's no previous HOF to verify against.
-        # if (iof.up_flag and self._hof_idx == self._iof_idx + iof.hops) or (
-        #         not iof.up_flag and self._hof_idx == self._iof_idx + 1):
-        #     return None
-        # # Otherwise use the next/prev HOF based on the up flag.
-        # offset = 1 if iof.up_flag else -1
-        # return self._ofs.get_by_idx(self._hof_idx + offset)
+        Requires(Acc(self.State(), 1/10))
+        Requires(Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self._ofs.State(), 1/10), iof in self._ofs.contents())))
+        # Requires iof in bla
+        # If this is the last hop of an Up path, or the first hop of a Down
+        # path, there's no previous HOF to verify against.
+        if Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self._ofs.State(), 1/10), Unfolding(Acc(iof.State(), 1/10), (iof.up_flag and self._hof_idx == self._iof_idx + iof.hops) or (
+                not iof.up_flag and self._hof_idx == self._iof_idx + 1)))):
+            return None
+        # Otherwise use the next/prev HOF based on the up flag.
+        offset = 1 if Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self._ofs.State(), 1/10), Unfolding(Acc(iof.State(), 1/10), iof.up_flag))) else -1
+        return cast(HopOpaqueField, Unfolding(Acc(self.State(), 1/10), self._ofs.get_by_idx(self._hof_idx + offset)))
 
     def is_on_last_segment(self) -> bool:
         ...
@@ -147,5 +145,5 @@ class SCIONPath(Serializable, Sized):
 
 @Pure
 def valid_hof(path: SCIONPath) -> bool:
-    Requires(path.State())
+    Requires(Acc(path.State(), 1/10))
     return True

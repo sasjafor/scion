@@ -92,7 +92,7 @@ class RouterFlag(TypeBase):
     ERROR = 0
     NO_PROCESS = 1
     # Process this locally
-    PROCESS_LOCAL = 2
+    PROCESS_LOCAL = 2 # type: int
     # Forward packet to supplied IFID
     FORWARD = 3
     # Packet has reached its destination ISD-AS
