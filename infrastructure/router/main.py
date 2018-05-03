@@ -514,7 +514,6 @@ class Router(SCIONElement):
         #Exsures(SCIONBaseError, not valid_hof(path))
         """Verify freshness and authentication of an opaque field."""
         iof = path.get_iof()
-        assert isinstance(iof, InfoOpaqueField)
         ts = Unfolding(Acc(path.State(), 1/10), Unfolding(Acc(path._ofs.State(), 1/10), Unfolding(Acc(iof.State(), 1/10), iof.timestamp)))
         hof = path.get_hof()
         prev_hof = path.get_hof_ver(ingress=ingress)
@@ -536,7 +535,7 @@ class Router(SCIONElement):
             Fold(Acc(self.State(), 1 / 10))
             raise SCIONOFExpiredError(hof)
         #Fold(Acc(iof.State(), 1 / 10))
-        Fold(Acc(self.State(), 1 / 10))
+        #Fold(Acc(self.State(), 1 / 10))
 
     def _egress_forward(self, t: Place, spkt: SCIONL4Packet) -> Place:
         logging.debug("Forwarding to remote interface: %s:%s",
@@ -752,10 +751,8 @@ class Router(SCIONElement):
         :returns:
         """
         Requires(Acc(list_pred(flags), 1/9))
-        #Requires(list_pred(flags))
         Requires(len(flags) == 0)
         Ensures(Acc(list_pred(flags), 1/9))
-        #Ensures(list_pred(flags))
         Ensures(not Result()[1])
         process = False
         # First check if any error or no_process flags are set
@@ -766,12 +763,10 @@ class Router(SCIONElement):
                 return True, False
             elif flag == RouterFlag.NO_PROCESS:
                 return True, False
-        assert process == False
         # Now check for other flags
         for (flag, *args) in flags:
             Invariant(len(flags) == 0)
             Invariant(process == False)
-            #assert False
             if flag == RouterFlag.FORWARD:
                 if from_local_as:
                     self._process_fwd_flag(pkt)
@@ -783,7 +778,6 @@ class Router(SCIONElement):
                 return True, False
             elif flag == RouterFlag.PROCESS_LOCAL:
                 process = True
-        assert process == False
         return False, process
 
     def _process_fwd_flag(self, pkt: SCIONL4Packet, ifid: int=None) -> None:
