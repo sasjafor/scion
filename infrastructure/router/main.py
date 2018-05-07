@@ -486,32 +486,32 @@ class Router(SCIONElement):
             If set, allow packets to be delivered locally that would otherwise
             be disallowed.
         """
-        # Unfold(Acc(spkt.State(), 1/10))
-        # if not force and Unfolding(Acc(spkt.addrs.State(), 1/10), Unfolding(Acc(spkt.addrs.dst.State(), 1/10), spkt.addrs.dst.isd_as)) != Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.addr.State(), 1/10), self.addr.isd_as)):
-        #     logging.error("Tried to deliver a non-local packet:\n%s", spkt)
-        #     Fold(Acc(spkt.State(), 1/10))
-        #     raise SCMPDeliveryNonLocal
-        # if len(spkt.path):
-        #     hof = spkt.path.get_hof()
-        #     if not force and hof.forward_only:
-        #         Fold(Acc(spkt.State(), 1 / 10))
-        #         raise SCMPDeliveryFwdOnly
-        #     if hof.verify_only:
-        #         Fold(Acc(spkt.State(), 1 / 10))
-        #         raise SCMPNonRoutingHOF
-        # # Forward packet to destination.
-        # addr = Unfolding(Acc(spkt.addrs.State(), 1/10), Unfolding(Acc(spkt.addrs.dst, 1/10), spkt.addrs.dst.host))
-        # if addr.TYPE == AddrType.SVC:
-        #     # Send request to any server.
-        #     try:
-        #         service = SVC_TO_SERVICE[addr.addr]
-        #         addr = self.get_srv_addr(service, spkt)
-        #     except SCIONServiceLookupError as e:
-        #         logging.error("Unable to deliver path mgmt packet: %s", e)
-        #         Fold(Acc(spkt.State(), 1 / 10))
-        #         raise SCMPUnknownHost
-        # Fold(Acc(spkt.State(), 1 / 10))
-        # self.send(t, spkt, addr, SCION_UDP_EH_DATA_PORT)
+        Unfold(Acc(spkt.State(), 1/10))
+        if not force and Unfolding(Acc(spkt.addrs.State(), 1/10), Unfolding(Acc(spkt.addrs.dst.State(), 1/10), spkt.addrs.dst.isd_as)) != Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.addr.State(), 1/10), self.addr.isd_as)):
+            logging.error("Tried to deliver a non-local packet:\n%s", spkt)
+            Fold(Acc(spkt.State(), 1/10))
+            raise SCMPDeliveryNonLocal
+        if len(spkt.path):
+            hof = spkt.path.get_hof()
+            if not force and hof.forward_only:
+                Fold(Acc(spkt.State(), 1 / 10))
+                raise SCMPDeliveryFwdOnly
+            if hof.verify_only:
+                Fold(Acc(spkt.State(), 1 / 10))
+                raise SCMPNonRoutingHOF
+        # Forward packet to destination.
+        addr = Unfolding(Acc(spkt.addrs.State(), 1/10), Unfolding(Acc(spkt.addrs.dst, 1/10), spkt.addrs.dst.host))
+        if addr.TYPE == AddrType.SVC:
+            # Send request to any server.
+            try:
+                service = SVC_TO_SERVICE[addr.addr]
+                addr = self.get_srv_addr(service, spkt)
+            except SCIONServiceLookupError as e:
+                logging.error("Unable to deliver path mgmt packet: %s", e)
+                Fold(Acc(spkt.State(), 1 / 10))
+                raise SCMPUnknownHost
+        Fold(Acc(spkt.State(), 1 / 10))
+        self.send(t, spkt, addr, SCION_UDP_EH_DATA_PORT)
 
     def verify_hof(self, path: SCIONPath, ingress: bool = True) -> None:
         Requires(Acc(path.State(), 1 / 9))
