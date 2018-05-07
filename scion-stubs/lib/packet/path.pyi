@@ -137,22 +137,54 @@ class SCIONPath(Serializable, Sized):
     def is_on_last_segment(self) -> bool:
         ...
 
+    @Pure
     def get_fwd_if(self) -> int:
-        ...
+        Requires(Acc(self.State(), 1/10))
+        Requires(Unfolding(Acc(self.State(), 1/10), isinstance(self._iof_idx, int)))
+        Requires(Unfolding(Acc(self.State(), 1/10), isinstance(self._hof_idx, int)))
+        """Return the interface to forward the current packet to."""
+        if not len(Unfolding(Acc(self.State(), 1/10), self._ofs)):
+            return 0
+        iof = self.get_iof()
+        hof = self.get_hof()
+        if Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self._ofs.State(), 1/10), Unfolding(Acc(iof.State(), 1/10), iof.up_flag))):
+            return Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self._ofs.State(), 1/10), Unfolding(Acc(hof.State(), 1/10), hof.ingress_if)))
+        return Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self._ofs.State(), 1/10), Unfolding(Acc(hof.State(), 1/10), hof.egress_if)))
 
     def inc_hof_idx(self) -> bool:
         ...
 
+    @Pure
     def get_of_idxs(self) -> Tuple[int, int]:
-        ...
+        Requires(Acc(self.State(), 1/10))
+        Requires(Unfolding(Acc(self.State(), 1/10), self._iof_idx is not None))
+        Requires(Unfolding(Acc(self.State(), 1/10), self._hof_idx is not None))
+        """
+        Get current InfoOpaqueField and HopOpaqueField indexes.
+
+        :return: Tuple (int, int) of IOF index and HOF index, respectively.
+        """
+        return Unfolding(Acc(self.State(), 1/10), self._iof_idx), Unfolding(Acc(self.State(), 1/10), self._hof_idx)
 
     @Pure
     def __len__(self) -> int:
         Requires(self.State())
         return Unfolding(self.State(), Unfolding(self._ofs.State(), len(self._ofs))) * OpaqueField.LEN
 
+    @Pure
     def get_curr_if(self, ingress: bool=True) -> int:
-        ...
+        Requires(Acc(self.State(), 1/10))
+        Requires(Unfolding(Acc(self.State(), 1/10), isinstance(self._iof_idx, int)))
+        Requires(Unfolding(Acc(self.State(), 1/10), isinstance(self._hof_idx, int)))
+        """
+        Return the current interface, depending on the direction of the
+        segment.
+        """
+        # hof = self.get_hof()
+        # iof = self.get_iof()
+        # if ingress == Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self._ofs.State(), 1/10), Unfolding(Acc(iof.State(), 1/10), iof.up_flag))):
+        #     return Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self._ofs.State(), 1/10), Unfolding(Acc(hof.State(), 1/10), hof.egress_if)))
+        # return Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self._ofs.State(), 1/10), Unfolding(Acc(hof.State(), 1/10), hof.ingress_if)))
 
     @classmethod
     def from_values(cls, a_iof: InfoOpaqueField=None, a_hofs: List[HopOpaqueField]=None,
