@@ -1,3 +1,5 @@
+from typing import Dict
+
 from lib.packet.host_addr import HostAddrSVC
 
 

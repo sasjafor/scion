@@ -25,3 +25,11 @@ class SCIONAddr(object):
     @classmethod
     def from_values(cls, isd_as: Optional[ISD_AS], host: Optional[HostAddrBase]) -> 'SCIONAddr':  # pragma: no cover
         ...
+
+    # @classmethod
+    # def calc_len(cls, type_):  # pragma: no cover
+    #     class_ = haddr_get_type(type_)
+    #     return ISD_AS.LEN + class_.LEN
+
+    def pack(self) -> bytes:  # pragma: no cover
+        ...

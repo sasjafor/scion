@@ -725,30 +725,31 @@ class SCIONElement(object):
     #
     # def _quiet_startup(self):
     #     return (time.time() - self._startup) < self.STARTUP_QUIET_PERIOD
-    #
-    # def dns_query_topo(self, qname):
-    #     """
-    #     Query dns for an answer. If the answer is empty, or an error occurs then
-    #     return the relevant topology entries instead.
-    #
-    #     :param str qname: Service to query for.
-    #     """
-    #     assert qname in SERVICE_TYPES
-    #     service_map = {
-    #         BEACON_SERVICE: self.topology.beacon_servers,
-    #         CERTIFICATE_SERVICE: self.topology.certificate_servers,
-    #         PATH_SERVICE: self.topology.path_servers,
-    #         SIBRA_SERVICE: self.topology.sibra_servers,
-    #     }
-    #     # Generate fallback from local topology
-    #     results = [(srv.addr, srv.port) for srv in service_map[qname]]
-    #     # FIXME(kormat): replace with new discovery service when that's ready.
-    #     #  results = self._dns.query(qname, fallback, self._quiet_startup())
-    #     if not results:
-    #         # No results from local toplogy either
-    #         raise SCIONServiceLookupError("No %s servers found" % qname)
-    #     return results
-    #
+
+    @ContractOnly
+    def dns_query_topo(self, qname: str) -> List[Tuple[HostAddrBase, int]]:
+        """
+        Query dns for an answer. If the answer is empty, or an error occurs then
+        return the relevant topology entries instead.
+
+        :param str qname: Service to query for.
+        """
+        # assert qname in SERVICE_TYPES
+        # service_map = {
+        #     BEACON_SERVICE: self.topology.beacon_servers,
+        #     CERTIFICATE_SERVICE: self.topology.certificate_servers,
+        #     PATH_SERVICE: self.topology.path_servers,
+        #     SIBRA_SERVICE: self.topology.sibra_servers,
+        # } # type: Dict[str, List[RouterElement]]
+        # # Generate fallback from local topology
+        # results = [(srv.addr, srv.port) for srv in service_map[qname]]
+        # # FIXME(kormat): replace with new discovery service when that's ready.
+        # #  results = self._dns.query(qname, fallback, self._quiet_startup())
+        # if not results:
+        #     # No results from local toplogy either
+        #     raise SCIONServiceLookupError("No %s servers found" % qname)
+        # return results
+
     # def _verify_revocation_for_asm(self, rev_info, as_marking, verify_all=True):
     #     """
     #     Verifies a revocation for a given AS marking.

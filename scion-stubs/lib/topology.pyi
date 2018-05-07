@@ -20,6 +20,10 @@ class Topology(object):
         self.is_core_as = False
         self.mtu = None  # type: Optional[int]
         self.isd_as = None  # type: Optional[ISD_AS]
+        self.beacon_servers = [] # type: List[RouterElement]
+        self.certificate_servers = [] # type: List[RouterElement]
+        self.path_servers = [] # type: List[RouterElement]
+        self.sibra_servers = [] # type: List[RouterElement]
 
     @Predicate
     def State(self) -> bool:

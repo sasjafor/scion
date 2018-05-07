@@ -2,12 +2,12 @@ from lib.errors import SCIONBaseError, SCIONChecksumFailed
 from lib.packet.ext_hdr import ExtensionHeader
 from lib.packet.packet_base import PacketBase
 from lib.util import calc_padding, Raw
-from lib.packet.host_addr import HostAddrIPv4, HostAddrIPv6, HostAddrSVC
+from lib.packet.host_addr import HostAddrIPv4, HostAddrIPv6, HostAddrSVC#, HostAddrInvalidType
 from lib.packet.packet_base import Serializable, L4HeaderBase
 from lib.packet.path import SCIONPath
 from lib.packet.scion_addr import ISD_AS, SCIONAddr
 from lib.packet.scmp.payload import SCMPPayload
-from lib.packet.scmp.errors import SCMPError
+from lib.packet.scmp.errors import SCMPError, SCMPBadSrcType, SCMPBadDstType
 from lib.packet.scmp.ext import SCMPExt
 from lib.sibra.ext.ext import SibraExtBase
 from lib.types import AddrType, L4Proto
@@ -163,6 +163,40 @@ class SCIONAddrHdr(Serializable):
         Requires(AddressType(self.dst))
         data_len = Unfolding(self.State(), addr_len(self.src) + addr_len(self.dst))
         return calc_padding(data_len, SCIONAddrHdr.BLK_SIZE)
+
+    def pack(self) -> bytes:
+        ...
+        # self.update()
+        # packed = []
+        # packed.append(self.src.pack())
+        # packed.append(self.dst.pack())
+        # packed.append(bytes(self._pad_len))
+        # raw = b"".join(packed)
+        # assert len(raw) % self.BLK_SIZE == 0
+        # assert len(raw) == self._total_len
+        # return raw
+
+    def update(self) -> None:
+        ...
+        # self._total_len, self._pad_len = self.calc_lens(
+        #     self.src.host.TYPE, self.dst.host.TYPE)
+
+    # @classmethod
+    # def calc_lens(cls, src_type, dst_type):
+    #     try:
+    #         data_len = SCIONAddr.calc_len(src_type)
+    #     except HostAddrInvalidType:
+    #         raise SCMPBadSrcType(
+    #             "Unsupported src address type: %s" % src_type) from None
+    #     try:
+    #         data_len += SCIONAddr.calc_len(dst_type)
+    #     except HostAddrInvalidType:
+    #         raise SCMPBadDstType(
+    #             "Unsupported dst address type: %s" % dst_type) from None
+    #     pad_len = calc_padding(data_len, cls.BLK_SIZE)
+    #     total_len = data_len + pad_len
+    #     assert total_len % cls.BLK_SIZE == 0
+    #     return total_len, pad_len
 
     @Predicate
     def State(self) -> bool:

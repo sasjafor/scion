@@ -52,6 +52,7 @@ from lib.errors import (
 )
 from lib.log import log_exception
 from lib.msg_meta import RawMetadata
+from lib.packet.svc import SVC_TO_SERVICE
 from lib.sibra.ext.ext import SibraExtBase
 from lib.packet.ext.one_hop_path import OneHopPathExt
 from lib.packet.ext.traceroute import TracerouteExt
@@ -199,11 +200,11 @@ class Router(SCIONElement):
     #     SCIONElement.run(self)
 
     def send(self, t: Place, packet: SCIONL4Packet, dst: HostAddrBase, dst_port: int) -> Place:
-        IOExists1(Place)(lambda t2: (
-            Requires(Acc(self.State(), 1/9) and Acc(packet.State(), 1/8) and Unfolding(Acc(packet.State(), 1/100), len(packet.ext_hdrs) == 0)),
-            Requires(token(t, 2) and udp_send(t, packed(packet), str(dst), dst_port, t2)),
-            Ensures(Acc(self.State(), 1/9) and Acc(packet.State(), 1/8) and Result() is t2 and token(t2))
-        ))
+        # IOExists1(Place)(lambda t2: (
+        #     Requires(Acc(self.State(), 1/9) and Acc(packet.State(), 1/8) and Unfolding(Acc(packet.State(), 1/100), len(packet.ext_hdrs) == 0)),
+        #     Requires(token(t, 2) and udp_send(t, packed(packet), str(dst), dst_port, t2)),
+        #     Ensures(Acc(self.State(), 1/9) and Acc(packet.State(), 1/8) and Result() is t2 and token(t2))
+        # ))
         """
         Send a packet to dst (class of that object must implement
         __str__ which returns IP addr string) using port and local or remote
@@ -366,20 +367,21 @@ class Router(SCIONElement):
     #     for addr in set([a for a, _ in bs_addrs]):
     #         pkt.set_payload(ifid_pld.copy())
     #         self.send(pkt, addr, SCION_UDP_EH_DATA_PORT)
-    #
-    # def get_srv_addr(self, service, pkt):
-    #     """
-    #     For a given service return a server address. Guarantee that all packets
-    #     from the same source to a given service are sent to the same server.
-    #
-    #     :param str service: Service to query for.
-    #     :type pkt: :class:`lib.packet.scion.SCIONBasePacket`
-    #
-    #     """
-    #     addrs = self.dns_query_topo(service)
-    #     addrs.sort()  # To not rely on order of DNS replies.
-    #     return addrs[zlib.crc32(pkt.addrs.pack()) % len(addrs)][0]
-    #
+
+    @ContractOnly
+    def get_srv_addr(self, service: str, pkt: SCIONL4Packet) -> HostAddrBase:
+        """
+        For a given service return a server address. Guarantee that all packets
+        from the same source to a given service are sent to the same server.
+
+        :param str service: Service to query for.
+        :type pkt: :class:`lib.packet.scion.SCIONBasePacket`
+
+        """
+        # addrs = self.dns_query_topo(service)
+        # addrs.sort()  # To not rely on order of DNS replies.
+        # return addrs[zlib.crc32(pkt.addrs.pack()) % len(addrs)][0]
+
     # def process_path_mgmt_packet(self, mgmt_pkt, from_local_as):
     #     """
     #     Process path management packets.
@@ -470,8 +472,7 @@ class Router(SCIONElement):
     #     # then drop the packet as the interface is down.
     #     self.handle_data(rev_pkt, ingress, drop_on_error=True)
 
-    def deliver(self, spkt: SCIONL4Packet, force: bool=True) -> None:
-        Requires(False)
+    def deliver(self, t: Place, spkt: SCIONL4Packet, force: bool=True) -> None:
         """
         Forwards the packet to the end destination within the current AS.
         #     :param spkt: The SCION Packet to forward.
@@ -480,26 +481,26 @@ class Router(SCIONElement):
             If set, allow packets to be delivered locally that would otherwise
             be disallowed.
         """
-    #     if not force and spkt.addrs.dst.isd_as != self.addr.isd_as:
-    #         logging.error("Tried to deliver a non-local packet:\n%s", spkt)
-    #         raise SCMPDeliveryNonLocal
-    #     if len(spkt.path):
-    #         hof = spkt.path.get_hof()
-    #         if not force and hof.forward_only:
-    #             raise SCMPDeliveryFwdOnly
-    #         if hof.verify_only:
-    #             raise SCMPNonRoutingHOF
-    #     # Forward packet to destination.
-    #     addr = spkt.addrs.dst.host
-    #     if addr.TYPE == AddrType.SVC:
-    #         # Send request to any server.
-    #         try:
-    #             service = SVC_TO_SERVICE[addr.addr]
-    #             addr = self.get_srv_addr(service, spkt)
-    #         except SCIONServiceLookupError as e:
-    #             logging.error("Unable to deliver path mgmt packet: %s", e)
-    #             raise SCMPUnknownHost
-    #     self.send(spkt, addr, SCION_UDP_EH_DATA_PORT)
+        # if not force and spkt.addrs.dst.isd_as != self.addr.isd_as:
+        #     logging.error("Tried to deliver a non-local packet:\n%s", spkt)
+        #     raise SCMPDeliveryNonLocal
+        # if len(spkt.path):
+        #     hof = spkt.path.get_hof()
+        #     if not force and hof.forward_only:
+        #         raise SCMPDeliveryFwdOnly
+        #     if hof.verify_only:
+        #         raise SCMPNonRoutingHOF
+        # # Forward packet to destination.
+        # addr = spkt.addrs.dst.host
+        # if addr.TYPE == AddrType.SVC:
+        #     # Send request to any server.
+        #     try:
+        #         service = SVC_TO_SERVICE[addr.addr]
+        #         addr = self.get_srv_addr(service, spkt)
+        #     except SCIONServiceLookupError as e:
+        #         logging.error("Unable to deliver path mgmt packet: %s", e)
+        #         raise SCMPUnknownHost
+        # self.send(t, spkt, addr, SCION_UDP_EH_DATA_PORT)
 
     def verify_hof(self, path: SCIONPath, ingress: bool = True) -> None:
         Requires(Acc(path.State(), 1 / 9))
@@ -525,6 +526,7 @@ class Router(SCIONElement):
             Fold(Acc(self.State(), 1 / 10))
             raise SCIONIFVerificationError(hof, iof)
 
+        # Assert(Implies(prev_hof is not None, Acc(prev_hof.State(), 1/10)))
         if int(SCIONTime.get_time()) <= ts + Unfolding(Acc(path.State(), 1/10), Unfolding(Acc(path._ofs.State(), 1/10), Unfolding(Acc(hof.State(), 1/10), hof.exp_time))) * EXP_TIME_UNIT:
             if not Unfolding(Acc(path.State(), 1/10), Unfolding(Acc(path._ofs.State(), 1/10), hof.verify_mac(self.of_gen_key, ts, prev_hof))):
                 # Fold(Acc(iof.State(), 1 / 10))
@@ -535,7 +537,7 @@ class Router(SCIONElement):
             Fold(Acc(self.State(), 1 / 10))
             raise SCIONOFExpiredError(hof)
         #Fold(Acc(iof.State(), 1 / 10))
-        #Fold(Acc(self.State(), 1 / 10))
+        Fold(Acc(self.State(), 1 / 10))
 
     def _egress_forward(self, t: Place, spkt: SCIONL4Packet) -> Place:
         logging.debug("Forwarding to remote interface: %s:%s",
@@ -591,18 +593,19 @@ class Router(SCIONElement):
     def _process_data(self, t: Place, spkt: SCIONL4Packet, ingress: bool, drop_on_error: bool) -> Place:
         Requires(Acc(spkt.State(), 1 / 2))
         Requires(Acc(self.State(), 1 / 2))
-        Requires(Unfolding(Rd(self.State()), Unfolding(Rd(self.topology.State()), isinstance(self.topology.mtu, int))))
-        Requires(Unfolding(Rd(spkt.State()), spkt.path != None))
-        # Requires(Unfolding(Rd(spkt.State()), Unfolding(Rd(spkt.path.State()), isinstance(spkt.path._iof_idx, int))))
-        # Requires(Unfolding(Rd(spkt.State()), Unfolding(Rd(spkt.path.State()), isinstance(spkt.path._hof_idx, int))))
+        Requires(Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.topology.State(), 1/10), isinstance(self.topology.mtu, int))))
+        Requires(Unfolding(Acc(spkt.State(), 1/10), spkt.path is not None and spkt.addrs is not None))
+        Requires(Unfolding(Acc(spkt.State(), 1/10), Unfolding(Acc(spkt.addrs.State(), 1/10), spkt.addrs.dst is not None)))
+        Requires(Unfolding(Acc(spkt.State(), 1/10), Unfolding(Acc(spkt.path.State(), 1/10), isinstance(spkt.path._iof_idx, int))))
+        Requires(Unfolding(Acc(spkt.State(), 1/10), Unfolding(Acc(spkt.path.State(), 1/10), isinstance(spkt.path._hof_idx, int))))
         Ensures(Acc(spkt.State(), 1 / 2))
         Ensures(Acc(self.State(), 1 / 2))
         Exsures(SCIONBaseError, Acc(spkt.State(), 1 / 2))
         Exsures(SCIONBaseError, Acc(self.State(), 1 / 2))
         # Exsures(SCIONBaseError, Unfolding(Rd(spkt.State()), spkt.path != None))
         # Exsures(SCIONBaseError, Unfolding(Rd(spkt.State()), Unfolding(Rd(spkt.path.State()), not valid_hof(spkt.path))))
-        path = Unfolding(Rd(spkt.State()), spkt.path)
-        if len(spkt) > Unfolding(Rd(self.State()), Unfolding(Rd(self.topology.State()), self.topology.mtu)):
+        path = Unfolding(Acc(spkt.State(), 1/10), spkt.path)
+        if len(spkt) > Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.topology.State(), 1/10), self.topology.mtu)):
             # FIXME(kormat): ignore this check for now, as PCB packets are often
             # over MTU, it's just that udp-overlay handles fragmentation for us.
             # Once we have TCP/SCION, this check should be re-instated.
@@ -610,16 +613,18 @@ class Router(SCIONElement):
             # if on egress.
             #  raise SCMPOversizePkt("Packet larger than mtu", mtu)
             pass
-        Unfold(Acc(spkt.State(), 1 / 4))
+        Unfold(Acc(spkt.State(), 1/4))
         self.verify_hof(path, ingress=ingress)
         hof = spkt.path.get_hof()
-        if hof.verify_only:
+        if Unfolding(Acc(spkt.path.State(), 1/10), Unfolding(Acc(spkt.path._ofs.State(), 1/10), Unfolding(Acc(hof.State(), 1/10), hof.verify_only))):
+            Fold(Acc(spkt.State(), 1/4))
             raise SCMPNonRoutingHOF
         # FIXME(aznair): Remove second condition once PathCombinator is less
         # stupid.
-        if (spkt.addrs.dst.isd_as == self.addr.isd_as and
+        if (Unfolding(Acc(spkt.addrs.State(), 1/10), Unfolding(Acc(spkt.addrs.dst.State(), 1/10), spkt.addrs.dst.isd_as)) == Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.addr.State(), 1/10), self.addr.isd_as)) and
                 spkt.path.is_on_last_segment()):
-            self.deliver(spkt)
+            self.deliver(t, spkt)
+            Fold(Acc(spkt.State(), 1 / 4))
             return t
         if ingress:
             prev_if = path.get_curr_if()
@@ -632,6 +637,7 @@ class Router(SCIONElement):
                 self._validate_segment_switch(
                     path, fwd_if, prev_if, prev_iof, prev_hof)
             elif skipped_vo:
+                Fold(Acc(spkt.State(), 1 / 4))
                 raise SCIONSegmentSwitchError("Skipped verify only field, but "
                                               "did not switch segments.")
         else:
@@ -654,12 +660,15 @@ class Router(SCIONElement):
                 logging.debug("IF is down, but drop_on_error is set, dropping")
                 return t
             self.send_revocation(spkt, fwd_if, ingress, path_incd)
+            Fold(Acc(spkt.State(), 1 / 4))
             return t
         if ingress:
             logging.debug("Sending to IF %s (%s:%s)", fwd_if, if_addr, port)
+            Fold(Acc(spkt.State(), 1 / 4))
             return self.send(t, spkt, if_addr, port)
         else:
             path.inc_hof_idx()
+            Fold(Acc(spkt.State(), 1 / 4))
             return self._egress_forward(t, spkt)
 
     def _validate_segment_switch(self, path: SCIONPath, fwd_if: int, prev_if: int,
