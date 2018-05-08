@@ -12,7 +12,9 @@ class Element(object):
 
     @Predicate
     def State(self) -> bool:
-        return Acc(self.addr)
+        return (Acc(self.addr) and
+                Acc(self.port) and
+                Acc(self.name))
 
 
 class Topology(object):
@@ -24,10 +26,31 @@ class Topology(object):
         self.certificate_servers = [] # type: List[RouterElement]
         self.path_servers = [] # type: List[RouterElement]
         self.sibra_servers = [] # type: List[RouterElement]
+        self.parent_border_routers = [] # type: List[RouterElement]
+        self.child_border_routers = [] # type: List[RouterElement]
+        self.peer_border_routers = [] # type: List[RouterElement]
+        self.routing_border_routers = [] # type: List[RouterElement]
 
     @Predicate
     def State(self) -> bool:
-        return Acc(self.is_core_as) and Acc(self.mtu) and Acc(self.isd_as)
+        return (Acc(self.is_core_as) and Acc(self.mtu) and Acc(self.isd_as) and
+                Acc(self.beacon_servers) and list_pred(self.beacon_servers) and
+                Acc(self.certificate_servers) and list_pred(self.certificate_servers) and
+                Acc(self.path_servers) and list_pred(self.path_servers) and
+                Acc(self.sibra_servers) and list_pred(self.sibra_servers) and
+                Acc(self.parent_border_routers) and list_pred(self.parent_border_routers) and
+                Acc(self.child_border_routers) and list_pred(self.child_border_routers) and
+                Acc(self.peer_border_routers) and list_pred(self.peer_border_routers) and
+                Acc(self.routing_border_routers) and list_pred(self.routing_border_routers))#and
+                #Forall(self.border_routers(), lambda e: (e.State())))
+
+    @Pure
+    @ContractOnly
+    def border_routers(self) -> Sequence[RouterElement]:
+        Requires(Acc(self.parent_border_routers, 1/10))
+        Requires(Acc(self.child_border_routers, 1/10))
+        Requires(Acc(self.peer_border_routers, 1/10))
+        Requires(Acc(self.routing_border_routers, 1/10))
 
     @classmethod
     def from_file(cls, topology_file: str) -> 'Topology':
@@ -36,8 +59,22 @@ class Topology(object):
     def get_own_config(self, server_type: str, server_id: str) -> Element:
         ...
 
+    @Pure
+    @ContractOnly
     def get_all_border_routers(self) -> List[RouterElement]:
-        ...
+        Requires(Acc(self.State(), 1/9))
+        """
+        Return all border routers associated to the AS.
+
+        :returns: all border routers associated to the AS.
+        :rtype: list
+        """
+        # all_border_routers = [] # type: List[RouterElement]
+        # all_border_routers.extend(Unfolding(Acc(self.State(), 1/10),self.parent_border_routers))
+        # all_border_routers.extend(Unfolding(Acc(self.State(), 1/10),self.child_border_routers))
+        # all_border_routers.extend(Unfolding(Acc(self.State(), 1/10),self.peer_border_routers))
+        # all_border_routers.extend(Unfolding(Acc(self.State(), 1/10),self.routing_border_routers))
+        # return all_border_routers
 
 
 class InterfaceElement(Element):
@@ -86,3 +123,9 @@ class RouterElement(Element):
         :param str name: router element name or id
         """
         self.interface = InterfaceElement({})
+
+    def State(self) -> bool:
+        return (Acc(self.interface) and
+                Acc(self.interface.State()))
+
+
