@@ -142,7 +142,7 @@ class Router(SCIONElement):
         #     TracerouteExt.EXT_TYPE: self.handle_traceroute,
         #     OneHopPathExt.EXT_TYPE: self.handle_one_hop_path,
         #     ExtHopByHopType.SCMP: self.handle_scmp,
-        # }
+        # } # type: Dict[int, Union[Callable[[SibraExtBase, SCIONL4Packet, bool], List[Tuple[int, str]]], Callable[[TracerouteExt, SCIONL4Packet, bool], List[Tuple[int, str]]], Callable[[ExtensionHeader, SCIONL4Packet, bool], List[Tuple[int]]], Callable[[SCMPExt, SCIONL4Packet, bool], List[Tuple[int]]] ]]
         # self.post_ext_handlers = {
         #     SibraExtBase.EXT_TYPE: False, TracerouteExt.EXT_TYPE: False,
         #     ExtHopByHopType.SCMP: False, OneHopPathExt.EXT_TYPE: False,
@@ -168,7 +168,11 @@ class Router(SCIONElement):
 
     @Predicate
     def State(self) -> bool:
-        return Acc(self.interface) and self.interface.State() and Acc(self._remote_sock) and Acc(self._udp_sock) and Acc(self.of_gen_key)
+        return (Acc(self.interface) and self.interface.State() and
+                Acc(self._remote_sock) and Acc(self._udp_sock) and
+                Acc(self.of_gen_key) )
+                # Acc(self.pre_ext_handlers) and
+                # Acc(self.post_ext_handlers))
 
     def _service_type(self) -> Optional[str]:
         return ROUTER_SERVICE
@@ -235,16 +239,18 @@ class Router(SCIONElement):
         """
         #Requires(MustTerminate(2))
         Requires(Acc(spkt.State(), 1/9))
+        Requires(Acc(self.State(), 1/10))
         Requires(Unfolding(Acc(spkt.State(), 1/100), len(spkt.ext_hdrs) == 0))
         Ensures(Acc(list_pred(Result())))
-        Ensures(Acc(spkt.State(), 1 / 9))
+        Ensures(Acc(spkt.State(), 1/9))
+        Ensures(Acc(self.State(), 1/10))
         Ensures(len(Result()) == 0)
         if pre_routing_phase:
             prefix = "pre"
-            # handlers = self.pre_ext_handlers  #type: Union[Dict[int, function], Dict[int, bool]]## type: Union[Dict[int, bool], Dict[int, Callable[[object, object, object], list]]]
+            # handlers = Unfolding(Acc(self.State(), 1/10), self.pre_ext_handlers) # type: Union[Dict[int, bool], Dict[int, Union[Callable[[SibraExtBase, SCIONL4Packet, bool], List[Tuple[int, str]]], Callable[[TracerouteExt, SCIONL4Packet, bool], List[Tuple[int, str]]], Callable[[ExtensionHeader, SCIONL4Packet, bool], List[Tuple[int]]], Callable[[SCMPExt, SCIONL4Packet, bool], List[Tuple[int]]] ]]]
         else:
             prefix = "post"
-            # handlers = self.post_ext_handlers
+            # handlers = Unfolding(Acc(self.State(), 1/10), self.post_ext_handlers)
         flags = []  # type: List[Tuple[int, ...]]
         # Hop-by-hop extensions must be first (just after path), and process
         # only MAX_HOPBYHOP_EXT number of them. If an SCMP ext header is
@@ -269,45 +275,59 @@ class Router(SCIONElement):
             # if count > MAX_HOPBYHOP_EXT:
             #     logging.error("Too many hop-by-hop extensions.")
             #     raise SCMPTooManyHopByHop(i)
-            # handler = handlers.get(ext_hdr.EXT_TYPE) # type: Optional[Union[function, bool]]
+            # handler = handlers.get(ext_hdr.EXT_TYPE)
             # if handler is None:
             #     logging.debug("No %s-handler for extension type %s",
             #                   prefix, ext_hdr.EXT_TYPE)
             #     raise SCMPBadHopByHop
             # if handler:
-            #     flags.extend(cast(Callable[[object, object, object], list], handler)(ext_hdr, spkt, from_local_as))
+            #     # new code because of types
+            #     if isinstance(ext_hdr, SibraExtBase):
+            #         #ext_hdr = cast(SCMPExt, ext_hdr)
+            #         flags.extend(handler(cast(SibraExtBase, ext_hdr), spkt, from_local_as))
+            #     else:
+            #         #ext_hdr = cast(SibraExtBase, ext_hdr)
+            #         flags.extend(handler(cast(SCMPExt, ext_hdr), spkt, from_local_as))
         Fold(Acc(spkt.State(), 1 / 9))
         return flags
 
-    # def handle_traceroute(self, hdr: TracerouteExt, spkt: SCIONL4Packet, _: bool) -> List[Tuple[int, str]]:
-    #     hdr.append_hop(self.addr.isd_as, self.interface.if_id)
-    #     return []
-    #
-    # def handle_one_hop_path(self, hdr: ExtensionHeader, spkt: SCIONL4Packet, from_local_as: bool) -> List[Tuple[int]]:
-    #     if len(spkt.path) != InfoOpaqueField.LEN + 2 * HopOpaqueField.LEN:
-    #         logging.error("OneHopPathExt: incorrect path length.")
-    #         return [(RouterFlag.ERROR,)]
-    #     if not from_local_as:  # Remote packet, create the 2nd Hop Field
-    #         info = spkt.path.get_iof() # type: Optional[InfoOpaqueField]
-    #         hf1 = spkt.path.get_hof_ver(ingress=True)
-    #         exp_time = OneHopPathExt.HOF_EXP_TIME
-    #         hf2 = HopOpaqueField.from_values(exp_time, self.interface.if_id, 0)
-    #         hf2.set_mac(self.of_gen_key, info.timestamp, hf1)
-    #         # FIXME(PSz): quite brutal for now:
-    #         spkt.path = SCIONPath.from_values(info, [hf1, hf2])
-    #         spkt.path.inc_hof_idx()
-    #     return []
-    #
-    # def handle_sibra(self, hdr: SibraExtBase, spkt: SCIONL4Packet, from_local_as: bool) -> List[Tuple[int, str]]:
-    #     ret = hdr.process(self.sibra_state, spkt, from_local_as,
-    #                       self.sibra_key)
-    #     logging.debug("Sibra state:\n%s", self.sibra_state)
-    #     return ret
-    #
-    # def handle_scmp(self, hdr: SCMPExt, spkt: SCIONL4Packet, _: bool) -> List[Tuple[int]]:
-    #     if hdr.hopbyhop:
-    #         return [(RouterFlag.PROCESS_LOCAL,)]
-    #     return []
+    @ContractOnly
+    def handle_traceroute(self, hdr: TracerouteExt, spkt: SCIONL4Packet, _: bool) -> List[Tuple[int, str]]:
+        Requires(True)
+        # hdr.append_hop(self.addr.isd_as, self.interface.if_id)
+        # return []
+
+    @ContractOnly
+    def handle_one_hop_path(self, hdr: ExtensionHeader, spkt: SCIONL4Packet, from_local_as: bool) -> List[Tuple[int]]:
+        Requires(True)
+        # if len(spkt.path) != InfoOpaqueField.LEN + 2 * HopOpaqueField.LEN:
+        #     logging.error("OneHopPathExt: incorrect path length.")
+        #     return [(RouterFlag.ERROR,)]
+        # if not from_local_as:  # Remote packet, create the 2nd Hop Field
+        #     info = spkt.path.get_iof() # type: Optional[InfoOpaqueField]
+        #     hf1 = spkt.path.get_hof_ver(ingress=True)
+        #     exp_time = OneHopPathExt.HOF_EXP_TIME
+        #     hf2 = HopOpaqueField.from_values(exp_time, self.interface.if_id, 0)
+        #     hf2.set_mac(self.of_gen_key, info.timestamp, hf1)
+        #     # FIXME(PSz): quite brutal for now:
+        #     spkt.path = SCIONPath.from_values(info, [hf1, hf2])
+        #     spkt.path.inc_hof_idx()
+        # return []
+
+    @ContractOnly
+    def handle_sibra(self, hdr: SibraExtBase, spkt: SCIONL4Packet, from_local_as: bool) -> List[Tuple[int, str]]:
+        Requires(True)
+        # ret = hdr.process(self.sibra_state, spkt, from_local_as,
+        #                   self.sibra_key)
+        # logging.debug("Sibra state:\n%s", self.sibra_state)
+        # return ret
+
+    @ContractOnly
+    def handle_scmp(self, hdr: SCMPExt, spkt: SCIONL4Packet, _: bool) -> List[Tuple[int]]:
+        Requires(True)
+        # if hdr.hopbyhop:
+        #     return [(RouterFlag.PROCESS_LOCAL,)]
+        # return []
 
     # def sync_interface(self):
     #     """
@@ -758,8 +778,8 @@ class Router(SCIONElement):
 
     def _calc_fwding_ingress(self, spkt: SCIONL4Packet) -> Tuple[int, bool, bool]:
         Requires(Acc(spkt.State()))
-        Requires(Unfolding(Acc(spkt.State(), 1/9), spkt.path is not None and Unfolding(Acc(spkt.path.State(), 1 / 9), isinstance(spkt.path._iof_idx, int))))
-        Requires(Unfolding(Acc(spkt.State(), 1/9), spkt.path is not None and Unfolding(Acc(spkt.path.State(), 1 / 9), isinstance(spkt.path._hof_idx, int))))
+        Requires(Unfolding(Acc(spkt.State(), 1/10), spkt.path is not None and Unfolding(Acc(spkt.path.State(), 1/10), isinstance(spkt.path._iof_idx, int))))
+        Requires(Unfolding(Acc(spkt.State(), 1/10), spkt.path is not None and Unfolding(Acc(spkt.path.State(), 1/10), isinstance(spkt.path._hof_idx, int))))
         Ensures(Acc(spkt.State()))
         Unfold(Acc(spkt.State()))
         path = spkt.path
@@ -771,7 +791,7 @@ class Router(SCIONElement):
             skipped_vo = path.inc_hof_idx()
             incd = True
         result = path.get_fwd_if(), incd, skipped_vo
-        # Fold(Acc(spkt.State()))
+        Fold(Acc(spkt.State()))
         return result
 
     @ContractOnly
