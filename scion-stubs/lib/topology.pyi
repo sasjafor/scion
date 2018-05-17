@@ -124,6 +124,7 @@ class RouterElement(Element):
         """
         self.interface = InterfaceElement({})
 
+    @Predicate
     def State(self) -> bool:
         return (Acc(self.interface) and
                 Acc(self.interface.State()))

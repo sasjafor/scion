@@ -19,7 +19,7 @@ class HostAddrBase(Serializable):
         :param addr: Address to parse/store.
         :param bool raw: Does the address need to be parsed?
         """
-        self.addr = None # type: HostAddrBase
+        self.addr = None # type: Optional[HostAddrBase]
         if raw:
             self._parse(addr)
         else:
