@@ -257,11 +257,11 @@ class Router(SCIONElement):
         # present, it must be the first hopbyhop extension (and isn't included
         # in the MAX_HOPBYHOP_EXT check).
         Unfold(Acc(spkt.State(), 1/9))
-        count = 0
         ext_hdrs = spkt.ext_hdrs
+        assert len(ext_hdrs) == 0
         for i, ext_hdr in enumerate(ext_hdrs):
-            #Invariant(Acc(spkt.ext_hdrs, 1/1000))
-            #Invariant(Acc(list_pred(ext_hdrs), 1/1000))
+            Invariant(Acc(spkt.ext_hdrs, 1/9))
+            Invariant(Acc(list_pred(ext_hdrs), 1/9))
             Invariant(len(ext_hdrs) == 0)
             assert False
             # if ext_hdr.EXT_CLASS != ExtensionClass.HOP_BY_HOP:
@@ -288,7 +288,7 @@ class Router(SCIONElement):
             #     else:
             #         #ext_hdr = cast(SibraExtBase, ext_hdr)
             #         flags.extend(handler(cast(SCMPExt, ext_hdr), spkt, from_local_as))
-        Fold(Acc(spkt.State(), 1 / 9))
+        Fold(Acc(spkt.State(), 1/9))
         return flags
 
     @ContractOnly
@@ -469,35 +469,48 @@ class Router(SCIONElement):
     def send_revocation(self, spkt: SCIONL4Packet, if_id: int, ingress: bool, path_incd: bool) -> None:
         Requires(Acc(self.State(), 1/10))
         Ensures(Acc(self.State(), 1/10))
-        """
-        Sends an interface revocation for 'if_id' along the path in 'spkt'.
-        """
-    #     logging.info("Interface %d is down. Issuing revocation.", if_id)
-    #     # Check that the interface is really down.
-    #     if_state = self.if_states[if_id]
-    #     if self.if_states[if_id].is_active:
-    #         logging.error("Interface %d appears to be up. Not sending " +
-    #                       "revocation." % if_id)
-    #         return
-    #
-    #     assert if_state.rev_info, "Revocation token missing."
-    #
-    #     rev_pkt = spkt.reversed_copy()
-    #     rev_pkt.convert_to_scmp_error(
-    #         self.addr, SCMPClass.PATH, SCMPPathClass.REVOKED_IF, spkt, if_id,
-    #         ingress, if_state.rev_info.copy(), hopbyhop=True)
-    #     if path_incd:
-    #         rev_pkt.path.inc_hof_idx()
-    #     rev_pkt.update()
-    #     logging.debug("Revocation Packet:\n%s" % rev_pkt.short_desc())
-    #     # FIXME(kormat): In some circumstances, this doesn't actually work, as
-    #     # handle_data will try to send the packet to this interface first, and
-    #     # then drop the packet as the interface is down.
-    #     self.handle_data(rev_pkt, ingress, drop_on_error=True)
+        # """
+        # Sends an interface revocation for 'if_id' along the path in 'spkt'.
+        # """
+        # logging.info("Interface %d is down. Issuing revocation.", if_id)
+        # # Check that the interface is really down.
+        # if_state = self.if_states[if_id]
+        # if self.if_states[if_id].is_active:
+        #     logging.error("Interface %d appears to be up. Not sending " +
+        #                   "revocation." % if_id)
+        #     return
+        #
+        # assert if_state.rev_info, "Revocation token missing."
+        #
+        # rev_pkt = spkt.reversed_copy()
+        # rev_pkt.convert_to_scmp_error(
+        #     self.addr, SCMPClass.PATH, SCMPPathClass.REVOKED_IF, spkt, if_id,
+        #     ingress, if_state.rev_info.copy(), hopbyhop=True)
+        # if path_incd:
+        #     rev_pkt.path.inc_hof_idx()
+        # rev_pkt.update()
+        # logging.debug("Revocation Packet:\n%s" % rev_pkt.short_desc())
+        # # FIXME(kormat): In some circumstances, this doesn't actually work, as
+        # # handle_data will try to send the packet to this interface first, and
+        # # then drop the packet as the interface is down.
+        # self.handle_data(rev_pkt, ingress, drop_on_error=True)
 
     def deliver(self, t: Place, spkt: SCIONL4Packet, force: bool=True) -> None:
         Requires(Acc(spkt.State(), 1/10))
         Requires(Acc(self.State(), 1/10))
+        Requires(dict_pred(SVC_TO_SERVICE))
+        Requires(Unfolding(Acc(spkt.State(), 1 / 10), spkt.addrs is not None))
+        Requires(Unfolding(Acc(spkt.State(), 1 / 10), spkt.path is not None))
+        Requires(Unfolding(Acc(spkt.State(), 1 / 10),
+                 Unfolding(Acc(spkt.addrs.State(), 1 / 10), spkt.addrs.dst is not None)))
+        Requires(Unfolding(Acc(spkt.State(), 1 / 10),
+                 Unfolding(Acc(spkt.addrs.State(), 1 / 10),
+                 Unfolding(Acc(spkt.addrs.dst.State(), 1 / 10), spkt.addrs.dst.host is not None))))
+        Requires(Unfolding(Acc(spkt.State(), 1 / 10),
+                 Unfolding(Acc(spkt.addrs.State(), 1 / 10),
+                 Unfolding(Acc(spkt.addrs.dst.State(), 1/10),
+                 Unfolding(Acc(spkt.addrs.dst.host.State(), 1/10), SVC_TO_SERVICE.__contains__(spkt.addrs.dst.host.addr))))))
+        Requires(Unfolding(Acc(spkt.State(), 1/10), Unfolding(Acc(spkt.path.State(), 1 / 10), isinstance(spkt.path._hof_idx, int))))
         Ensures(Acc(spkt.State(), 1/10))
         Ensures(Acc(self.State(), 1/10))
         Exsures(SCIONBaseError, Acc(spkt.State(), 1/10))
@@ -510,32 +523,42 @@ class Router(SCIONElement):
             If set, allow packets to be delivered locally that would otherwise
             be disallowed.
         """
-        # Unfold(Acc(spkt.State(), 1/10))
-        # if not force and Unfolding(Acc(spkt.addrs.State(), 1/10), Unfolding(Acc(spkt.addrs.dst.State(), 1/10), spkt.addrs.dst.isd_as)) != Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.addr.State(), 1/10), self.addr.isd_as)):
-        #     logging.error("Tried to deliver a non-local packet:\n%s", spkt)
-        #     Fold(Acc(spkt.State(), 1/10))
-        #     raise SCMPDeliveryNonLocal
-        # if len(spkt.path):
-        #     hof = spkt.path.get_hof()
-        #     if not force and hof.forward_only:
-        #         Fold(Acc(spkt.State(), 1 / 10))
-        #         raise SCMPDeliveryFwdOnly
-        #     if hof.verify_only:
-        #         Fold(Acc(spkt.State(), 1 / 10))
-        #         raise SCMPNonRoutingHOF
-        # # Forward packet to destination.
-        # addr = Unfolding(Acc(spkt.addrs.State(), 1/10), Unfolding(Acc(spkt.addrs.dst, 1/10), spkt.addrs.dst.host))
-        # if addr.TYPE == AddrType.SVC:
-        #     # Send request to any server.
-        #     try:
-        #         service = SVC_TO_SERVICE[addr.addr]
-        #         addr = self.get_srv_addr(service, spkt)
-        #     except SCIONServiceLookupError as e:
-        #         logging.error("Unable to deliver path mgmt packet: %s", e)
-        #         Fold(Acc(spkt.State(), 1 / 10))
-        #         raise SCMPUnknownHost
-        # Fold(Acc(spkt.State(), 1 / 10))
-        # self.send(t, spkt, addr, SCION_UDP_EH_DATA_PORT)
+        Unfold(Acc(spkt.State(), 1/10))
+        Unfold(Acc(spkt.addrs.State(), 1/10))
+        if not force and Unfolding(Acc(spkt.addrs.dst.State(), 1/10), spkt.addrs.dst.isd_as) != Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.addr.State(), 1/10), self.addr.isd_as)):
+            logging.error("Tried to deliver a non-local packet:\n%s", spkt)
+            Fold(Acc(spkt.addrs.State(), 1 / 10))
+            Fold(Acc(spkt.State(), 1/10))
+            raise SCMPDeliveryNonLocal
+        if len(spkt.path):
+            hof = spkt.path.get_hof()
+            Unfold(Acc(spkt.path.State(), 1 / 10))
+            if not force and Unfolding(Acc(spkt.path._ofs.State(), 1/10), Unfolding(Acc(hof.State(), 1/10), hof.forward_only)):
+                Fold(Acc(spkt.addrs.State(), 1/10))
+                Fold(Acc(spkt.path.State(), 1/10))
+                Fold(Acc(spkt.State(), 1 / 10))
+                raise SCMPDeliveryFwdOnly
+            if Unfolding(Acc(spkt.path._ofs.State(), 1/10), Unfolding(Acc(hof.State(), 1/10), hof.verify_only)):
+                Fold(Acc(spkt.addrs.State(), 1 / 10))
+                Fold(Acc(spkt.path.State(), 1 / 10))
+                Fold(Acc(spkt.State(), 1 / 10))
+                raise SCMPNonRoutingHOF
+            Fold(Acc(spkt.path.State(), 1 / 10))
+        # Forward packet to destination.
+        addr = Unfolding(Acc(spkt.addrs.dst.State(), 1/10), spkt.addrs.dst.host)
+        if isinstance(addr.TYPE, int) and addr.TYPE == AddrType.SVC:
+            # Send request to any server.
+            try:
+                service = Unfolding(Acc(spkt.addrs.dst.State(), 1/10), Unfolding(Acc(addr.State(), 1/10), SVC_TO_SERVICE[addr.addr]))
+                addr = self.get_srv_addr(service, spkt)
+            except SCIONServiceLookupError as e:
+                logging.error("Unable to deliver path mgmt packet: %s", e)
+                Fold(Acc(spkt.addrs.State(), 1 / 10))
+                Fold(Acc(spkt.State(), 1 / 10))
+                raise SCMPUnknownHost
+        Fold(Acc(spkt.addrs.State(), 1 / 10))
+        Fold(Acc(spkt.State(), 1 / 10))
+        self.send(t, spkt, addr, SCION_UDP_EH_DATA_PORT)
 
     def verify_hof(self, path: SCIONPath, ingress: bool = True) -> None:
         Requires(Acc(path.State(), 1 / 9))
@@ -576,10 +599,13 @@ class Router(SCIONElement):
 
     def _egress_forward(self, t: Place, spkt: SCIONL4Packet) -> Place:
         Requires(Acc(self.State(), 1/10))
+        Requires(Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.interface.State(), 1/10), self.interface.to_addr is not None)))
         Ensures(Acc(self.State(), 1/10))
+        addr = Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.interface.State(), 1/10), self.interface.to_addr))
+        port = Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.interface.State(), 1/10), self.interface.to_udp_port))
         logging.debug("Forwarding to remote interface: %s:%s",
-                      self.interface.to_addr, self.interface.to_udp_port)
-        return self.send(t, spkt, self.interface.to_addr, self.interface.to_udp_port)
+                      addr, port)
+        return self.send(t, spkt, addr, port)
 
     def handle_data(self, t: Place, spkt: SCIONL4Packet, from_local_as: bool, drop_on_error: bool=False) -> Place:
         Requires(Acc(spkt.State()))
@@ -813,6 +839,8 @@ class Router(SCIONElement):
         Requires(Acc(self.State(), 1/40))
         Requires(Acc(pkt.State(), 1/40))
         Requires(Unfolding(Acc(pkt.State(), 1/40), pkt.addrs is not None))
+        Ensures(Acc(self.State(), 1/40))
+        Ensures(Acc(pkt.State(), 1/40))
         return Unfolding(Acc(pkt.State(), 1/40), Unfolding(Acc(pkt.addrs.State(), 1/40), pkt.addrs.dst)) in [
             Unfolding(Acc(self.State(), 1/40), self.addr),
             SCIONAddr.from_values(Unfolding(Acc(self.State(), 1/40), Unfolding(Acc(self.addr.State(), 1/40), self.addr.isd_as)),

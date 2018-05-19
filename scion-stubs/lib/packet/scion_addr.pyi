@@ -16,7 +16,8 @@ class SCIONAddr(object):
 
     @Predicate
     def State(self) -> bool:
-        return Acc(self.isd_as) and Acc(self.host)
+        return (Acc(self.isd_as) and
+                Acc(self.host) and Implies(self.host is not None, self.host.State()))
 
     @Pure
     def matches(self, raw: bytes, offset: int) -> bool:

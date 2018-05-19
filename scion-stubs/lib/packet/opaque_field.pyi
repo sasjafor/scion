@@ -43,11 +43,34 @@ class OpaqueFieldList(Sized):
 
     @Pure
     @ContractOnly
+    def get_hofs_in_segment(self, iof: InfoOpaqueField) -> Sequence[HopOpaqueField]:
+        Requires(Acc(self.State(), 1/10))
+        # Helper method for contracts that returns the hop fields in a segment for a given InfoOpaqueField
+
+    @Pure
+    @ContractOnly
     def __len__(self) -> int:
         Requires(Acc(self._labels, 1/10))
         Requires(Acc(dict_pred(self._labels), 1/10))
         Ensures(Result() >= 0)
 
+    @Pure
+    @ContractOnly
+    def get_hof_by_idx(self, idx: int) -> HopOpaqueField:
+        Requires(Acc(self.State(), 1/10))
+        Requires(idx >= 0 and idx < Unfolding(Acc(self.State(), 1/10), len(self)))
+        Ensures(Result() is Unfolding(Acc(self.State(), 1/10), self.contents()[idx]))
+        Ensures(Result() in Unfolding(Acc(self.State(), 1/10), self.contents()))
+
+    @Pure
+    @ContractOnly
+    def get_by_idx_unfolded(self, idx: int) -> OpaqueField:
+        Requires(Acc(self._order, 1/10))
+        Requires(Acc(self._labels, 1/10))
+        Requires(Acc(dict_pred(self._labels), 1/10))
+        Requires(idx >= 0 and idx < len(self))
+        Ensures(Result() is self.contents()[idx])
+        Ensures(Result() in self.contents())
 
     @Pure
     @ContractOnly

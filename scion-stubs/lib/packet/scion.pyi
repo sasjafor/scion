@@ -2,7 +2,7 @@ from lib.errors import SCIONBaseError, SCIONChecksumFailed
 from lib.packet.ext_hdr import ExtensionHeader
 from lib.packet.packet_base import PacketBase
 from lib.util import calc_padding, Raw
-from lib.packet.host_addr import HostAddrIPv4, HostAddrIPv6, HostAddrSVC#, HostAddrInvalidType
+from lib.packet.host_addr import HostAddrIPv4, HostAddrIPv6, HostAddrSVC  # , HostAddrInvalidType
 from lib.packet.packet_base import Serializable, L4HeaderBase
 from lib.packet.path import SCIONPath
 from lib.packet.scion_addr import ISD_AS, SCIONAddr
@@ -305,6 +305,9 @@ class SCIONL4Packet(SCIONExtPacket):
         Ensures(is_valid_packet(self))
         Exsures(SCMPError, Acc(self.State(), 1/2) and not is_valid_packet(self))
         Exsures(SCIONChecksumFailed, Acc(self.State(), 1/2) and not is_valid_packet(self))
+        ...
+
+    def convert_to_scmp_error(self, addr: SCIONAddr, class_: object, type_: object, pkt: SCIONL4Packet, *args: object, hopbyhop: bool=False, **kwargs: object) -> None:
         ...
 
 @Pure
