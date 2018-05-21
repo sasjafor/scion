@@ -68,6 +68,7 @@ class OpaqueFieldList(Sized):
         Requires(Acc(self._order, 1/10))
         Requires(Acc(self._labels, 1/10))
         Requires(Acc(dict_pred(self._labels), 1/10))
+        # Requires(Forall(self.contents(), lambda e: (e.State())))
         Requires(idx >= 0 and idx < len(self))
         Ensures(Result() is self.contents()[idx])
         Ensures(Result() in self.contents())

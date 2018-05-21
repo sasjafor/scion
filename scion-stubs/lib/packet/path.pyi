@@ -29,22 +29,25 @@ class SCIONPath(Serializable, Sized):
         return (Acc(self._ofs) and self._ofs.State() and
                 Acc(self._hof_idx) and
                 Acc(self._iof_idx) and
-                Implies(isinstance(self._hof_idx, int),
+                Implies(self._hof_idx is not None,
                     self._hof_idx >= 0 and self._hof_idx < Unfolding(self._ofs.State(), len(self._ofs)) and
                     isinstance(self._ofs.get_by_idx(self._hof_idx), HopOpaqueField)) and
-                Implies(isinstance(self._iof_idx, int) and
-                        isinstance(self._hof_idx, int),
+                Implies(self._iof_idx is not None,
                     self._iof_idx >= 0 and self._iof_idx < Unfolding(self._ofs.State(), len(self._ofs)) and
                     isinstance(self._ofs.get_by_idx(self._iof_idx), InfoOpaqueField) and
-                    Implies(Unfolding(self._ofs.State(), Unfolding(cast(InfoOpaqueField, self._ofs.get_by_idx_unfolded(self._iof_idx)).State(), cast(InfoOpaqueField, self._ofs.get_by_idx_unfolded(self._iof_idx)).up_flag and
-                            not self._hof_idx == self._iof_idx + cast(InfoOpaqueField, self._ofs.get_by_idx_unfolded(self._iof_idx)).hops)), self._hof_idx < Unfolding(self._ofs.State(), len(self._ofs)) - 1 and isinstance(self._ofs.get_by_idx(self._hof_idx + 1), HopOpaqueField)) and
-                    Implies(not Unfolding(self._ofs.State(), Unfolding(cast(InfoOpaqueField, self._ofs.get_by_idx_unfolded(self._iof_idx)).State(), cast(InfoOpaqueField, self._ofs.get_by_idx_unfolded(self._iof_idx)).up_flag)) and
-                            not self._hof_idx == self._iof_idx + 1, self._hof_idx >= 1 and isinstance(self._ofs.get_by_idx(self._hof_idx - 1), HopOpaqueField))) and
+                    isinstance(Unfolding(self._ofs.State(), self._ofs.get_by_idx_unfolded(self._iof_idx)), InfoOpaqueField)) and
+                    # Implies(Unfolding(self._ofs.State(), Unfolding(cast(InfoOpaqueField, self._ofs.get_by_idx_unfolded(self._iof_idx)).State(), cast(InfoOpaqueField, self._ofs.get_by_idx_unfolded(self._iof_idx)).up_flag and
+                    #         not self._hof_idx == self._iof_idx + cast(InfoOpaqueField, self._ofs.get_by_idx_unfolded(self._iof_idx)).hops)), self._hof_idx < Unfolding(self._ofs.State(), len(self._ofs)) - 1 and isinstance(self._ofs.get_by_idx(self._hof_idx + 1), HopOpaqueField)) and
+                    # Implies(not Unfolding(self._ofs.State(), Unfolding(cast(InfoOpaqueField, self._ofs.get_by_idx_unfolded(self._iof_idx)).State(), cast(InfoOpaqueField, self._ofs.get_by_idx_unfolded(self._iof_idx)).up_flag)) and
+                    #         not self._hof_idx == self._iof_idx + 1, self._hof_idx >= 1 and isinstance(self._ofs.get_by_idx(self._hof_idx - 1), HopOpaqueField))) and
+                    # Implies(self._hof_idx is not None,
+                    #         Implies(Unfolding(self._ofs.State(), Unfolding(cast(InfoOpaqueField, self._ofs.get_by_idx_unfolded(self._iof_idx)).State(), cast(InfoOpaqueField, self._ofs.get_by_idx_unfolded(self._iof_idx)).up_flag)), self._hof_idx < Unfolding(self._ofs.State(), len(self._ofs)) - 1 and isinstance(self._ofs.get_by_idx(self._hof_idx + 1), HopOpaqueField)) and
+                    #         Implies(not Unfolding(self._ofs.State(), Unfolding(cast(InfoOpaqueField, self._ofs.get_by_idx_unfolded(self._iof_idx)).State(), cast(InfoOpaqueField, self._ofs.get_by_idx_unfolded(self._iof_idx)).up_flag)), self._hof_idx >= 1 and isinstance(self._ofs.get_by_idx(self._hof_idx - 1), HopOpaqueField)))) and
                                                 # Forall(self._ofs.get_hofs_in_segment(cast(InfoOpaqueField, self._ofs.get_by_idx(self._iof_idx))), lambda e: (isinstance(e, HopOpaqueField)))) and
                                                 # Forall(self._ofs.contents(), lambda e: (isinstance(e, HopOpaqueField), [[self._ofs.get_by_idx , cast(InfoOpaqueField, self._ofs.get_by_idx(self._iof_idx)).hops <= ]]) and
 
-                # Implies(isinstance(self._iof_idx, int) and
-                #         isinstance(self._hof_idx, int) and
+                # Implies(self._iof_idx is not None and
+                #         self._hof_idx is not None and
                 #         self._iof_idx >= 0 and self._iof_idx < Unfolding(self._ofs.State(), len(self._ofs)) and
                 #         self._hof_idx >= 0 and self._hof_idx < Unfolding(self._ofs.State(), len(self._ofs)) and
                 #         isinstance(self._ofs.get_by_idx(self._iof_idx), InfoOpaqueField),
@@ -78,7 +81,7 @@ class SCIONPath(Serializable, Sized):
     # @ContractOnly
     def get_hof_ver(self, ingress: bool =True) -> Optional[HopOpaqueField]:
         Requires(Acc(self.State(), 1/10))
-        Requires(Unfolding(Acc(self.State(), 1/10), isinstance(self._iof_idx, int) and isinstance(self._hof_idx, int)))
+        Requires(Unfolding(Acc(self.State(), 1/10), self._iof_idx is not None and self._hof_idx is not None))
         Ensures(Implies(Result() is not None, Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self._ofs.State(), 1/10), Result() in self._ofs.contents()))))
         """Return the :any:`HopOpaqueField` needed to verify the current HOF."""
         # iof = self.get_iof()
@@ -127,8 +130,8 @@ class SCIONPath(Serializable, Sized):
     def _get_hof_ver_normal(self, iof: InfoOpaqueField) -> Optional[HopOpaqueField]:
         Requires(Acc(self.State(), 1/10))
         Requires(Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self._ofs.State(), 1/10), iof in self._ofs.contents())))
-        Requires(Unfolding(Acc(self.State(), 1/10), isinstance(self._iof_idx, int)))
-        Requires(Unfolding(Acc(self.State(), 1/10), isinstance(self._hof_idx, int)))
+        Requires(Unfolding(Acc(self.State(), 1/10), self._iof_idx is not None))
+        Requires(Unfolding(Acc(self.State(), 1/10), self._hof_idx is not None))
         # Requires(Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self._ofs.State(), 1/10), Unfolding(Acc(iof.State(), 1/10), Implies((not ((iof.up_flag and self._hof_idx == self._iof_idx + iof.hops) or (
         #         not iof.up_flag and self._hof_idx == self._iof_idx + 1))) and iof.up_flag, self._hof_idx < len(self._ofs) - 1)))))
         # Requires(Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self._ofs.State(), 1/10), Unfolding(Acc(iof.State(), 1/10), Implies((not (iof.up_flag and self._hof_idx == self._iof_idx + iof.hops) or (
@@ -149,8 +152,8 @@ class SCIONPath(Serializable, Sized):
     @Pure
     def get_fwd_if(self) -> int:
         Requires(Acc(self.State(), 1/10))
-        Requires(Unfolding(Acc(self.State(), 1/10), isinstance(self._iof_idx, int)))
-        Requires(Unfolding(Acc(self.State(), 1/10), isinstance(self._hof_idx, int)))
+        Requires(Unfolding(Acc(self.State(), 1/10), self._iof_idx is not None))
+        Requires(Unfolding(Acc(self.State(), 1/10), self._hof_idx is not None))
         # """Return the interface to forward the current packet to."""
         # if not Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self._ofs.State(), 1/10), len(self._ofs))):
         #     return 0
@@ -162,8 +165,8 @@ class SCIONPath(Serializable, Sized):
 
     def inc_hof_idx(self) -> bool:
         Requires(Acc(self.State()))
-        Requires(Unfolding(Acc(self.State(), 1/10), isinstance(self._iof_idx, int)))
-        Requires(Unfolding(Acc(self.State(), 1/10), isinstance(self._hof_idx, int)))
+        Requires(Unfolding(Acc(self.State(), 1/10), self._iof_idx is not None))
+        Requires(Unfolding(Acc(self.State(), 1/10), self._hof_idx is not None))
         Ensures(Acc(self.State()))
         """
         Increment the HOF idx to next routing HOF.
@@ -172,26 +175,32 @@ class SCIONPath(Serializable, Sized):
         Also detect when there are no HOFs left in the current segment, and
         switch to the next segment, before restarting.
         """
-        # iof = self.get_iof()
-        # skipped_verify_only = False
-        # Unfold(self.State())
-        # while True:
-        #     self._hof_idx += 1
-        #     if (self._hof_idx - self._iof_idx) > Unfolding(Acc(self._ofs, 1/10), Unfolding(Acc(iof.State(), 1/10), iof.hops)):
-        #         # Switch to the next segment
-        #         self._iof_idx = self._hof_idx
-        #         Fold(Acc(self.State(), 1/10))
-        #         iof = self.get_iof()
-        #         Unfold(Acc(self.State(), 1/10))
-        #         # Continue looking for a routing HOF
-        #         continue
-        #     Fold(Acc(self.State(), 1/10))
-        #     hof = self.get_hof()
-        #     Unfold(Acc(self.State(), 1/10))
-        #     if not Unfolding(Acc(self._ofs, 1/10), Unfolding(Acc(hof.State(), 1/10), hof.verify_only)):
-        #         break
-        #     skipped_verify_only = True
-        # return skipped_verify_only
+        iof = self.get_iof()
+        skipped_verify_only = False
+        Unfold(self.State())
+        while True:
+            Invariant(Acc(self._hof_idx))
+            Invariant(Acc(self._iof_idx))
+            Invariant(Acc(self._ofs))
+            Invariant(Acc(self._ofs.State()))
+            Invariant(self._hof_idx is not None)
+            Invariant(self._iof_idx is not None)
+            self._hof_idx += 1
+            if (self._hof_idx - self._iof_idx) > Unfolding(Acc(self._ofs.State(), 1/10), Unfolding(Acc(iof.State(), 1/10), iof.hops)):
+                # Switch to the next segment
+                self._iof_idx = self._hof_idx
+                Fold(Acc(self.State(), 1/10))
+                iof = self.get_iof()
+                Unfold(Acc(self.State(), 1/10))
+                # Continue looking for a routing HOF
+                continue
+            Fold(Acc(self.State(), 1/10))
+            hof = self.get_hof()
+            Unfold(Acc(self.State(), 1/10))
+            if not Unfolding(Acc(self._ofs.State(), 1/10), Unfolding(Acc(hof.State(), 1/10), hof.verify_only)):
+                break
+            skipped_verify_only = True
+        return skipped_verify_only
 
     @Pure
     def get_of_idxs(self) -> Tuple[int, int]:
@@ -210,20 +219,20 @@ class SCIONPath(Serializable, Sized):
         Requires(Acc(self.State(), 1/10))
         return Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self._ofs.State(), 1/10), len(self._ofs))) * OpaqueField.LEN
 
-    @Pure
+
     def get_curr_if(self, ingress: bool=True) -> int:
         Requires(Acc(self.State(), 1/10))
-        Requires(Unfolding(Acc(self.State(), 1/10), isinstance(self._iof_idx, int)))
-        Requires(Unfolding(Acc(self.State(), 1/10), isinstance(self._hof_idx, int)))
+        Requires(Unfolding(Acc(self.State(), 1/10), self._iof_idx is not None))
+        Requires(Unfolding(Acc(self.State(), 1/10), self._hof_idx is not None))
         """
         Return the current interface, depending on the direction of the
         segment.
         """
-        # hof = self.get_hof()
-        # iof = self.get_iof()
-        # if ingress == Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self._ofs.State(), 1/10), Unfolding(Acc(iof.State(), 1/10), iof.up_flag))):
-        #     return Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self._ofs.State(), 1/10), Unfolding(Acc(hof.State(), 1/10), hof.egress_if)))
-        # return Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self._ofs.State(), 1/10), Unfolding(Acc(hof.State(), 1/10), hof.ingress_if)))
+        hof = self.get_hof()
+        iof = self.get_iof()
+        if ingress == Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self._ofs.State(), 1/10), Unfolding(Acc(iof.State(), 1/10), iof.up_flag))):
+            return Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self._ofs.State(), 1/10), Unfolding(Acc(hof.State(), 1/10), hof.egress_if)))
+        return Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self._ofs.State(), 1/10), Unfolding(Acc(hof.State(), 1/10), hof.ingress_if)))
 
     @classmethod
     def from_values(cls, a_iof: InfoOpaqueField=None, a_hofs: List[HopOpaqueField]=None,
