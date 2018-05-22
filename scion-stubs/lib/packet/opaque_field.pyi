@@ -56,6 +56,16 @@ class OpaqueFieldList(Sized):
 
     @Pure
     @ContractOnly
+    def count(self, label: str) -> int:
+        Requires(Acc(self.State(), 1/10))
+
+    @Pure
+    @ContractOnly
+    def get_label_by_idx(self, idx: int) -> str:
+        Requires(Acc(self.State(), 1/10))
+
+    @Pure
+    @ContractOnly
     def get_hof_by_idx(self, idx: int) -> HopOpaqueField:
         Requires(Acc(self.State(), 1/10))
         Requires(idx >= 0 and idx < Unfolding(Acc(self.State(), 1/10), len(self)))

@@ -210,7 +210,10 @@ class Router(SCIONElement):
         #     Ensures(Acc(self.State(), 1/9) and Acc(packet.State(), 1/8) and Result() is t2 and token(t2))
         # ))
         Requires(Acc(self.State(), 1/10))
+        Requires(Acc(packet.State(), 1/9))
+        Requires(Unfolding(Acc(packet.State(), 1/100), len(packet.ext_hdrs) == 0))
         Ensures(Acc(self.State(), 1/10))
+        Ensures(Acc(packet.State(), 1/9))
         """
         Send a packet to dst (class of that object must implement
         __str__ which returns IP addr string) using port and local or remote
@@ -222,14 +225,14 @@ class Router(SCIONElement):
         :type dst: :class:`HostAddrBase`
         :param int dst_port: The port number of the next hop.
         """
-        Unfold(Acc(self.State(), 1 / 10))
-        from_local_as = dst == Unfolding(Acc(self.interface.State(), 1/10), self.interface.to_addr)
+        from_local_as = dst == Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.interface.State(), 1/10), self.interface.to_addr))
         self.handle_extensions(packet, False, from_local_as)
+        Unfold(Acc(self.State(), 1/10))
         if from_local_as:
             result = self._remote_sock.send(t, packet.pack(), (str(dst), dst_port))
         else:
             result = self._udp_sock.send(t, packet.pack(), (str(dst), dst_port))
-        Fold(Acc(self.State(), 1 / 10))
+        Fold(Acc(self.State(), 1/10))
         return result[1]
 
     def handle_extensions(self, spkt: SCIONL4Packet, pre_routing_phase: bool, from_local_as: bool) -> List[Tuple[int, ...]]:
@@ -466,34 +469,34 @@ class Router(SCIONElement):
     #     """
     #     return self.interface.link_type == LinkType.PARENT
     #
-    def send_revocation(self, spkt: SCIONL4Packet, if_id: int, ingress: bool, path_incd: bool) -> None:
+    def send_revocation(self, t: Place, spkt: SCIONL4Packet, if_id: int, ingress: bool, path_incd: bool) -> None:
         Requires(Acc(self.State(), 1/10))
         Ensures(Acc(self.State(), 1/10))
-        # """
-        # Sends an interface revocation for 'if_id' along the path in 'spkt'.
-        # """
-        # logging.info("Interface %d is down. Issuing revocation.", if_id)
-        # # Check that the interface is really down.
-        # if_state = self.if_states[if_id]
-        # if self.if_states[if_id].is_active:
-        #     logging.error("Interface %d appears to be up. Not sending " +
-        #                   "revocation." % if_id)
-        #     return
-        #
-        # assert if_state.rev_info, "Revocation token missing."
-        #
-        # rev_pkt = spkt.reversed_copy()
-        # rev_pkt.convert_to_scmp_error(
-        #     self.addr, SCMPClass.PATH, SCMPPathClass.REVOKED_IF, spkt, if_id,
-        #     ingress, if_state.rev_info.copy(), hopbyhop=True)
-        # if path_incd:
-        #     rev_pkt.path.inc_hof_idx()
-        # rev_pkt.update()
-        # logging.debug("Revocation Packet:\n%s" % rev_pkt.short_desc())
-        # # FIXME(kormat): In some circumstances, this doesn't actually work, as
-        # # handle_data will try to send the packet to this interface first, and
-        # # then drop the packet as the interface is down.
-        # self.handle_data(rev_pkt, ingress, drop_on_error=True)
+        """
+        Sends an interface revocation for 'if_id' along the path in 'spkt'.
+        """
+        logging.info("Interface %d is down. Issuing revocation.", if_id)
+        # Check that the interface is really down.
+        if_state = self.if_states[if_id]
+        if self.if_states[if_id].is_active:
+            # logging.error("Interface %d appears to be up. Not sending " +
+            #               "revocation." % if_id)
+            return
+
+        assert if_state.rev_info, "Revocation token missing."
+
+        rev_pkt = cast(SCIONL4Packet, spkt.reversed_copy()) # type: SCIONL4Packet
+        rev_pkt.convert_to_scmp_error(
+            self.addr, SCMPClass.PATH, SCMPPathClass.REVOKED_IF, spkt, if_id,
+            ingress, if_state.rev_info.copy(), hopbyhop=True)
+        if path_incd:
+            rev_pkt.path.inc_hof_idx()
+        rev_pkt.update()
+        logging.debug("Revocation Packet:\n%s" % rev_pkt.short_desc())
+        # FIXME(kormat): In some circumstances, this doesn't actually work, as
+        # handle_data will try to send the packet to this interface first, and
+        # then drop the packet as the interface is down.
+        self.handle_data(t, rev_pkt, ingress, drop_on_error=True)
 
     def deliver(self, t: Place, spkt: SCIONL4Packet, force: bool=True) -> None:
         Requires(Acc(spkt.State(), 1/10))
@@ -510,7 +513,7 @@ class Router(SCIONElement):
                  Unfolding(Acc(spkt.addrs.State(), 1 / 10),
                  Unfolding(Acc(spkt.addrs.dst.State(), 1/10),
                  Unfolding(Acc(spkt.addrs.dst.host.State(), 1/10), SVC_TO_SERVICE.__contains__(spkt.addrs.dst.host.addr))))))
-        Requires(Unfolding(Acc(spkt.State(), 1/10), Unfolding(Acc(spkt.path.State(), 1 / 10), isinstance(spkt.path._hof_idx, int))))
+        Requires(Unfolding(Acc(spkt.State(), 1/10), Unfolding(Acc(spkt.path.State(), 1 / 10), spkt.path._hof_idx is not None)))
         Ensures(Acc(spkt.State(), 1/10))
         Ensures(Acc(self.State(), 1/10))
         Exsures(SCIONBaseError, Acc(spkt.State(), 1/10))
@@ -659,8 +662,8 @@ class Router(SCIONElement):
         Requires(Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.topology.State(), 1/10), isinstance(self.topology.mtu, int))))
         Requires(Unfolding(Acc(spkt.State(), 1/10), spkt.path is not None and spkt.addrs is not None))
         Requires(Unfolding(Acc(spkt.State(), 1/10), Unfolding(Acc(spkt.addrs.State(), 1/10), spkt.addrs.dst is not None)))
-        Requires(Unfolding(Acc(spkt.State(), 1/10), Unfolding(Acc(spkt.path.State(), 1/10), isinstance(spkt.path._iof_idx, int))))
-        Requires(Unfolding(Acc(spkt.State(), 1/10), Unfolding(Acc(spkt.path.State(), 1/10), isinstance(spkt.path._hof_idx, int))))
+        Requires(Unfolding(Acc(spkt.State(), 1/10), Unfolding(Acc(spkt.path.State(), 1/10), spkt.path._iof_idx is not None)))
+        Requires(Unfolding(Acc(spkt.State(), 1/10), Unfolding(Acc(spkt.path.State(), 1/10), spkt.path._hof_idx is not None)))
         Ensures(Acc(spkt.State()))
         Ensures(Acc(self.State(), 1 / 2))
         Exsures(SCIONBaseError, Acc(spkt.State()))
@@ -726,7 +729,7 @@ class Router(SCIONElement):
                 Fold(Acc(spkt.State(), 1 / 4))
                 return t
             Fold(Acc(spkt.State(), 1 / 4))
-            self.send_revocation(spkt, fwd_if, ingress, path_incd)
+            self.send_revocation(t, spkt, fwd_if, ingress, path_incd)
             return t
         if ingress:
             logging.debug("Sending to IF %s (%s:%s)", fwd_if, if_addr, port)
@@ -804,8 +807,8 @@ class Router(SCIONElement):
 
     def _calc_fwding_ingress(self, spkt: SCIONL4Packet) -> Tuple[int, bool, bool]:
         Requires(Acc(spkt.State()))
-        Requires(Unfolding(Acc(spkt.State(), 1/10), spkt.path is not None and Unfolding(Acc(spkt.path.State(), 1/10), isinstance(spkt.path._iof_idx, int))))
-        Requires(Unfolding(Acc(spkt.State(), 1/10), spkt.path is not None and Unfolding(Acc(spkt.path.State(), 1/10), isinstance(spkt.path._hof_idx, int))))
+        Requires(Unfolding(Acc(spkt.State(), 1/10), spkt.path is not None and Unfolding(Acc(spkt.path.State(), 1/10), spkt.path._iof_idx is not None)))
+        Requires(Unfolding(Acc(spkt.State(), 1/10), spkt.path is not None and Unfolding(Acc(spkt.path.State(), 1/10), spkt.path._hof_idx is not None)))
         Ensures(Acc(spkt.State()))
         Unfold(Acc(spkt.State()))
         path = spkt.path
@@ -820,7 +823,6 @@ class Router(SCIONElement):
         Fold(Acc(spkt.State()))
         return result
 
-    @ContractOnly
     def _link_type(self, if_id: int) -> Optional[str]:
         # Requires(Acc(self.State(), 1/9))
         # Ensures(Acc(self.State(), 1/9))
@@ -829,11 +831,11 @@ class Router(SCIONElement):
         """
         Returns the link type of the link corresponding to 'if_id' or None.
         """
-        # border_router = Unfolding(Acc(self.State(), 1/9), self.topology.get_all_border_routers())
-        # for br in border_router:
-        #     if Unfolding(Acc(br.State(), 1/10), Unfolding(Acc(br.interface.State(), 1/10), br.interface.if_id)) == if_id:
-        #         return Unfolding(Acc(br.State(), 1/10), Unfolding(Acc(br.interface.State(), 1/10), br.interface.link_type))
-        # return None
+        border_router = Unfolding(Acc(self.State(), 1/9), self.topology.get_all_border_routers())
+        for br in border_router:
+            if Unfolding(Acc(br.State(), 1/10), Unfolding(Acc(br.interface.State(), 1/10), br.interface.if_id)) == if_id:
+                return Unfolding(Acc(br.State(), 1/10), Unfolding(Acc(br.interface.State(), 1/10), br.interface.link_type))
+        return None
 
     def _needs_local_processing(self, pkt: SCIONL4Packet) -> bool:
         Requires(Acc(self.State(), 1/40))

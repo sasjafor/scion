@@ -728,6 +728,9 @@ class SCIONElement(object):
 
     @ContractOnly
     def dns_query_topo(self, qname: str) -> List[Tuple[HostAddrBase, int]]:
+        Requires(Acc(self.State(), 1/10))
+        Requires(qname in SERVICE_TYPES)
+        Ensures(Acc(self.State(), 1/10))
         """
         Query dns for an answer. If the answer is empty, or an error occurs then
         return the relevant topology entries instead.
@@ -735,6 +738,8 @@ class SCIONElement(object):
         :param str qname: Service to query for.
         """
         assert qname in SERVICE_TYPES
+        Unfold(Acc(self.State(), 1/10))
+        Unfold(Acc(self.topology.State(), 1/10))
         service_map = {
             BEACON_SERVICE: self.topology.beacon_servers,
             CERTIFICATE_SERVICE: self.topology.certificate_servers,
@@ -745,6 +750,8 @@ class SCIONElement(object):
         results = [(srv.addr, srv.port) for srv in service_map[qname]]
         # FIXME(kormat): replace with new discovery service when that's ready.
         #  results = self._dns.query(qname, fallback, self._quiet_startup())
+        Fold(Acc(self.topology.State(), 1/10))
+        Fold(Acc(self.State(), 1 / 10))
         if not results:
             # No results from local toplogy either
             raise SCIONServiceLookupError("No %s servers found" % qname)

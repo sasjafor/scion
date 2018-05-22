@@ -6,7 +6,9 @@ class Serializable:
 
 
 class Cerealizable:
-    pass
+
+    def copy(self) -> Cerealizable:
+        ...
 
 
 class SCIONPayloadBaseProto(Cerealizable):

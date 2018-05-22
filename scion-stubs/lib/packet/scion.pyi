@@ -234,12 +234,15 @@ class SCIONBasePacket(PacketBase, Sized):
         self._payload = b""
 
     def pack(self) -> bytes:
-        Requires(Acc(self.State(), 1/100))
+        Requires(Acc(self.State(), 1/10))
         Requires(MustTerminate(2))
-        Ensures(Acc(self.State(), 1/100) and Result() is packed(self))
+        Ensures(Acc(self.State(), 1/10) and Result() is packed(self))
         ...
 
     def reversed_copy(self) -> 'SCIONBasePacket':
+        ...
+
+    def short_desc(self) -> str:
         ...
 
     @Predicate
@@ -313,7 +316,7 @@ class SCIONL4Packet(SCIONExtPacket):
 @Pure
 @ContractOnly
 def packed(spkt: SCIONBasePacket) -> bytes:
-    Requires(spkt.State())
+    Requires(Acc(spkt.State(), 1/10))
 
 @Pure
 def extensions_match(next_hdr: int, hdrs: List[Union[SCMPExt, SibraExtBase]], packet: bytes, offset: int) -> bool:
