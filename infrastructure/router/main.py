@@ -824,17 +824,20 @@ class Router(SCIONElement):
         return result
 
     def _link_type(self, if_id: int) -> Optional[str]:
-        # Requires(Acc(self.State(), 1/9))
-        # Ensures(Acc(self.State(), 1/9))
-        Requires(Acc(self.State(), 1/10))
-        Ensures(Acc(self.State(), 1/10))
+        Requires(Acc(self.State(), 1/9))
+        Ensures(Acc(self.State(), 1/9))
+        # Requires(Acc(self.State(), 1/10))
+        # Ensures(Acc(self.State(), 1/10))
         """
         Returns the link type of the link corresponding to 'if_id' or None.
         """
-        border_router = Unfolding(Acc(self.State(), 1/9), self.topology.get_all_border_routers())
+        Unfold(Acc(self.State(), 1/9))
+        border_router = self.topology.get_all_border_routers()
         for br in border_router:
             if Unfolding(Acc(br.State(), 1/10), Unfolding(Acc(br.interface.State(), 1/10), br.interface.if_id)) == if_id:
+                Fold(Acc(self.State(), 1/9))
                 return Unfolding(Acc(br.State(), 1/10), Unfolding(Acc(br.interface.State(), 1/10), br.interface.link_type))
+        Fold(Acc(self.State(), 1/9))
         return None
 
     def _needs_local_processing(self, pkt: SCIONL4Packet) -> bool:

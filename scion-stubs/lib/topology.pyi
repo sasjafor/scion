@@ -61,20 +61,20 @@ class Topology(object):
 
     @Pure
     @ContractOnly
-    def get_all_border_routers(self) -> List[RouterElement]:
-        Requires(Acc(self.State(), 1/9))
+    def get_all_border_routers(self) -> Sequence[RouterElement]:
+        Requires(Acc(self.State(), 1/10))
         """
         Return all border routers associated to the AS.
 
         :returns: all border routers associated to the AS.
         :rtype: list
         """
-        # all_border_routers = [] # type: List[RouterElement]
-        # all_border_routers.extend(Unfolding(Acc(self.State(), 1/10),self.parent_border_routers))
-        # all_border_routers.extend(Unfolding(Acc(self.State(), 1/10),self.child_border_routers))
-        # all_border_routers.extend(Unfolding(Acc(self.State(), 1/10),self.peer_border_routers))
-        # all_border_routers.extend(Unfolding(Acc(self.State(), 1/10),self.routing_border_routers))
-        # return all_border_routers
+        all_border_routers = [] # type: Sequence[RouterElement]
+        all_border_routers.__add__(ToSeq(Unfolding(Acc(self.State(), 1/10),self.parent_border_routers)))
+        all_border_routers.__add__(ToSeq(Unfolding(Acc(self.State(), 1/10),self.child_border_routers)))
+        all_border_routers.__add__(ToSeq(Unfolding(Acc(self.State(), 1/10),self.peer_border_routers)))
+        all_border_routers.__add__(ToSeq(Unfolding(Acc(self.State(), 1/10),self.routing_border_routers)))
+        return all_border_routers
 
 
 class InterfaceElement(Element):
