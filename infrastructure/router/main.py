@@ -264,8 +264,8 @@ class Router(SCIONElement):
         assert len(ext_hdrs) == 0
         for i, ext_hdr in enumerate(ext_hdrs):
             Invariant(Acc(spkt.ext_hdrs, 1/9))
-            Invariant(Acc(list_pred(ext_hdrs), 1/9))
-            Invariant(len(ext_hdrs) == 0)
+            Invariant(Acc(list_pred(spkt.ext_hdrs), 1/9))
+            Invariant(len(spkt.ext_hdrs) == 0)
             assert False
             # if ext_hdr.EXT_CLASS != ExtensionClass.HOP_BY_HOP:
             #     break
@@ -813,7 +813,7 @@ class Router(SCIONElement):
         Unfold(Acc(spkt.State()))
         path = spkt.path
         hof = path.get_hof()
-        assert isinstance(hof, HopOpaqueField)
+        # assert isinstance(hof, HopOpaqueField)
         incd = False
         skipped_vo = False
         if Unfolding(Acc(path.State(), 1/9), Unfolding(Acc(path._ofs.State(), 1/9), Unfolding(Acc(hof.State(), 1/9), hof.xover))):

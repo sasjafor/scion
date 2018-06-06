@@ -1,6 +1,6 @@
 from lib.packet.host_addr import HostAddrBase
 from lib.packet.scion_addr import ISD_AS
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, cast
 from nagini_contracts.contracts import *
 
 
@@ -41,8 +41,12 @@ class Topology(object):
                 Acc(self.parent_border_routers) and list_pred(self.parent_border_routers) and
                 Acc(self.child_border_routers) and list_pred(self.child_border_routers) and
                 Acc(self.peer_border_routers) and list_pred(self.peer_border_routers) and
-                Acc(self.routing_border_routers) and list_pred(self.routing_border_routers))#and
-                #Forall(self.border_routers(), lambda e: (e.State())))
+                Acc(self.routing_border_routers) and list_pred(self.routing_border_routers) and
+                Forall(self.parent_border_routers, lambda x: (x in self.border_routers())) and
+                Forall(self.child_border_routers, lambda x: (x in self.border_routers())) and
+                Forall(self.peer_border_routers, lambda x: (x in self.border_routers())) and
+                Forall(self.routing_border_routers, lambda x: (x in self.border_routers())) and
+                Forall(self.border_routers(), lambda e: (e.State())))
 
     @Pure
     @ContractOnly
@@ -59,21 +63,24 @@ class Topology(object):
     def get_own_config(self, server_type: str, server_id: str) -> Element:
         ...
 
-    @Pure
-    @ContractOnly
-    def get_all_border_routers(self) -> Sequence[RouterElement]:
+    def get_all_border_routers(self) -> List[RouterElement]:
         Requires(Acc(self.State(), 1/10))
+        Ensures(Acc(self.State(), 1/10))
+        Ensures(list_pred(Result()))
+        Ensures(Forall(ToSeq(cast(List[RouterElement], Result())), lambda e: (e in Unfolding(Acc(self.State(), 1/10), self.border_routers()))))
         """
         Return all border routers associated to the AS.
 
         :returns: all border routers associated to the AS.
         :rtype: list
         """
-        all_border_routers = [] # type: Sequence[RouterElement]
-        all_border_routers.__add__(ToSeq(Unfolding(Acc(self.State(), 1/10),self.parent_border_routers)))
-        all_border_routers.__add__(ToSeq(Unfolding(Acc(self.State(), 1/10),self.child_border_routers)))
-        all_border_routers.__add__(ToSeq(Unfolding(Acc(self.State(), 1/10),self.peer_border_routers)))
-        all_border_routers.__add__(ToSeq(Unfolding(Acc(self.State(), 1/10),self.routing_border_routers)))
+        all_border_routers = [] # type: List[RouterElement]
+        Unfold(Acc(self.State(), 1/10))
+        all_border_routers.extend(self.parent_border_routers)
+        all_border_routers.extend(self.child_border_routers)
+        all_border_routers.extend(self.peer_border_routers)
+        all_border_routers.extend(self.routing_border_routers)
+        Fold(Acc(self.State(), 1/10))
         return all_border_routers
 
 
