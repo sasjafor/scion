@@ -170,7 +170,9 @@ class Router(SCIONElement):
     def State(self) -> bool:
         return (Acc(self.interface) and self.interface.State() and
                 Acc(self._remote_sock) and Acc(self._udp_sock) and
-                Acc(self.of_gen_key) )
+                Acc(self.of_gen_key) and
+                Acc(self.if_states) and dict_pred(self.if_states) and
+                Forall(self.if_states.values(), lambda x: (x.State())))
                 # Acc(self.pre_ext_handlers) and
                 # Acc(self.post_ext_handlers))
 
@@ -469,16 +471,18 @@ class Router(SCIONElement):
     #     """
     #     return self.interface.link_type == LinkType.PARENT
     #
+
     def send_revocation(self, t: Place, spkt: SCIONL4Packet, if_id: int, ingress: bool, path_incd: bool) -> None:
         Requires(Acc(self.State(), 1/10))
+        Requires(Unfolding(Acc(self.State(), 1/10), self.if_states.__contains__(if_id)))
         Ensures(Acc(self.State(), 1/10))
         """
         Sends an interface revocation for 'if_id' along the path in 'spkt'.
         """
         logging.info("Interface %d is down. Issuing revocation.", if_id)
         # Check that the interface is really down.
-        if_state = self.if_states[if_id]
-        if self.if_states[if_id].is_active:
+        if_state = Unfolding(Acc(self.State(), 1/10), self.if_states[if_id])
+        if Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.if_states[if_id].State(), 1/10), self.if_states[if_id].is_active)):
             # logging.error("Interface %d appears to be up. Not sending " +
             #               "revocation." % if_id)
             return

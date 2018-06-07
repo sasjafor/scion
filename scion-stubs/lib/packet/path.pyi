@@ -1,3 +1,5 @@
+from nagini_contracts.obligations import MustTerminate
+
 from lib.packet.packet_base import Serializable
 from lib.packet.opaque_field import OpaqueField, InfoOpaqueField, HopOpaqueField, OpaqueFieldList
 from lib.packet.pcb import ASMarking
@@ -79,6 +81,7 @@ class SCIONPath(Serializable, Sized):
     @Pure
     def get_iof(self) -> Optional[InfoOpaqueField]:  # pragma: no cover
         Requires(Acc(self.State(), 1/10))
+        Requires(MustTerminate(1))
         Ensures(Implies(Result() is not None, Result() in Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self._ofs.State(), 1/10), self._ofs.contents()))))
         idx = Unfolding(Acc(self.State(), 1/10), self._iof_idx)
         if not isinstance(idx, int):
