@@ -81,7 +81,6 @@ class SCIONPath(Serializable, Sized):
     @Pure
     def get_iof(self) -> Optional[InfoOpaqueField]:  # pragma: no cover
         Requires(Acc(self.State(), 1/10))
-        Requires(MustTerminate(1))
         Ensures(Implies(Result() is not None, Result() in Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self._ofs.State(), 1/10), self._ofs.contents()))))
         idx = Unfolding(Acc(self.State(), 1/10), self._iof_idx)
         if not isinstance(idx, int):
@@ -181,11 +180,11 @@ class SCIONPath(Serializable, Sized):
         else:
             return True
 
-    # @Pure
     def get_fwd_if(self) -> int:
         Requires(Acc(self.State(), 1/10))
         Requires(Unfolding(Acc(self.State(), 1/10), self._iof_idx is not None))
         Requires(Unfolding(Acc(self.State(), 1/10), self._hof_idx is not None))
+        Requires(MustTerminate(3))
         Ensures(Acc(self.State(), 1/10))
         """Return the interface to forward the current packet to."""
         if not Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self._ofs.State(), 1/10), len(self._ofs))):
@@ -263,11 +262,11 @@ class SCIONPath(Serializable, Sized):
         Requires(Acc(self.State(), 1/10))
         return Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self._ofs.State(), 1/10), len(self._ofs))) * OpaqueField.LEN
 
-    # @Pure
     def get_curr_if(self, ingress: bool=True) -> int:
         Requires(Acc(self.State(), 1/10))
         Requires(Unfolding(Acc(self.State(), 1/10), self._iof_idx is not None))
         Requires(Unfolding(Acc(self.State(), 1/10), self._hof_idx is not None))
+        Requires(MustTerminate(3))
         Ensures(Acc(self.State(), 1/10))
         """
         Return the current interface, depending on the direction of the

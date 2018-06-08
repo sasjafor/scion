@@ -171,10 +171,17 @@ class Router(SCIONElement):
         return (Acc(self.interface) and self.interface.State() and
                 Acc(self._remote_sock) and Acc(self._udp_sock) and
                 Acc(self.of_gen_key) and
-                Acc(self.if_states) and dict_pred(self.if_states) and
-                Forall(self.if_states.values(), lambda x: (x.State())))
+                Acc(self.if_states) and dict_pred(self.if_states) )
+                # Forall(self.get_if_states_seq(), lambda x: (x.State())))
                 # Acc(self.pre_ext_handlers) and
                 # Acc(self.post_ext_handlers))
+
+    # @ContractOnly
+    # @Pure
+    # def get_if_states_seq(self) -> Sequence[InterfaceState]:
+    #     Ensures(Forall(cast(Sequence[InterfaceState], Result()), lambda x: (x in self.if_states.values())))
+    #     # helper method to return the values of self.if_states
+    #     pass
 
     def _service_type(self) -> Optional[str]:
         return ROUTER_SERVICE
@@ -472,6 +479,7 @@ class Router(SCIONElement):
     #     return self.interface.link_type == LinkType.PARENT
     #
 
+    @ContractOnly
     def send_revocation(self, t: Place, spkt: SCIONL4Packet, if_id: int, ingress: bool, path_incd: bool) -> None:
         Requires(Acc(self.State(), 1/10))
         Requires(Unfolding(Acc(self.State(), 1/10), self.if_states.__contains__(if_id)))
@@ -553,7 +561,7 @@ class Router(SCIONElement):
             Fold(Acc(spkt.path.State(), 1 / 10))
         # Forward packet to destination.
         addr = Unfolding(Acc(spkt.addrs.dst.State(), 1/10), spkt.addrs.dst.host)
-        if isinstance(addr.TYPE, int) and addr.TYPE == AddrType.SVC:
+        if addr.TYPE is not None and addr.TYPE == AddrType.SVC:
             # Send request to any server.
             try:
                 service = Unfolding(Acc(spkt.addrs.dst.State(), 1/10), Unfolding(Acc(addr.State(), 1/10), SVC_TO_SERVICE[addr.addr]))
