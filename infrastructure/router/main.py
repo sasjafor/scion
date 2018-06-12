@@ -100,7 +100,7 @@ from nagini_contracts.io_builtins import Place, token, IOOperation, IOExists1, T
 
 
 # for type annotations
-from typing import List, Tuple, Union, Callable, cast, Optional, Dict, Any
+from typing import List, Tuple, Union, Callable, cast, Optional, Dict, Any, Iterable
 from lib.packet.scion import SCIONL4Packet, packed
 from lib.packet.host_addr import HostAddrBase
 from lib.util import Raw
@@ -137,16 +137,16 @@ class Router(SCIONElement):
         self.sibra_key = PBKDF2(self.config.master_as_key, b"Derive SIBRA Key")
         self.if_states = defaultdict(InterfaceState)  # type: defaultdict[int, InterfaceState]
         self.revocations = ExpiringDict(1000, self.FWD_REVOCATION_TIMEOUT)  # type: ExpiringDict[RevocationInfo, bool]
-        # self.pre_ext_handlers = {
-        #     SibraExtBase.EXT_TYPE: self.handle_sibra,
-        #     TracerouteExt.EXT_TYPE: self.handle_traceroute,
-        #     OneHopPathExt.EXT_TYPE: self.handle_one_hop_path,
-        #     ExtHopByHopType.SCMP: self.handle_scmp,
-        # } # type: Dict[int, Union[Callable[[SibraExtBase, SCIONL4Packet, bool], List[Tuple[int, str]]], Callable[[TracerouteExt, SCIONL4Packet, bool], List[Tuple[int, str]]], Callable[[ExtensionHeader, SCIONL4Packet, bool], List[Tuple[int]]], Callable[[SCMPExt, SCIONL4Packet, bool], List[Tuple[int]]] ]]
-        # self.post_ext_handlers = {
-        #     SibraExtBase.EXT_TYPE: False, TracerouteExt.EXT_TYPE: False,
-        #     ExtHopByHopType.SCMP: False, OneHopPathExt.EXT_TYPE: False,
-        # }
+        self.pre_ext_handlers = {
+            SibraExtBase.EXT_TYPE: self.handle_sibra,
+            TracerouteExt.EXT_TYPE: self.handle_traceroute,
+            OneHopPathExt.EXT_TYPE: self.handle_one_hop_path,
+            ExtHopByHopType.SCMP: self.handle_scmp,
+        } # type: Dict[int, Union[Callable[[SibraExtBase, SCIONL4Packet, bool], List[Tuple[int, str]]], Callable[[TracerouteExt, SCIONL4Packet, bool], List[Tuple[int, str]]], Callable[[ExtensionHeader, SCIONL4Packet, bool], List[Tuple[int]]], Callable[[SCMPExt, SCIONL4Packet, bool], List[Tuple[int]]] ]]
+        self.post_ext_handlers = {
+            SibraExtBase.EXT_TYPE: False, TracerouteExt.EXT_TYPE: False,
+            ExtHopByHopType.SCMP: False, OneHopPathExt.EXT_TYPE: False,
+        }
         self.sibra_state = SibraState(
             self.interface.bandwidth,
             "%s#%s -> %s" % (self.addr.isd_as, self.interface.if_id,
@@ -259,47 +259,54 @@ class Router(SCIONElement):
         Ensures(len(Result()) == 0)
         if pre_routing_phase:
             prefix = "pre"
-            # handlers = Unfolding(Acc(self.State(), 1/10), self.pre_ext_handlers) # type: Union[Dict[int, bool], Dict[int, Union[Callable[[SibraExtBase, SCIONL4Packet, bool], List[Tuple[int, str]]], Callable[[TracerouteExt, SCIONL4Packet, bool], List[Tuple[int, str]]], Callable[[ExtensionHeader, SCIONL4Packet, bool], List[Tuple[int]]], Callable[[SCMPExt, SCIONL4Packet, bool], List[Tuple[int]]] ]]]
+            handlers = Unfolding(Acc(self.State(), 1/10), self.pre_ext_handlers) # type: Union[Dict[int, bool], Dict[int, Union[Callable[[SibraExtBase, SCIONL4Packet, bool], List[Tuple[int, str]]], Callable[[TracerouteExt, SCIONL4Packet, bool], List[Tuple[int, str]]], Callable[[ExtensionHeader, SCIONL4Packet, bool], List[Tuple[int]]], Callable[[SCMPExt, SCIONL4Packet, bool], List[Tuple[int]]] ]]]
         else:
             prefix = "post"
-            # handlers = Unfolding(Acc(self.State(), 1/10), self.post_ext_handlers)
+            handlers = Unfolding(Acc(self.State(), 1/10), self.post_ext_handlers)
         flags = []  # type: List[Tuple[int, ...]]
         # Hop-by-hop extensions must be first (just after path), and process
         # only MAX_HOPBYHOP_EXT number of them. If an SCMP ext header is
         # present, it must be the first hopbyhop extension (and isn't included
         # in the MAX_HOPBYHOP_EXT check).
         Unfold(Acc(spkt.State(), 1/9))
+        count = 0
         ext_hdrs = spkt.ext_hdrs
-        assert len(ext_hdrs) == 0
         for i, ext_hdr in enumerate(ext_hdrs):
             Invariant(Acc(spkt.ext_hdrs, 1/9))
             Invariant(Acc(list_pred(spkt.ext_hdrs), 1/9))
             Invariant(len(spkt.ext_hdrs) == 0)
-            assert False
-            # if ext_hdr.EXT_CLASS != ExtensionClass.HOP_BY_HOP:
-            #     break
-            # if ext_hdr.EXT_TYPE == ExtHopByHopType.SCMP:
-            #     if i != 0:
-            #         logging.error("SCMP ext header not first.")
-            #         raise SCMPBadExtOrder(i)
-            # else:
-            #     count += 1
-            # if count > MAX_HOPBYHOP_EXT:
-            #     logging.error("Too many hop-by-hop extensions.")
-            #     raise SCMPTooManyHopByHop(i)
-            # handler = handlers.get(ext_hdr.EXT_TYPE)
-            # if handler is None:
-            #     logging.debug("No %s-handler for extension type %s",
-            #                   prefix, ext_hdr.EXT_TYPE)
-            #     raise SCMPBadHopByHop
-            # if handler:
-            #     # new code because of types
-            #     if isinstance(ext_hdr, SibraExtBase):
-            #         #ext_hdr = cast(SCMPExt, ext_hdr)
-            #         flags.extend(handler(cast(SibraExtBase, ext_hdr), spkt, from_local_as))
-            #     else:
-            #         #ext_hdr = cast(SibraExtBase, ext_hdr)
-            #         flags.extend(handler(cast(SCMPExt, ext_hdr), spkt, from_local_as))
+            # assert False
+            if ext_hdr.EXT_CLASS != ExtensionClass.HOP_BY_HOP:
+                break
+            if ext_hdr.EXT_TYPE == ExtHopByHopType.SCMP:
+                if i != 0:
+                    logging.error("SCMP ext header not first.")
+                    raise SCMPBadExtOrder(i)
+            else:
+                count += 1
+            if count > MAX_HOPBYHOP_EXT:
+                logging.error("Too many hop-by-hop extensions.")
+                raise SCMPTooManyHopByHop(i)
+            handler = handlers.get(ext_hdr.EXT_TYPE) # type: Optional[Union[bool, Callable[[SibraExtBase, SCIONL4Packet, bool], List[Tuple[int, str]]], Callable[[TracerouteExt, SCIONL4Packet, bool], List[Tuple[int, str]]], Callable[[ExtensionHeader, SCIONL4Packet, bool], List[Tuple[int]]], Callable[[SCMPExt, SCIONL4Packet, bool], List[Tuple[int]]]]]
+            if handler is None:
+                logging.debug("No %s-handler for extension type %s",
+                              prefix, ext_hdr.EXT_TYPE)
+                raise SCMPBadHopByHop
+            if handler:
+                # new code because of types
+                if isinstance(ext_hdr, SCMPExt) or isinstance(ext_hdr, TracerouteExt):
+                    handler = cast(Callable[[SCMPExt, SCIONL4Packet, bool], List[Tuple[int]]], handler)
+                    flags.extend(cast(List[Tuple[int]], handler(cast(SCMPExt, ext_hdr), spkt, from_local_as)))
+                # elif isinstance(ext_hdr, TracerouteExt):
+                #     handler = cast(Callable[[TracerouteExt, SCIONL4Packet, bool], List[Tuple[int, str]]], handler)
+                #     flags.extend(cast(List[Tuple[int, ...]], handler(cast(TracerouteExt, ext_hdr), spkt, from_local_as)))
+                elif isinstance(ext_hdr, SibraExtBase):
+                    handler = cast(Callable[[SibraExtBase, SCIONL4Packet, bool], List[Tuple[int, str]]], handler)
+                    flags.extend(cast(List[Tuple[int, ...]], handler(cast(SibraExtBase, ext_hdr), spkt, from_local_as)))
+                # elif isinstance(ext_hdr, ExtensionHeader):
+                #     handler = cast(Callable[[ExtensionHeader, SCIONL4Packet, bool], List[Tuple[int]]], handler)
+                #     flags.extend(cast(List[Tuple[int]], handler(cast(ExtensionHeader, ext_hdr), spkt, from_local_as)))
+
         Fold(Acc(spkt.State(), 1/9))
         return flags
 
@@ -561,7 +568,7 @@ class Router(SCIONElement):
             Fold(Acc(spkt.path.State(), 1 / 10))
         # Forward packet to destination.
         addr = Unfolding(Acc(spkt.addrs.dst.State(), 1/10), spkt.addrs.dst.host)
-        if addr.TYPE is not None and addr.TYPE == AddrType.SVC:
+        if isinstance(addr.TYPE, int) and addr.TYPE == AddrType.SVC:
             # Send request to any server.
             try:
                 service = Unfolding(Acc(spkt.addrs.dst.State(), 1/10), Unfolding(Acc(addr.State(), 1/10), SVC_TO_SERVICE[addr.addr]))
@@ -615,6 +622,7 @@ class Router(SCIONElement):
     def _egress_forward(self, t: Place, spkt: SCIONL4Packet) -> Place:
         Requires(Acc(self.State(), 1/10))
         Requires(Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.interface.State(), 1/10), self.interface.to_addr is not None)))
+        # Requires(MustTerminate())
         Ensures(Acc(self.State(), 1/10))
         addr = Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.interface.State(), 1/10), self.interface.to_addr))
         port = Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.interface.State(), 1/10), self.interface.to_udp_port))

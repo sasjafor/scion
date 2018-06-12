@@ -1,3 +1,5 @@
+from nagini_contracts.obligations import MustTerminate
+
 from lib.packet.host_addr import HostAddrBase
 from lib.packet.scion_addr import ISD_AS
 from typing import Optional, List, Dict, cast
@@ -65,6 +67,7 @@ class Topology(object):
 
     def get_all_border_routers(self) -> List[RouterElement]:
         Requires(Acc(self.State(), 1/10))
+        # Requires(MustTerminate(2))
         Ensures(Acc(self.State(), 1/10))
         Ensures(list_pred(Result()))
         Ensures(Forall(ToSeq(cast(List[RouterElement], Result())), lambda e: (e in Unfolding(Acc(self.State(), 1/10), self.border_routers()))))
