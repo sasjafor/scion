@@ -257,7 +257,7 @@ class SCIONBasePacket(PacketBase, Sized):
 
 class SCIONExtPacket(SCIONBasePacket):
     def __init__(self, raw: bytes=None) -> None:  # pragma: no cover
-        self.ext_hdrs = []  # type: List[Union[SCMPExt, SibraExtBase]]
+        self.ext_hdrs = []  # type: List[ExtensionHeader]
         super().__init__(raw)
 
     @Predicate
@@ -319,7 +319,7 @@ def packed(spkt: SCIONBasePacket) -> bytes:
     Requires(Acc(spkt.State(), 1/10))
 
 @Pure
-def extensions_match(next_hdr: int, hdrs: List[Union[SCMPExt, SibraExtBase]], packet: bytes, offset: int) -> bool:
+def extensions_match(next_hdr: int, hdrs: List[ExtensionHeader], packet: bytes, offset: int) -> bool:
     Requires(Acc(list_pred(hdrs)))
     Requires(Forall(hdrs, lambda e: (e.State(), [])))
     if len(hdrs) == 0:
@@ -327,13 +327,13 @@ def extensions_match(next_hdr: int, hdrs: List[Union[SCMPExt, SibraExtBase]], pa
     return False
 
 @Pure
-def extension_len(hdrs: List[Union[SCMPExt, SibraExtBase]]) -> int:
+def extension_len(hdrs: List[ExtensionHeader]) -> int:
     Requires(Acc(list_pred(hdrs)))
     Requires(Forall(hdrs, lambda e: (e.State(), [])))
     return extension_len_rec(hdrs, 0)
 
 @Pure
-def extension_len_rec(hdrs: List[Union[SCMPExt, SibraExtBase]], index: int) -> int:
+def extension_len_rec(hdrs: List[ExtensionHeader], index: int) -> int:
     Requires(Acc(list_pred(hdrs)))
     Requires(Forall(hdrs, lambda e: (e.State(), [])))
     Requires(index >= 0 and index <= len(hdrs))

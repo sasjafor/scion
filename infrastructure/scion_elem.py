@@ -22,6 +22,8 @@ import os
 import queue
 import threading
 import time
+from nagini_contracts.obligations import MustTerminate
+
 from collections import defaultdict
 
 # SCION
@@ -730,6 +732,7 @@ class SCIONElement(object):
     def dns_query_topo(self, qname: str) -> List[Tuple[HostAddrBase, int]]:
         Requires(Acc(self.State(), 1/10))
         Requires(qname in SERVICE_TYPES)
+        Requires(MustTerminate(2))
         Ensures(Acc(self.State(), 1/10))
         """
         Query dns for an answer. If the answer is empty, or an error occurs then

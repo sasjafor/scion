@@ -32,22 +32,28 @@ class SCIONPath(Serializable, Sized):
                 Acc(self._hof_idx) and
                 Acc(self._iof_idx) and
                 Implies(self._hof_idx is not None,
-                    self._hof_idx >= 0 and self._hof_idx < Unfolding(self._ofs.State(), len(self._ofs)) and
+                    self._hof_idx >= 0 and self._hof_idx < self.get_ofs_len() and
                     isinstance(self._ofs.get_by_idx(self._hof_idx), HopOpaqueField)) and
                 Implies(self._iof_idx is not None,
-                    self._iof_idx >= 0 and self._iof_idx < Unfolding(self._ofs.State(), len(self._ofs)) and
+                    self._iof_idx >= 0 and self._iof_idx < self.get_ofs_len() and
                     isinstance(self._ofs.get_by_idx(self._iof_idx), InfoOpaqueField)) and
                 Implies(self._hof_idx is not None and
                         self._iof_idx is not None,
                         Let(cast(InfoOpaqueField, self._ofs.get_by_idx(self._iof_idx)), bool, lambda iof:
                         Let(self._hof_idx, bool, lambda hof_idx :
-                        Implies(Unfolding(self._ofs.State(), Unfolding(iof.State(), iof.up_flag)),
-                                hof_idx >= 0 and hof_idx + 1 >= 0 and hof_idx < Unfolding(self._ofs.State(), len(self._ofs)) - 1 and hof_idx + 1 < Unfolding(self._ofs.State(), len(self._ofs)) and isinstance(self._ofs.get_by_idx(hof_idx + 1), HopOpaqueField)) and
-                        Implies(not Unfolding(self._ofs.State(), Unfolding(iof.State(), iof.up_flag)),
-                                hof_idx >= 1 and hof_idx < Unfolding(self._ofs.State(), len(self._ofs)) and isinstance(self._ofs.get_by_idx(hof_idx - 1), HopOpaqueField))
+                        Implies(Unfolding(self._ofs.State(), iof.get_up_flag()),
+                                hof_idx >= 0 and hof_idx + 1 >= 0 and hof_idx < self.get_ofs_len() - 1 and hof_idx + 1 < self.get_ofs_len() and isinstance(self._ofs.get_by_idx(hof_idx + 1), HopOpaqueField)) and
+                        Implies(not Unfolding(self._ofs.State(), iof.get_up_flag()),
+                                hof_idx >= 1 and hof_idx < self.get_ofs_len() and isinstance(self._ofs.get_by_idx(hof_idx - 1), HopOpaqueField))
                         ))) and
                 Acc(self.interfaces) and Acc(list_pred(self.interfaces)) and
                 Acc(self.mtu))
+
+    @Pure
+    def get_ofs_len(self) -> int:
+        Requires(Acc(self._ofs, 1/10))
+        Requires(Acc(self._ofs.State(), 1/10))
+        return Unfolding(Acc(self._ofs.State(), 1/10), len(self._ofs))
 
     @Pure
     def matches(self, raw: bytes, offset: int) -> bool:
@@ -195,8 +201,8 @@ class SCIONPath(Serializable, Sized):
             # Invariant(Acc(self._ofs.State()))
             Invariant(Unfolding(self.State(), self._hof_idx is not None))
             Invariant(Unfolding(self.State(), self._iof_idx is not None))
-            Invariant(Unfolding(self.State(), isinstance(self._hof_idx, int)))
-            Invariant(Unfolding(self.State(), isinstance(self._iof_idx, int)))
+            # Invariant(Unfolding(self.State(), isinstance(self._hof_idx, int)))
+            # Invariant(Unfolding(self.State(), isinstance(self._iof_idx, int)))
             Invariant(iof in Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self._ofs.State(), 1/10), self._ofs.contents())))
             # Invariant(Unfolding(Acc(self.State()), (self._hof_idx >= 0) and (self._hof_idx < Unfolding(Acc(self._ofs.State()), len(self._ofs))) and isinstance(self._ofs.get_by_idx(self._hof_idx), HopOpaqueField)))
             Unfold(self.State())

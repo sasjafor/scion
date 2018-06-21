@@ -173,3 +173,8 @@ class InfoOpaqueField(OpaqueField):
                 Acc(self.timestamp) and
                 Acc(self.isd) and
                 Acc(self.hops))
+
+    @Pure
+    def get_up_flag(self) -> bool:
+        Requires(Acc(self.State(), 1/10))
+        return Unfolding(Acc(self.State(), 1/10), self.up_flag)

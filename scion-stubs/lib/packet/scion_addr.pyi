@@ -1,13 +1,23 @@
+from nagini_contracts.obligations import MustTerminate
+
 from lib.packet.host_addr import HostAddrBase
 from typing import Optional
 from nagini_contracts.contracts import *
 
+from lib.packet.packet_base import Serializable
 
-class ISD_AS:
+
+class ISD_AS(Serializable):
     LEN = 4
-    def __init__(self, raw: Optional[str] = None) -> None: ...
+
+    def __init__(self, raw: Optional[str] = None) -> None:
+        self._isd = 0
+        self._as = 0
+
     def to_int(self) -> int: ...
 
+    def State(self) -> bool:
+        return Acc(self._isd) and Acc(self._as)
 
 class SCIONAddr(object):
     def __init__(self) -> None:  # pragma: no cover
@@ -25,6 +35,7 @@ class SCIONAddr(object):
 
     @classmethod
     def from_values(cls, isd_as: Optional[ISD_AS], host: Optional[HostAddrBase]) -> 'SCIONAddr':  # pragma: no cover
+        Requires(MustTerminate(1))
         ...
 
     # @classmethod

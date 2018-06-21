@@ -297,15 +297,15 @@ class Router(SCIONElement):
                 if isinstance(ext_hdr, SCMPExt) or isinstance(ext_hdr, TracerouteExt):
                     handler = cast(Callable[[SCMPExt, SCIONL4Packet, bool], List[Tuple[int]]], handler)
                     flags.extend(cast(List[Tuple[int]], handler(cast(SCMPExt, ext_hdr), spkt, from_local_as)))
-                # elif isinstance(ext_hdr, TracerouteExt):
-                #     handler = cast(Callable[[TracerouteExt, SCIONL4Packet, bool], List[Tuple[int, str]]], handler)
-                #     flags.extend(cast(List[Tuple[int, ...]], handler(cast(TracerouteExt, ext_hdr), spkt, from_local_as)))
+                elif isinstance(ext_hdr, TracerouteExt):
+                    handler = cast(Callable[[TracerouteExt, SCIONL4Packet, bool], List[Tuple[int, str]]], handler)
+                    flags.extend(cast(List[Tuple[int, ...]], handler(cast(TracerouteExt, ext_hdr), spkt, from_local_as)))
                 elif isinstance(ext_hdr, SibraExtBase):
                     handler = cast(Callable[[SibraExtBase, SCIONL4Packet, bool], List[Tuple[int, str]]], handler)
                     flags.extend(cast(List[Tuple[int, ...]], handler(cast(SibraExtBase, ext_hdr), spkt, from_local_as)))
-                # elif isinstance(ext_hdr, ExtensionHeader):
-                #     handler = cast(Callable[[ExtensionHeader, SCIONL4Packet, bool], List[Tuple[int]]], handler)
-                #     flags.extend(cast(List[Tuple[int]], handler(cast(ExtensionHeader, ext_hdr), spkt, from_local_as)))
+                elif isinstance(ext_hdr, ExtensionHeader):
+                    handler = cast(Callable[[ExtensionHeader, SCIONL4Packet, bool], List[Tuple[int]]], handler)
+                    flags.extend(cast(List[Tuple[int]], handler(cast(ExtensionHeader, ext_hdr), spkt, from_local_as)))
 
         Fold(Acc(spkt.State(), 1/9))
         return flags
@@ -411,6 +411,7 @@ class Router(SCIONElement):
 
     @ContractOnly
     def get_srv_addr(self, service: str, pkt: SCIONL4Packet) -> HostAddrBase:
+        Requires(MustTerminate(3))
         """
         For a given service return a server address. Guarantee that all packets
         from the same source to a given service are sent to the same server.
@@ -587,6 +588,8 @@ class Router(SCIONElement):
         Requires(Acc(self.State(), 1 / 9))
         Requires(Unfolding(Acc(path.State(), 1/10), path._iof_idx is not None))
         Requires(Unfolding(Acc(path.State(), 1/10), path._hof_idx is not None))
+        Requires(Unfolding(Acc(path.State(), (1 / 10)), Let(cast(InfoOpaqueField, path._ofs.get_by_idx(path._iof_idx)), bool, (lambda iof: Unfolding(Acc(path._ofs.State(), (1 / 10)), Unfolding(Acc(iof.State(), (1 / 10)), (not iof.peer)))))))
+        Requires(MustTerminate(4))
         Ensures(Acc(path.State(), 1 / 9))
         Ensures(Acc(self.State(), 1 / 9))
         Ensures(valid_hof(path))
@@ -844,19 +847,22 @@ class Router(SCIONElement):
         return result
 
     def _link_type(self, if_id: int) -> Optional[str]:
-        Requires(Acc(self.State(), 1/9))
-        Ensures(Acc(self.State(), 1/9))
+        Requires(Acc(self.State(), 1/10))
+        Ensures(Acc(self.State(), 1/10))
         # Requires(Acc(self.State(), 1/10))
         # Ensures(Acc(self.State(), 1/10))
         """
         Returns the link type of the link corresponding to 'if_id' or None.
         """
-        Unfold(Acc(self.State(), 1/9))
+        Unfold(Acc(self.State(), 1/10))
         border_router = self.topology.get_all_border_routers()
         for br in border_router:
-            if Unfolding(Acc(br.State(), 1/10), Unfolding(Acc(br.interface.State(), 1/10), br.interface.if_id)) == if_id:
-                Fold(Acc(self.State(), 1/9))
-                return Unfolding(Acc(br.State(), 1/10), Unfolding(Acc(br.interface.State(), 1/10), br.interface.link_type))
+            Invariant(Acc(self.topology, 1/10))
+            Invariant(Acc(self.topology.State(), 1/10))
+            Invariant(br in Unfolding(Acc(self.topology.State(), 1/10), self.topology.border_routers()))
+            if Unfolding(Acc(self.topology.State(), 1/10), Unfolding(Acc(br.State(), 1/10), Unfolding(Acc(br.interface.State(), 1/10), br.interface.if_id))) == if_id:
+                Fold(Acc(self.State(), 1/10))
+                return Unfolding(Acc(self.topology.State(), 1/10), Unfolding(Acc(br.State(), 1/10), Unfolding(Acc(br.interface.State(), 1/10), br.interface.link_type)))
         Fold(Acc(self.State(), 1/9))
         return None
 
@@ -864,6 +870,7 @@ class Router(SCIONElement):
         Requires(Acc(self.State(), 1/40))
         Requires(Acc(pkt.State(), 1/40))
         Requires(Unfolding(Acc(pkt.State(), 1/40), pkt.addrs is not None))
+        Requires(MustTerminate(2))
         Ensures(Acc(self.State(), 1/40))
         Ensures(Acc(pkt.State(), 1/40))
         return Unfolding(Acc(pkt.State(), 1/40), Unfolding(Acc(pkt.addrs.State(), 1/40), pkt.addrs.dst)) in [
@@ -879,12 +886,14 @@ class Router(SCIONElement):
         """
         Requires(Acc(list_pred(flags), 1/9))
         Requires(len(flags) == 0)
+        Requires(MustTerminate(2))
         Ensures(Acc(list_pred(flags), 1/9))
         Ensures(not Result()[1])
         process = False
         # First check if any error or no_process flags are set
         for (flag, *args) in flags:
             Invariant(len(flags) == 0)
+            Invariant(MustTerminate(1))
             if flag == RouterFlag.ERROR:
                 logging.error("%s", args[0])
                 return True, False
@@ -894,6 +903,7 @@ class Router(SCIONElement):
         for (flag, *args) in flags:
             Invariant(len(flags) == 0)
             Invariant(process == False)
+            Invariant(MustTerminate(1))
             if flag == RouterFlag.FORWARD:
                 if from_local_as:
                     self._process_fwd_flag(pkt)
