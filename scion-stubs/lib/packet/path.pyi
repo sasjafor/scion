@@ -53,7 +53,7 @@ class SCIONPath(Serializable, Sized):
     def get_ofs_len(self) -> int:
         Requires(Acc(self._ofs, 1/10))
         Requires(Acc(self._ofs.State(), 1/10))
-        return Unfolding(Acc(self._ofs.State(), 1/10), len(self._ofs))
+        return cast(int, Unfolding(Acc(self._ofs.State(), 1/10), len(self._ofs)))
 
     @Pure
     def matches(self, raw: bytes, offset: int) -> bool:
@@ -64,7 +64,7 @@ class SCIONPath(Serializable, Sized):
         Requires(Acc(self.State(), 1/10))
         Ensures(Implies(Result() is not None, Result() in Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self._ofs.State(), 1/10), self._ofs.contents()))))
         idx = Unfolding(Acc(self.State(), 1/10), self._iof_idx)
-        if not isinstance(idx, int):
+        if not idx is not None:
             return None
         return cast(InfoOpaqueField, Unfolding(Acc(self.State(), 1/10), self._ofs.get_by_idx(idx)))
 
@@ -73,7 +73,7 @@ class SCIONPath(Serializable, Sized):
         Requires(Acc(self.State(), 1/10))
         Ensures(Implies(Result() is not None, Result() in Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self._ofs.State(), 1/10), self._ofs.contents()))))
         idx = Unfolding(Acc(self.State(), 1/10), self._hof_idx)
-        if not isinstance(idx, int):
+        if not idx is not None:
             return None
         return cast(HopOpaqueField, Unfolding(Acc(self.State(), 1/10), self._ofs.get_by_idx(idx)))
 

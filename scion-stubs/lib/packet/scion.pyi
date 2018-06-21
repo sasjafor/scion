@@ -2,7 +2,7 @@ from lib.errors import SCIONBaseError, SCIONChecksumFailed
 from lib.packet.ext_hdr import ExtensionHeader
 from lib.packet.packet_base import PacketBase
 from lib.util import calc_padding, Raw
-from lib.packet.host_addr import HostAddrIPv4, HostAddrIPv6, HostAddrSVC  # , HostAddrInvalidType
+from lib.packet.host_addr import HostAddrIPv4, HostAddrIPv6, HostAddrSVC, HostAddrBase  # , HostAddrInvalidType
 from lib.packet.packet_base import Serializable, L4HeaderBase
 from lib.packet.path import SCIONPath
 from lib.packet.scion_addr import ISD_AS, SCIONAddr
@@ -312,6 +312,58 @@ class SCIONL4Packet(SCIONExtPacket):
 
     def convert_to_scmp_error(self, addr: SCIONAddr, class_: object, type_: object, pkt: SCIONL4Packet, *args: object, hopbyhop: bool=False, **kwargs: object) -> None:
         ...
+
+    @Pure
+    def get_addrs_dst_isd_as(self) -> Optional[ISD_AS]:
+        Requires(Acc(self.addrs, 1/10))
+        Requires(Acc(self.addrs.dst, 1/10))
+        Requires(Acc(self.addrs.dst.State(), 1/10))
+        return Unfolding(Acc(self.addrs.dst.State(), 1/10), self.addrs.dst.isd_as)
+
+    @Pure
+    def get_addrs(self) -> Optional[SCIONAddrHdr]:
+        Requires(Acc(self.State(), 1/10))
+        return Unfolding(Acc(self.State(), 1 / 10), self.addrs)
+
+    @Pure
+    def get_path(self) -> Optional[SCIONPath]:
+        Requires(Acc(self.State(), 1/10))
+        return Unfolding(Acc(self.State(), 1 / 10), self.path)
+
+    @Pure
+    def get_addrs_dst(self) -> Optional[SCIONAddr]:
+        Requires(Acc(self.State(), 1/10))
+        Requires(self.get_addrs() is not None)
+        return Unfolding(Acc(self.State(), 1 / 10),
+                 Unfolding(Acc(self.addrs.State(), 1 / 10), self.addrs.dst))
+
+    @Pure
+    def get_addrs_dst_host(self) -> Optional[HostAddrBase]:
+        Requires(Acc(self.State(), 1/10))
+        Requires(self.get_addrs() is not None)
+        Requires(self.get_addrs_dst() is not None)
+        return Unfolding(Acc(self.State(), 1 / 10),
+                 Unfolding(Acc(self.addrs.State(), 1 / 10),
+                 Unfolding(Acc(self.addrs.dst.State(), 1 / 10), self.addrs.dst.host)))
+
+    @Pure
+    def get_addrs_dst_host_addr(self) -> bytes:
+        Requires(Acc(self.State(), 1/10))
+        Requires(self.get_addrs() is not None)
+        Requires(self.get_addrs_dst() is not None)
+        Requires(self.get_addrs_dst_host() is not None)
+        return Unfolding(Acc(self.State(), 1 / 10),
+                 Unfolding(Acc(self.addrs.State(), 1 / 10),
+                 Unfolding(Acc(self.addrs.dst.State(), 1/10),
+                 Unfolding(Acc(self.addrs.dst.host.State(), 1/10), self.addrs.dst.host.addr))))
+
+    @Pure
+    def get_path_hof_idx(self) -> int:
+        Requires(Acc(self.State(), 1/10))
+        Requires(self.get_path() is not None)
+        return Unfolding(Acc(self.State(), 1/10),
+                Unfolding(Acc(self.path.State(), 1 / 10), self.path._hof_idx))
+
 
 @Pure
 @ContractOnly

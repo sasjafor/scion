@@ -15,12 +15,12 @@ class HostAddrBase(Serializable):
     TYPE = None  # type: Optional[int]
     LEN = None  # type: Optional[int]
 
-    def __init__(self, addr: HostAddrBase, raw: bool=True) -> None:  # pragma: no cover
+    def __init__(self, addr: bytes, raw: bool=True) -> None:  # pragma: no cover
         """
         :param addr: Address to parse/store.
         :param bool raw: Does the address need to be parsed?
         """
-        self.addr = None # type: Optional[HostAddrBase]
+        self.addr = None # type: bytes
         if raw:
             self._parse(addr)
         else:
@@ -31,7 +31,7 @@ class HostAddrBase(Serializable):
     def __str__(self) -> str:
         ...
 
-    def _parse(self, addr: HostAddrBase) -> None:
+    def _parse(self, addr: bytes) -> None:
         ...
 
     @Predicate

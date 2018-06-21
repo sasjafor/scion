@@ -70,7 +70,7 @@ class Topology(object):
         Requires(MustTerminate(2))
         Ensures(Acc(self.State(), 1/10))
         Ensures(list_pred(Result()))
-        Ensures(Forall(ToSeq(cast(List[RouterElement], Result())), lambda e: (e in Unfolding(Acc(self.State(), 1/10), self.border_routers()))))
+        Ensures(Forall(cast(List[RouterElement], Result()), lambda e: (e in Unfolding(Acc(self.State(), 1/10), self.border_routers()), [[e in Result()]])))
         """
         Return all border routers associated to the AS.
 
@@ -132,11 +132,20 @@ class RouterElement(Element):
         :param dict router_dict: contains information about an border router.
         :param str name: router element name or id
         """
-        self.interface = InterfaceElement({})
+        self.interface = InterfaceElement({}) # type: InterfaceElement
 
     @Predicate
     def State(self) -> bool:
         return (Acc(self.interface) and
                 Acc(self.interface.State()))
 
+    @Pure
+    def get_interface_if_id(self) -> int:
+        Requires(Acc(self.State(), 1/10))
+        return Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.interface.State(), 1/10), self.interface.if_id))
+
+    @Pure
+    def get_interface_link_type(self) -> Optional[str]:
+        Requires(Acc(self.State(), 1/10))
+        return Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.interface.State(), 1/10), self.interface.link_type))
 

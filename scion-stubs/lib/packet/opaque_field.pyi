@@ -31,8 +31,7 @@ class OpaqueFieldList(Sized):
     @Predicate
     def State(self) -> bool:
         return (Acc(self._order) and Acc(self._labels) and Acc(dict_pred(self._labels)) and
-                Forall(self.contents(), lambda e: (e.State())))
-                # Forall(self.contents(), lambda e: (e.State(), [[e in self.contents()]])))
+                Forall(self.contents(), lambda e: (e.State(), [[e in self.contents()]])))
 
     @Pure
     @ContractOnly
@@ -155,6 +154,10 @@ class HopOpaqueField(OpaqueField):
                 Acc(self.egress_if) and
                 Acc(self.mac))
 
+    @Pure
+    def get_forward_only(self) -> bool:
+        Requires(Acc(self.State(), 1/10))
+        return Unfolding(Acc(self.State(), 1/10), self.forward_only)
 
 class InfoOpaqueField(OpaqueField):
     def __init__(self) -> None:  # pragma: no cover
