@@ -138,11 +138,16 @@ class Router(SCIONElement):
         self.if_states = defaultdict(InterfaceState)  # type: defaultdict[int, InterfaceState]
         self.revocations = ExpiringDict(1000, self.FWD_REVOCATION_TIMEOUT)  # type: ExpiringDict[RevocationInfo, bool]
         self.pre_ext_handlers = {
-            SibraExtBase.EXT_TYPE: self.handle_sibra,
-            TracerouteExt.EXT_TYPE: self.handle_traceroute,
-            OneHopPathExt.EXT_TYPE: self.handle_one_hop_path,
-            ExtHopByHopType.SCMP: self.handle_scmp,
-        } # type: Dict[int, Union[Callable[[SibraExtBase, SCIONL4Packet, bool], List[Tuple[int, str]]], Callable[[TracerouteExt, SCIONL4Packet, bool], List[Tuple[int, str]]], Callable[[ExtensionHeader, SCIONL4Packet, bool], List[Tuple[int]]], Callable[[SCMPExt, SCIONL4Packet, bool], List[Tuple[int]]] ]]
+            # SibraExtBase.EXT_TYPE: self.handle_sibra,
+            # TracerouteExt.EXT_TYPE: self.handle_traceroute,
+            # OneHopPathExt.EXT_TYPE: self.handle_one_hop_path,
+            # ExtHopByHopType.SCMP: self.handle_scmp,
+            SibraExtBase.EXT_TYPE: True,
+            TracerouteExt.EXT_TYPE: True,
+            OneHopPathExt.EXT_TYPE: True,
+            ExtHopByHopType.SCMP: True,
+        }
+        ## type: Dict[int, Union[Callable[[SibraExtBase, SCIONL4Packet, bool], List[Tuple[int, str]]], Callable[[TracerouteExt, SCIONL4Packet, bool], List[Tuple[int, str]]], Callable[[ExtensionHeader, SCIONL4Packet, bool], List[Tuple[int]]], Callable[[SCMPExt, SCIONL4Packet, bool], List[Tuple[int]]] ]]
         self.post_ext_handlers = {
             SibraExtBase.EXT_TYPE: False, TracerouteExt.EXT_TYPE: False,
             ExtHopByHopType.SCMP: False, OneHopPathExt.EXT_TYPE: False,
@@ -533,7 +538,8 @@ class Router(SCIONElement):
         Requires(spkt.get_addrs_dst() is not None)
         Requires(spkt.get_addrs_dst_host() is not None)
         Requires(SVC_TO_SERVICE.__contains__(spkt.get_addrs_dst_host_addr()))
-        Requires(spkt.get_path_hof_idx() is not None)
+        # Requires(spkt.get_path_hof_idx() is not None)
+        Requires(Unfolding(Acc(spkt.State(), 1/10), Unfolding(Acc(spkt.path.State(), 1/10), spkt.path._hof_idx is not None)))
         Ensures(Acc(spkt.State(), 1/10))
         Ensures(Acc(self.State(), 1/10))
         Exsures(SCIONBaseError, Acc(spkt.State(), 1/10))
@@ -557,7 +563,7 @@ class Router(SCIONElement):
             hof = spkt.path.get_hof()
             assert hof is not None
             Unfold(Acc(spkt.path.State(), 1 / 10))
-            if not force and Unfolding(Acc(spkt.path._ofs.State(), 1/10), cast(HopOpaqueField, hof).get_forward_only()):
+            if not force and Unfolding(Acc(spkt.path._ofs.State(), 1/10), hof.get_forward_only()):
                 Fold(Acc(spkt.addrs.State(), 1/10))
                 Fold(Acc(spkt.path.State(), 1/10))
                 Fold(Acc(spkt.State(), 1/10))

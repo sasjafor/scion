@@ -64,16 +64,17 @@ class SCIONPath(Serializable, Sized):
         Requires(Acc(self.State(), 1/10))
         Ensures(Implies(Result() is not None, Result() in Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self._ofs.State(), 1/10), self._ofs.contents()))))
         idx = Unfolding(Acc(self.State(), 1/10), self._iof_idx)
-        if not idx is not None:
+        if idx is None:
             return None
         return cast(InfoOpaqueField, Unfolding(Acc(self.State(), 1/10), self._ofs.get_by_idx(idx)))
 
     @Pure
     def get_hof(self) -> Optional[HopOpaqueField]:  # pragma: no cover
         Requires(Acc(self.State(), 1/10))
+        Ensures(Implies(Unfolding(Acc(self.State(), 1/10), self._hof_idx is not None), Result() is not None))
         Ensures(Implies(Result() is not None, Result() in Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self._ofs.State(), 1/10), self._ofs.contents()))))
         idx = Unfolding(Acc(self.State(), 1/10), self._hof_idx)
-        if not idx is not None:
+        if idx is None:
             return None
         return cast(HopOpaqueField, Unfolding(Acc(self.State(), 1/10), self._ofs.get_by_idx(idx)))
 
