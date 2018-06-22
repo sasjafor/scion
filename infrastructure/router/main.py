@@ -263,7 +263,8 @@ class Router(SCIONElement):
         Ensures(len(Result()) == 0)
         if pre_routing_phase:
             prefix = "pre"
-            handlers = Unfolding(Acc(self.State(), 1/10), self.pre_ext_handlers) # type: Union[Dict[int, bool], Dict[int, Union[Callable[[SibraExtBase, SCIONL4Packet, bool], List[Tuple[int, str]]], Callable[[TracerouteExt, SCIONL4Packet, bool], List[Tuple[int, str]]], Callable[[ExtensionHeader, SCIONL4Packet, bool], List[Tuple[int]]], Callable[[SCMPExt, SCIONL4Packet, bool], List[Tuple[int]]] ]]]
+            handlers = Unfolding(Acc(self.State(), 1/10), self.pre_ext_handlers) # type: Dict[int, bool]
+            ## type: Union[Dict[int, bool], Dict[int, Union[Callable[[SibraExtBase, SCIONL4Packet, bool], List[Tuple[int, str]]], Callable[[TracerouteExt, SCIONL4Packet, bool], List[Tuple[int, str]]], Callable[[ExtensionHeader, SCIONL4Packet, bool], List[Tuple[int]]], Callable[[SCMPExt, SCIONL4Packet, bool], List[Tuple[int]]] ]]]
         else:
             prefix = "post"
             handlers = Unfolding(Acc(self.State(), 1/10), self.post_ext_handlers)
@@ -292,31 +293,25 @@ class Router(SCIONElement):
                 logging.error("Too many hop-by-hop extensions.")
                 raise SCMPTooManyHopByHop(i)
             # handler = handlers.get(ext_hdr.EXT_TYPE) # type: Optional[Union[bool, Callable[[SibraExtBase, SCIONL4Packet, bool], List[Tuple[int, str]]], Callable[[TracerouteExt, SCIONL4Packet, bool], List[Tuple[int, str]]], Callable[[ExtensionHeader, SCIONL4Packet, bool], List[Tuple[int]]], Callable[[SCMPExt, SCIONL4Packet, bool], List[Tuple[int]]]]]
-            if pre_routing_phase:
-                handler = handlers.__contains__(ext_hdr.EXT_TYPE) # type: Optional[bool]
-            else:
-                if handlers.__contains__(ext_hdr.EXT_TYPE):
-                    handler = False
-                else:
-                    handler = None
+            handler = handlers.get(ext_hdr.EXT_TYPE) # type: Optional[bool]
             if handler is None:
                 logging.debug("No %s-handler for extension type %s",
                               prefix, ext_hdr.EXT_TYPE)
                 raise SCMPBadHopByHop
-            # if handler:
-            #     # new code because of types
-            #     if isinstance(ext_hdr, SCMPExt):
-            #         # handler = cast(Callable[[SCMPExt, SCIONL4Packet, bool], List[Tuple[int]]], handler)
-            #         flags.extend(cast(List[Tuple[int]], self.handle_scmp(cast(SCMPExt, ext_hdr), spkt, from_local_as)))
-            #     elif isinstance(ext_hdr, TracerouteExt):
-            #         # handler = cast(Callable[[TracerouteExt, SCIONL4Packet, bool], List[Tuple[int, str]]], handler)
-            #         flags.extend(cast(List[Tuple[int, ...]], self.handle_traceroute(cast(TracerouteExt, ext_hdr), spkt, from_local_as)))
-            #     elif isinstance(ext_hdr, SibraExtBase):
-            #         # handler = cast(Callable[[SibraExtBase, SCIONL4Packet, bool], List[Tuple[int, str]]], handler)
-            #         flags.extend(cast(List[Tuple[int, ...]], self.handle_sibra(cast(SibraExtBase, ext_hdr), spkt, from_local_as)))
-            #     elif isinstance(ext_hdr, ExtensionHeader):
-            #         # handler = cast(Callable[[ExtensionHeader, SCIONL4Packet, bool], List[Tuple[int]]], handler)
-            #         flags.extend(cast(List[Tuple[int]], self.handle_one_hop_path(cast(ExtensionHeader, ext_hdr), spkt, from_local_as)))
+            if handler:
+                # new code because of types
+                if isinstance(ext_hdr, SCMPExt):
+                    # handler = cast(Callable[[SCMPExt, SCIONL4Packet, bool], List[Tuple[int]]], handler)
+                    flags.extend(cast(List[Tuple[int]], self.handle_scmp(cast(SCMPExt, ext_hdr), spkt, from_local_as)))
+                elif isinstance(ext_hdr, TracerouteExt):
+                    # handler = cast(Callable[[TracerouteExt, SCIONL4Packet, bool], List[Tuple[int, str]]], handler)
+                    flags.extend(cast(List[Tuple[int, ...]], self.handle_traceroute(cast(TracerouteExt, ext_hdr), spkt, from_local_as)))
+                elif isinstance(ext_hdr, SibraExtBase):
+                    # handler = cast(Callable[[SibraExtBase, SCIONL4Packet, bool], List[Tuple[int, str]]], handler)
+                    flags.extend(cast(List[Tuple[int, ...]], self.handle_sibra(cast(SibraExtBase, ext_hdr), spkt, from_local_as)))
+                elif isinstance(ext_hdr, ExtensionHeader):
+                    # handler = cast(Callable[[ExtensionHeader, SCIONL4Packet, bool], List[Tuple[int]]], handler)
+                    flags.extend(cast(List[Tuple[int]], self.handle_one_hop_path(cast(ExtensionHeader, ext_hdr), spkt, from_local_as)))
 
         Fold(Acc(spkt.State(), 1/9))
         return flags
@@ -538,8 +533,8 @@ class Router(SCIONElement):
         Requires(spkt.get_addrs_dst() is not None)
         Requires(spkt.get_addrs_dst_host() is not None)
         Requires(SVC_TO_SERVICE.__contains__(spkt.get_addrs_dst_host_addr()))
-        # Requires(spkt.get_path_hof_idx() is not None)
-        Requires(Unfolding(Acc(spkt.State(), 1/10), Unfolding(Acc(spkt.path.State(), 1/10), spkt.path._hof_idx is not None)))
+        Requires(spkt.get_path_hof_idx() is not None)
+        # Requires(Unfolding(Acc(spkt.State(), 1/10), Unfolding(Acc(spkt.path.State(), 1/10), spkt.path._hof_idx is not None)))
         Ensures(Acc(spkt.State(), 1/10))
         Ensures(Acc(self.State(), 1/10))
         Exsures(SCIONBaseError, Acc(spkt.State(), 1/10))
@@ -814,13 +809,13 @@ class Router(SCIONElement):
             Fold(Acc(path.State(), 1/10))
             raise SCIONSegmentSwitchError(
                 "Switching from down- to up-segment is not allowed.")
-        if (Unfolding(Acc(prev_iof.State(), 1/10), prev_iof.up_flag) and Unfolding(Acc(path._ofs.State(), 1/10), Unfolding(Acc(cur_iof.State(), 1/10), cur_iof.up_flag)) and
+        if (prev_iof.get_up_flag() and Unfolding(Acc(path._ofs.State(), 1/10), cur_iof.get_up_flag()) and
                 (fwd_on_link_type is None or fwd_on_link_type != LinkType.ROUTING)):
             Fold(Acc(path.State(), 1 / 10))
             raise SCIONSegmentSwitchError(
                 "Switching from up- to up-segment is not allowed "
                 "if the packet is not forwarded over a ROUTING link.")
-        if (Unfolding(Acc(prev_iof.State(), 1/10), not prev_iof.up_flag) and Unfolding(Acc(path._ofs.State(), 1/10), Unfolding(Acc(cur_iof.State(), 1/10), not cur_iof.up_flag)) and
+        if (not prev_iof.get_up_flag() and Unfolding(Acc(path._ofs.State(), 1/10), not cur_iof.get_up_flag()) and
                 (rcvd_on_link_type is None or rcvd_on_link_type != LinkType.ROUTING)):
             Fold(Acc(path.State(), 1 / 10))
             raise SCIONSegmentSwitchError(
@@ -833,7 +828,7 @@ class Router(SCIONElement):
                 "Switching from core- to core-segment is not allowed.")
         if (((rcvd_on_link_type is None or rcvd_on_link_type == LinkType.PEER) or
              (fwd_on_link_type is None or fwd_on_link_type == LinkType.PEER)) and
-                    Unfolding(Acc(prev_hof.State(), 1/10), prev_hof.egress_if) != Unfolding(Acc(path._ofs.State(), 1/10), Unfolding(Acc(cur_hof.State(), 1/10), cur_hof.egress_if))):
+                    prev_hof.get_egress_if() != Unfolding(Acc(path._ofs.State(), 1/10),cur_hof.get_egress_if())):
             Fold(Acc(path.State(), 1 / 10))
             raise SCIONSegmentSwitchError(
                 "Egress IF of peering HOF does not match egress IF of current "

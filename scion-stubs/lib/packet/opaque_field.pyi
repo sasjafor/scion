@@ -159,6 +159,11 @@ class HopOpaqueField(OpaqueField):
         Requires(Acc(self.State(), 1/10))
         return Unfolding(Acc(self.State(), 1/10), self.forward_only)
 
+    @Pure
+    def get_egress_if(self) -> int:
+        Requires(Acc(self.State(), 1/10))
+        return Unfolding(Acc(self.State(), 1/10), self.egress_if)
+
 class InfoOpaqueField(OpaqueField):
     def __init__(self) -> None:  # pragma: no cover
         self.up_flag = False
