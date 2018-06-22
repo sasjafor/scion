@@ -257,6 +257,7 @@ class Router(SCIONElement):
         Requires(Acc(spkt.State(), 1/9))
         Requires(Acc(self.State(), 1/10))
         Requires(Unfolding(Acc(spkt.State(), 1/100), len(spkt.ext_hdrs) == 0))
+        Requires(MustTerminate(2))
         Ensures(Acc(list_pred(Result())))
         Ensures(Acc(spkt.State(), 1/9))
         Ensures(Acc(self.State(), 1/10))
@@ -280,6 +281,7 @@ class Router(SCIONElement):
             Invariant(Acc(spkt.ext_hdrs, 1/9))
             Invariant(Acc(list_pred(spkt.ext_hdrs), 1/9))
             Invariant(len(spkt.ext_hdrs) == 0)
+            Invariant(MustTerminate(1))
             # assert False
             if ext_hdr.EXT_CLASS != ExtensionClass.HOP_BY_HOP:
                 break
@@ -855,18 +857,19 @@ class Router(SCIONElement):
 
     def _link_type(self, if_id: int) -> Optional[str]:
         Requires(Acc(self.State(), 1/10))
+        Requires(MustTerminate(Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.topology.State(), 1/10), len(self.topology.border_routers()) + 3))))
         Ensures(Acc(self.State(), 1/10))
-        # Requires(Acc(self.State(), 1/10))
-        # Ensures(Acc(self.State(), 1/10))
         """
         Returns the link type of the link corresponding to 'if_id' or None.
         """
         Unfold(Acc(self.State(), 1/10))
         border_router = self.topology.get_all_border_routers()
         Fold(Acc(self.State(), 1/10))
-        for br in border_router:
+        for i, br in enumerate(border_router):
             Invariant(Acc(self.State(), 1/10))
             Invariant(Forall(border_router, lambda x: (x in self.get_topology_border_routers())))
+            # Invariant(i <= Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.topology.State(), 1/10), len(self.topology.border_routers()) + 2)))
+            Invariant(MustTerminate(Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.topology.State(), 1/10), len(self.topology.border_routers()) - i + 2))))
             if Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.topology.State(), 1/10), br.get_interface_if_id())) == if_id:
                 return Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.topology.State(), 1/10), br.get_interface_link_type()))
         return None
