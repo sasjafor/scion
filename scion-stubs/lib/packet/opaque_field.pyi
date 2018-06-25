@@ -155,9 +155,24 @@ class HopOpaqueField(OpaqueField):
                 Acc(self.mac))
 
     @Pure
+    def get_xover(self) -> bool:
+        Requires(Acc(self.State(), 1/10))
+        return Unfolding(Acc(self.State(), 1/10), self.xover)
+
+    @Pure
+    def get_verify_only(self) -> bool:
+        Requires(Acc(self.State(), 1/10))
+        return Unfolding(Acc(self.State(), 1/10), self.verify_only)
+
+    @Pure
     def get_forward_only(self) -> bool:
         Requires(Acc(self.State(), 1/10))
         return Unfolding(Acc(self.State(), 1/10), self.forward_only)
+
+    @Pure
+    def get_exp_time(self) -> int:
+        Requires(Acc(self.State(), 1/10))
+        return Unfolding(Acc(self.State(), 1/10), self.exp_time)
 
     @Pure
     def get_egress_if(self) -> int:
@@ -186,3 +201,18 @@ class InfoOpaqueField(OpaqueField):
     def get_up_flag(self) -> bool:
         Requires(Acc(self.State(), 1/10))
         return Unfolding(Acc(self.State(), 1/10), self.up_flag)
+
+    @Pure
+    def get_peer(self) -> bool:
+        Requires(Acc(self.State(), 1/10))
+        return Unfolding(Acc(self.State(), 1/10), self.peer)
+
+    @Pure
+    def get_hops(self) -> int:
+        Requires(Acc(self.State(), 1/10))
+        return Unfolding(Acc(self.State(), 1/10), self.hops)
+
+    @Pure
+    def get_timestamp(self) -> int:
+        Requires(Acc(self.State(), 1/10))
+        return Unfolding(Acc(self.State(), 1/10), self.timestamp)

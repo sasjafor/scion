@@ -57,7 +57,6 @@ class Topology(object):
         Requires(Acc(self.child_border_routers, 1/10))
         Requires(Acc(self.peer_border_routers, 1/10))
         Requires(Acc(self.routing_border_routers, 1/10))
-        Ensures(len(Result()) >= 0)
 
     @classmethod
     def from_file(cls, topology_file: str) -> 'Topology':

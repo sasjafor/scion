@@ -1,11 +1,15 @@
 from typing import Dict, Optional, Sized
 from nagini_contracts.contracts import *
+from nagini_contracts.obligations import MustTerminate
+
 
 class SCIONTime(object):
     #_custom_time = None  # type: None
 
     @classmethod
-    def get_time(cls) -> int: ...
+    def get_time(cls) -> int:
+        Requires(MustTerminate(1))
+        ...
 
     @classmethod
     def set_time_method(cls, method:Optional[object]=None) -> None: ...

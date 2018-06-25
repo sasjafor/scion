@@ -1,3 +1,5 @@
+from nagini_contracts.obligations import MustTerminate
+
 from lib.types import AddrType
 from typing import Optional, Tuple
 from nagini_contracts.contracts import *
@@ -17,6 +19,7 @@ class UDPSocket(Socket):
         ...
 
     def send(self, t: Place, data: bytes, dst: Tuple[str, int]=None) -> Tuple[bool, Place]:
+        Requires(MustTerminate(1))
         # IOExists1(Place)(lambda t2: (
         #     Requires(dst is not None and token(t, 1) and udp_send(t, data, dst[0], dst[1], t2)),
         #     Ensures(Result()[1] is t2 and token(t2))

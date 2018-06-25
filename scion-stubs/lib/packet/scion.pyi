@@ -358,11 +358,18 @@ class SCIONL4Packet(SCIONExtPacket):
                  Unfolding(Acc(self.addrs.dst.host.State(), 1/10), self.addrs.dst.host.addr))))
 
     @Pure
-    def get_path_hof_idx(self) -> int:
+    def get_path_hof_idx(self) -> Optional[int]:
         Requires(Acc(self.State(), 1/10))
         Requires(self.get_path() is not None)
         return Unfolding(Acc(self.State(), 1/10),
                 Unfolding(Acc(self.path.State(), 1 / 10), self.path._hof_idx))
+
+    @Pure
+    def get_path_iof_idx(self) -> Optional[int]:
+        Requires(Acc(self.State(), 1/10))
+        Requires(self.get_path() is not None)
+        return Unfolding(Acc(self.State(), 1/10),
+                Unfolding(Acc(self.path.State(), 1 / 10), self.path._iof_idx))
 
 
 @Pure
