@@ -2,7 +2,9 @@ from nagini_contracts.contracts import Requires
 from nagini_contracts.obligations import MustTerminate
 
 
-def error(msg: str, *args: object) -> None: ...
+def error(msg: str, *args: object) -> None:
+    Requires(MustTerminate(1))
+    ...
 
 def warning(msg: str, *args: object) -> None: ...
 

@@ -538,6 +538,7 @@ class Router(SCIONElement):
         Requires(SVC_TO_SERVICE.__contains__(spkt.get_addrs_dst_host_addr()))
         Requires(spkt.get_path_hof_idx() is not None)
         Requires(Unfolding(Acc(spkt.State(), (1 / 100)), (len(spkt.ext_hdrs) == 0)))
+        Requires(MustTerminate(4))
         # Requires(Unfolding(Acc(spkt.State(), 1/10), Unfolding(Acc(spkt.path.State(), 1/10), spkt.path._hof_idx is not None)))
         Ensures(Acc(spkt.State(), 1/9))
         Ensures(Acc(self.State(), 1/9))
@@ -560,7 +561,6 @@ class Router(SCIONElement):
             raise SCMPDeliveryNonLocal
         if len(spkt.path):
             hof = spkt.path.get_hof()
-            assert hof is not None
             Unfold(Acc(spkt.path.State(), 1 / 10))
             if not force and Unfolding(Acc(spkt.path._ofs.State(), 1/10), hof.get_forward_only()):
                 Fold(Acc(spkt.addrs.State(), 1/10))
@@ -703,6 +703,15 @@ class Router(SCIONElement):
         Requires(spkt.get_addrs_dst() is not None)
         Requires(spkt.get_path_iof_idx() is not None)
         Requires(spkt.get_path_hof_idx() is not None)
+        Requires(spkt.get_addrs_dst_host() is not None)
+        Requires(Unfolding(Acc(spkt.State(), (1 / 100)), (len(spkt.ext_hdrs) == 0)))
+        # Requires(Let(cast(InfoOpaqueField, spkt.get_path_ofs().get_by_idx(spkt.get_path_iof_idx())), bool,
+        #                        (lambda iof: Unfolding(Acc(spkt.get_path_ofs().State(), (1 / 10)), not iof.get_peer()))))
+        Requires(Unfolding(Acc(spkt.State(), 1/10), Unfolding(Acc(spkt.path.State(), (1 / 10)),
+                           Let(cast(InfoOpaqueField, spkt.path._ofs.get_by_idx(spkt.path._iof_idx)), bool,
+                               (lambda iof: Unfolding(Acc(spkt.path._ofs.State(), (1 / 10)), not iof.get_peer()))))))
+        Requires(dict_pred(SVC_TO_SERVICE))
+        Requires(SVC_TO_SERVICE.__contains__(spkt.get_addrs_dst_host_addr()))
         Ensures(Acc(spkt.State()))
         Ensures(Acc(self.State(), 1/2))
         Exsures(SCIONBaseError, Acc(spkt.State()))
@@ -726,7 +735,7 @@ class Router(SCIONElement):
             raise SCMPNonRoutingHOF
         # FIXME(aznair): Remove second condition once PathCombinator is less
         # stupid.
-        if spkt.get_addrs_dst_isd_as() == self.get_addr_isd_as() and spkt.path.is_on_last_segment():
+        if Unfolding(Acc(spkt.addrs.State(), 1/10), spkt.get_addrs_dst_isd_as()) == self.get_addr_isd_as() and spkt.path.is_on_last_segment():
             Fold(Acc(spkt.State(), 1/4))
             self.deliver(t, spkt)
             return t
@@ -871,11 +880,15 @@ class Router(SCIONElement):
         Unfold(Acc(self.State(), 1/10))
         border_router = self.topology.get_all_border_routers()
         Fold(Acc(self.State(), 1/10))
-        for i, br in enumerate(border_router):
+        border_router_enum = enumerate(border_router)
+        for i, br in border_router_enum:
             Invariant(Acc(self.State(), 1/10))
             Invariant(list_pred(border_router))
-            Invariant(Forall(border_router, lambda x: (x in self.get_topology_border_routers(), [[x in self.get_topology_border_routers()]])))
-            # Invariant(Forall(self.get_topology_border_routers(), lambda x: (Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.topology.State(), 1/10), Acc(x.State(), 1/10))), [[x in self.get_topology_border_routers()]])))
+            # Invariant(Forall(border_router, lambda x: (x in self.get_topology_border_routers(), [[x in border_router]])))
+            Invariant(Forall(border_router_enum, lambda x: (x in self.get_topology_border_routers())))
+            # Invariant(Forall(border_router, lambda x: (Acc(x.State(), 1/10))))
+            # Invariant(Forall(self.get_topology_border_routers(), lambda x: (Acc(Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.topology.State(), 1/10), x)).State(), 1/10), [[x in self.get_topology_border_routers()]])))
+            # Invariant(Forall(self.get_topology_border_routers(), lambda x: (Acc(x.State(), 1 / 10))))
             # Invariant(i <= Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.topology.State(), 1/10), len(self.topology.border_routers()) + 2)))
             Invariant(MustTerminate(Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.topology.State(), 1/10), len(self.topology.border_routers()) - i + 2))))
             if Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.topology.State(), 1/10), br.get_interface_if_id())) == if_id:

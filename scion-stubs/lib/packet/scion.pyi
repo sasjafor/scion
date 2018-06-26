@@ -1,5 +1,6 @@
 from lib.errors import SCIONBaseError, SCIONChecksumFailed
 from lib.packet.ext_hdr import ExtensionHeader
+from lib.packet.opaque_field import OpaqueFieldList
 from lib.packet.packet_base import PacketBase
 from lib.util import calc_padding, Raw
 from lib.packet.host_addr import HostAddrIPv4, HostAddrIPv6, HostAddrSVC, HostAddrBase  # , HostAddrInvalidType
@@ -370,6 +371,12 @@ class SCIONL4Packet(SCIONExtPacket):
         Requires(self.get_path() is not None)
         return Unfolding(Acc(self.State(), 1/10),
                 Unfolding(Acc(self.path.State(), 1 / 10), self.path._iof_idx))
+
+    @Pure
+    def get_path_ofs(self) -> OpaqueFieldList:
+        Requires(Acc(self.State(), 1/10))
+        Requires(self.get_path() is not None)
+        return Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.path.State(), 1/10), self.path._ofs))
 
 
 @Pure
