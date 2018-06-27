@@ -418,7 +418,6 @@ class Router(SCIONElement):
     #         pkt.set_payload(ifid_pld.copy())
     #         self.send(pkt, addr, SCION_UDP_EH_DATA_PORT)
 
-    @ContractOnly
     def get_srv_addr(self, service: str, pkt: SCIONL4Packet) -> HostAddrBase:
         Requires(MustTerminate(3))
         """
@@ -589,11 +588,6 @@ class Router(SCIONElement):
         Fold(Acc(spkt.State(), 1 / 10))
         self.send(t, spkt, addr, SCION_UDP_EH_DATA_PORT)
 
-    @Pure
-    def get_addr_isd_as(self) -> Optional[ISD_AS]:
-        Requires(Acc(self.State(), 1/10))
-        return Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.addr.State(), 1/10), self.addr.isd_as))
-
     def verify_hof(self, path: SCIONPath, ingress: bool = True) -> None:
         Requires(Acc(path.State(), 1 / 9))
         Requires(Acc(self.State(), 1 / 9))
@@ -627,22 +621,16 @@ class Router(SCIONElement):
             raise SCIONOFExpiredError(hof)
         Fold(Acc(self.State(), 1 / 10))
 
-    @Pure
-    def get_interface_if_id(self) -> int:
-        Requires(Acc(self.interface, 1/10))
-        Requires(Acc(self.interface.State(), 1/10))
-        return Unfolding(Acc(self.interface.State(), 1/10), self.interface.if_id)
-
     def _egress_forward(self, t: Place, spkt: SCIONL4Packet) -> Place:
         Requires(Acc(self.State(), 1/10))
         Requires(Acc(spkt.State(), 1/9))
-        Requires(Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.interface.State(), 1/10), self.interface.to_addr is not None)))
+        Requires(self.get_interface_to_addr() is not None)
         Requires(Unfolding(Acc(spkt.State(), 1/10), len(spkt.ext_hdrs) == 0))
         Requires(MustTerminate(4))
         Ensures(Acc(self.State(), 1/10))
         Ensures(Acc(spkt.State(), 1/9))
-        addr = Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.interface.State(), 1/10), self.interface.to_addr))
-        port = Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.interface.State(), 1/10), self.interface.to_udp_port))
+        addr = self.get_interface_to_addr()
+        port = self.get_interface_to_udp_port()
         logging.debug("Forwarding to remote interface: %s:%s",
                       addr, port)
         return self.send(t, spkt, addr, port)
@@ -895,11 +883,6 @@ class Router(SCIONElement):
                 return Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.topology.State(), 1/10), br.get_interface_link_type()))
         return None
 
-    @Pure
-    def get_topology_border_routers(self) -> Sequence[RouterElement]:
-        Requires(Acc(self.State(), 1/10))
-        return Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.topology.State(), 1/10), self.topology.border_routers()))
-
     def _needs_local_processing(self, pkt: SCIONL4Packet) -> bool:
         Requires(Acc(self.State(), 1/40))
         Requires(Acc(pkt.State(), 1/40))
@@ -1037,8 +1020,68 @@ class Router(SCIONElement):
         except SCIONBaseError:
             log_exception("Error handling packet: %s" % pkt)
 
+    """
+    Start of performance helper functions
+    """
+
     @Pure
     def get_topology_mtu(self) -> Optional[int]:
         Requires(Acc(self.State(), 1/10))
-        return Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.topology.State(), 1/10), self.topology.mtu))
+        return Unfolding(Acc(self.State(), 1/10), self.get_topology_mtu_1())
+
+    @Pure
+    def get_topology_mtu_1(self) -> Optional[int]:
+        Requires(Acc(self.topology, 1 / 10))
+        Requires(Acc(self.topology.State(), 1 / 10))
+        return Unfolding(Acc(self.topology.State(), 1/10), self.topology.mtu)
+
+    @Pure
+    def get_topology_border_routers(self) -> Sequence[RouterElement]:
+        Requires(Acc(self.State(), 1 / 10))
+        return Unfolding(Acc(self.State(), 1/10), self.get_topology_border_routers_1())
+
+    @Pure
+    def get_topology_border_routers_1(self) -> Sequence[RouterElement]:
+        Requires(Acc(self.topology, 1/10))
+        Requires(Acc(self.topology.State(), 1/10))
+        return Unfolding(Acc(self.topology.State(), 1 / 10), self.topology.border_routers())
+
+    @Pure
+    def get_interface_if_id(self) -> int:
+        Requires(Acc(self.interface, 1 / 10))
+        Requires(Acc(self.interface.State(), 1 / 10))
+        return Unfolding(Acc(self.interface.State(), 1 / 10), self.interface.if_id)
+
+    @Pure
+    def get_addr_isd_as(self) -> Optional[ISD_AS]:
+        Requires(Acc(self.State(), 1 / 10))
+        return Unfolding(Acc(self.State(), 1 / 10), self.get_addr_isd_as_1())
+
+    @Pure
+    def get_addr_isd_as_1(self) -> Optional[ISD_AS]:
+        Requires(Acc(self.addr, 1/10))
+        Requires(Acc(self.addr.State(), 1/10))
+        return Unfolding(Acc(self.addr.State(), 1 / 10), self.addr.isd_as)
+
+    @Pure
+    def get_interface_to_addr(self) -> Optional[HostAddrBase]:
+        Requires(Acc(self.State(), 1/10))
+        return Unfolding(Acc(self.State(), 1/10),  self.get_interface_to_addr_1())
+
+    @Pure
+    def get_interface_to_addr_1(self) -> Optional[HostAddrBase]:
+        Requires(Acc(self.interface, 1/10))
+        Requires(Acc(self.interface.State(), 1/10))
+        return Unfolding(Acc(self.interface.State(), 1/10), self.interface.to_addr)
+
+    @Pure
+    def get_interface_to_udp_port(self) -> int:
+        Requires(Acc(self.State(), 1 / 10))
+        return Unfolding(Acc(self.State(), 1 / 10), self.get_interface_to_udp_port_1())
+
+    @Pure
+    def get_interface_to_udp_port_1(self) -> int:
+        Requires(Acc(self.interface, 1 / 10))
+        Requires(Acc(self.interface.State(), 1 / 10))
+        return Unfolding(Acc(self.interface.State(), 1 / 10), self.interface.to_udp_port)
 

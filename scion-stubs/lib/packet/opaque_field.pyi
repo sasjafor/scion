@@ -207,6 +207,11 @@ class InfoOpaqueField(OpaqueField):
         return Unfolding(Acc(self.State(), 1/10), self.up_flag)
 
     @Pure
+    def get_shortcut(self) -> bool:
+        Requires(Acc(self.State(), 1/10))
+        return Unfolding(Acc(self.State(), 1/10), self.shortcut)
+
+    @Pure
     def get_peer(self) -> bool:
         Requires(Acc(self.State(), 1/10))
         return Unfolding(Acc(self.State(), 1/10), self.peer)

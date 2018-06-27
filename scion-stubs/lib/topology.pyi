@@ -70,7 +70,7 @@ class Topology(object):
         Requires(MustTerminate(2))
         Ensures(Acc(self.State(), 1/10))
         Ensures(list_pred(Result()))
-        Ensures(Forall(cast(List[RouterElement], Result()), lambda e: (e in Unfolding(Acc(self.State(), 1/10), self.border_routers()), [[e in Result()]])))
+        Ensures(Forall(cast(List[RouterElement], Result()), lambda e: (e in self.get_border_routers(), [[e in Result()]])))
         """
         Return all border routers associated to the AS.
 
@@ -85,6 +85,35 @@ class Topology(object):
         all_border_routers.extend(self.routing_border_routers)
         Fold(Acc(self.State(), 1/10))
         return all_border_routers
+
+    """
+    Start of performance helper functions
+    """
+
+    @Pure
+    def get_border_routers(self) -> Sequence[RouterElement]:
+        Requires(Acc(self.State(), 1/10))
+        return Unfolding(Acc(self.State(), 1/10), self.border_routers())
+
+    @Pure
+    def get_parent_border_routers(self) -> List[RouterElement]:
+        Requires(Acc(self.State(), 1/10))
+        return Unfolding(Acc(self.State(), 1/10), self.parent_border_routers)
+
+    @Pure
+    def get_child_border_routers(self) -> List[RouterElement]:
+        Requires(Acc(self.State(), 1/10))
+        return Unfolding(Acc(self.State(), 1/10), self.child_border_routers)
+
+    @Pure
+    def get_peer_border_routers(self) -> List[RouterElement]:
+        Requires(Acc(self.State(), 1/10))
+        return Unfolding(Acc(self.State(), 1/10), self.peer_border_routers)
+
+    @Pure
+    def get_routing_border_routers(self) -> List[RouterElement]:
+        Requires(Acc(self.State(), 1/10))
+        return Unfolding(Acc(self.State(), 1/10), self.routing_border_routers)
 
 
 class InterfaceElement(Element):
@@ -138,6 +167,10 @@ class RouterElement(Element):
     def State(self) -> bool:
         return (Acc(self.interface) and
                 Acc(self.interface.State()))
+
+    """
+    Start of performance helper functions
+    """
 
     @Pure
     def get_interface_if_id(self) -> int:

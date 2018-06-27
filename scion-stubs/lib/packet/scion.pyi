@@ -314,6 +314,10 @@ class SCIONL4Packet(SCIONExtPacket):
     def convert_to_scmp_error(self, addr: SCIONAddr, class_: object, type_: object, pkt: SCIONL4Packet, *args: object, hopbyhop: bool=False, **kwargs: object) -> None:
         ...
 
+    """
+    Start of performance helper functions
+    """
+
     @Pure
     def get_addrs_dst_isd_as(self) -> Optional[ISD_AS]:
         Requires(Acc(self.addrs, 1/10))
@@ -324,59 +328,114 @@ class SCIONL4Packet(SCIONExtPacket):
     @Pure
     def get_addrs(self) -> Optional[SCIONAddrHdr]:
         Requires(Acc(self.State(), 1/10))
-        return Unfolding(Acc(self.State(), 1 / 10), self.addrs)
+        return Unfolding(Acc(self.State(), 1/10), self.addrs)
 
     @Pure
     def get_path(self) -> Optional[SCIONPath]:
         Requires(Acc(self.State(), 1/10))
-        return Unfolding(Acc(self.State(), 1 / 10), self.path)
+        return Unfolding(Acc(self.State(), 1/10), self.path)
 
     @Pure
     def get_addrs_dst(self) -> Optional[SCIONAddr]:
         Requires(Acc(self.State(), 1/10))
         Requires(self.get_addrs() is not None)
-        return Unfolding(Acc(self.State(), 1 / 10),
-                 Unfolding(Acc(self.addrs.State(), 1 / 10), self.addrs.dst))
+        return Unfolding(Acc(self.State(), 1/10), self.get_addrs_dst_1())
+
+    @Pure
+    def get_addrs_dst_1(self) -> Optional[SCIONAddr]:
+        Requires(Acc(self.addrs, 1/10))
+        Requires(Acc(self.addrs.State(), 1/10))
+        return Unfolding(Acc(self.addrs.State(), 1/10), self.addrs.dst)
 
     @Pure
     def get_addrs_dst_host(self) -> Optional[HostAddrBase]:
         Requires(Acc(self.State(), 1/10))
         Requires(self.get_addrs() is not None)
         Requires(self.get_addrs_dst() is not None)
-        return Unfolding(Acc(self.State(), 1 / 10),
-                 Unfolding(Acc(self.addrs.State(), 1 / 10),
-                 Unfolding(Acc(self.addrs.dst.State(), 1 / 10), self.addrs.dst.host)))
+        return Unfolding(Acc(self.State(), 1/10), self.get_addrs_dst_host_1())
 
     @Pure
-    def get_addrs_dst_host_addr(self) -> bytes:
+    def get_addrs_dst_host_1(self) -> Optional[HostAddrBase]:
+        Requires(Acc(self.addrs, 1/10))
+        Requires(Acc(self.addrs.State(), 1/10))
+        Requires(self.get_addrs_dst_1() is not None)
+        return Unfolding(Acc(self.addrs.State(), 1/10), self.get_addrs_dst_host_2())
+
+    @Pure
+    def get_addrs_dst_host_2(self) -> Optional[HostAddrBase]:
+        Requires(Acc(self.addrs, 1/10))
+        Requires(Acc(self.addrs.dst, 1/10))
+        Requires(Acc(self.addrs.dst.State(), 1/10))
+        return Unfolding(Acc(self.addrs.dst.State(), 1/10), self.addrs.dst.host)
+
+
+    @Pure
+    def get_addrs_dst_host_addr(self) -> Optional[bytes]:
         Requires(Acc(self.State(), 1/10))
         Requires(self.get_addrs() is not None)
         Requires(self.get_addrs_dst() is not None)
         Requires(self.get_addrs_dst_host() is not None)
-        return Unfolding(Acc(self.State(), 1 / 10),
-                 Unfolding(Acc(self.addrs.State(), 1 / 10),
-                 Unfolding(Acc(self.addrs.dst.State(), 1/10),
-                 Unfolding(Acc(self.addrs.dst.host.State(), 1/10), self.addrs.dst.host.addr))))
+        return Unfolding(Acc(self.State(), 1 / 10), self.get_addrs_dst_host_addr_1())
+
+    @Pure
+    def get_addrs_dst_host_addr_1(self) -> Optional[bytes]:
+        Requires(Acc(self.addrs, 1/10))
+        Requires(Acc(self.addrs.State(), 1/10))
+        Requires(self.get_addrs_dst_1() is not None)
+        Requires(self.get_addrs_dst_host_1() is not None)
+        return Unfolding(Acc(self.addrs.State(), 1/10), self.get_addrs_dst_host_addr_2())
+
+    @Pure
+    def get_addrs_dst_host_addr_2(self) -> Optional[bytes]:
+        Requires(Acc(self.addrs, 1/10))
+        Requires(Acc(self.addrs.dst, 1/10))
+        Requires(Acc(self.addrs.dst.State(), 1/10))
+        Requires(self.get_addrs_dst_host_2() is not None)
+        return Unfolding(Acc(self.addrs.dst.State(), 1/10), self.get_addrs_dst_host_addr_3())
+
+    @Pure
+    def get_addrs_dst_host_addr_3(self) -> Optional[bytes]:
+        Requires(Acc(self.addrs, 1/10))
+        Requires(Acc(self.addrs.dst, 1/10))
+        Requires(Acc(self.addrs.dst.host, 1/10))
+        Requires(Acc(self.addrs.dst.host.State(), 1/10))
+        return Unfolding(Acc(self.addrs.dst.host.State(), 1/10), self.addrs.dst.host.addr)
 
     @Pure
     def get_path_hof_idx(self) -> Optional[int]:
         Requires(Acc(self.State(), 1/10))
         Requires(self.get_path() is not None)
-        return Unfolding(Acc(self.State(), 1/10),
-                Unfolding(Acc(self.path.State(), 1 / 10), self.path._hof_idx))
+        return Unfolding(Acc(self.State(), 1/10), self.get_path_hof_idx_1())
+
+    @Pure
+    def get_path_hof_idx_1(self) -> Optional[int]:
+        Requires(Acc(self.path, 1/10))
+        Requires(Acc(self.path.State(), 1/10))
+        return Unfolding(Acc(self.path.State(), 1 / 10), self.path._hof_idx)
 
     @Pure
     def get_path_iof_idx(self) -> Optional[int]:
         Requires(Acc(self.State(), 1/10))
         Requires(self.get_path() is not None)
-        return Unfolding(Acc(self.State(), 1/10),
-                Unfolding(Acc(self.path.State(), 1 / 10), self.path._iof_idx))
+        return Unfolding(Acc(self.State(), 1/10), self.get_path_iof_idx_1())
+
+    @Pure
+    def get_path_iof_idx_1(self) -> Optional[int]:
+        Requires(Acc(self.path, 1/10))
+        Requires(Acc(self.path.State(), 1/10))
+        return Unfolding(Acc(self.path.State(), 1 / 10), self.path._hof_idx)
 
     @Pure
     def get_path_ofs(self) -> OpaqueFieldList:
         Requires(Acc(self.State(), 1/10))
         Requires(self.get_path() is not None)
-        return Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.path.State(), 1/10), self.path._ofs))
+        return Unfolding(Acc(self.State(), 1/10), self.get_path_ofs_1())
+
+    @Pure
+    def get_path_ofs_1(self) -> OpaqueFieldList:
+        Requires(Acc(self.path, 1/10))
+        Requires(Acc(self.path.State(), 1/10))
+        return Unfolding(Acc(self.path.State(), 1/10), self.path._ofs)
 
 
 @Pure
