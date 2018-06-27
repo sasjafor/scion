@@ -65,28 +65,9 @@ class OpaqueFieldList(Sized):
 
     @Pure
     @ContractOnly
-    def get_hof_by_idx(self, idx: int) -> HopOpaqueField:
-        Requires(Acc(self.State(), 1/10))
-        Requires(idx >= 0 and idx < Unfolding(Acc(self.State(), 1/10), len(self)))
-        Ensures(Result() is Unfolding(Acc(self.State(), 1/10), self.contents()[idx]))
-        Ensures(Result() in Unfolding(Acc(self.State(), 1/10), self.contents()))
-
-    @Pure
-    @ContractOnly
-    def get_by_idx_unfolded(self, idx: int) -> OpaqueField:
-        Requires(Acc(self._order, 1/10))
-        Requires(Acc(self._labels, 1/10))
-        Requires(Acc(dict_pred(self._labels), 1/10))
-        # Requires(Forall(self.contents(), lambda e: (e.State())))
-        Requires(idx >= 0 and idx < len(self))
-        Ensures(Result() is self.contents()[idx])
-        Ensures(Result() in self.contents())
-
-    @Pure
-    @ContractOnly
     def get_by_idx(self, idx: int) -> OpaqueField:
         Requires(Acc(self.State(), 1/10))
-        Requires(idx >= 0 and idx < Unfolding(Acc(self.State(), 1/10), len(self)))
+        Requires(idx >= 0 and idx < self.get_len())
         Ensures(Result() is Unfolding(Acc(self.State(), 1/10), self.contents()[idx]))
         Ensures(Result() in Unfolding(Acc(self.State(), 1/10), self.contents()))
         # """
@@ -109,6 +90,20 @@ class OpaqueFieldList(Sized):
         #     offset -= len(group)
         # raise SCIONIndexError("Requested OF index (%d) is out of range (max %d)"
         #                       % (idx, len(self) - 1))
+
+    """
+    Start of helper functions for performance
+    """
+
+    @Pure
+    def get_len(self) -> int:
+        Requires(Acc(self.State(), 1/10))
+        return Unfolding(Acc(self.State(), 1/10), len(self))
+
+    @Pure
+    def get_contents(self) -> Sequence[OpaqueField]:
+        Requires(Acc(self.State(), 1/10))
+        return Unfolding(Acc(self.State(), 1/10), self.contents())
 
 
 class HopOpaqueField(OpaqueField):
@@ -154,6 +149,10 @@ class HopOpaqueField(OpaqueField):
                 Acc(self.egress_if) and
                 Acc(self.mac))
 
+    """
+    Start of helper functions for performance
+    """
+
     @Pure
     def get_xover(self) -> bool:
         Requires(Acc(self.State(), 1/10))
@@ -178,6 +177,11 @@ class HopOpaqueField(OpaqueField):
     def get_egress_if(self) -> int:
         Requires(Acc(self.State(), 1/10))
         return Unfolding(Acc(self.State(), 1/10), self.egress_if)
+
+    @Pure
+    def get_ingress_if(self) -> int:
+        Requires(Acc(self.State(), 1/10))
+        return Unfolding(Acc(self.State(), 1/10), self.ingress_if)
 
 class InfoOpaqueField(OpaqueField):
     def __init__(self) -> None:  # pragma: no cover

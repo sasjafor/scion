@@ -863,7 +863,7 @@ class Router(SCIONElement):
         hof = path.get_hof()
         incd = False
         skipped_vo = False
-        if Unfolding(Acc(path.State(), 1/9), Unfolding(Acc(path._ofs.State(), 1/9), hof.get_xover())):
+        if path.get_hof_xover(hof):
             skipped_vo = path.inc_hof_idx()
             incd = True
         result = path.get_fwd_if(), incd, skipped_vo
