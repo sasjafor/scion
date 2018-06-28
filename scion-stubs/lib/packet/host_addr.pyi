@@ -2,7 +2,7 @@ from lib.errors import SCIONBaseError
 from lib.types import AddrType
 from lib.packet.packet_base import Serializable
 from typing import Optional
-from nagini_contracts.contracts import ContractOnly, Pure, Predicate, Acc
+from nagini_contracts.contracts import ContractOnly, Pure, Predicate, Acc, Requires, Unfolding
 
 
 # class HostAddrInvalidType(SCIONBaseError):
@@ -37,6 +37,15 @@ class HostAddrBase(Serializable):
     @Predicate
     def State(self) -> bool:
         return Acc(self.addr)
+
+    """
+    Start of performance helper functions
+    """
+
+    @Pure
+    def get_addr(self) -> Optional[bytes]:
+        Requires(Acc(self.State(), 1/10))
+        return Unfolding(Acc(self.State(), 1/10), self.addr)
 
 
 class HostAddrNone(HostAddrBase):  # pragma: no cover

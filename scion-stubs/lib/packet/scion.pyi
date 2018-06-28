@@ -1,6 +1,6 @@
 from lib.errors import SCIONBaseError, SCIONChecksumFailed
 from lib.packet.ext_hdr import ExtensionHeader
-from lib.packet.opaque_field import OpaqueFieldList
+from lib.packet.opaque_field import OpaqueFieldList, HopOpaqueField, OpaqueField
 from lib.packet.packet_base import PacketBase
 from lib.util import calc_padding, Raw
 from lib.packet.host_addr import HostAddrIPv4, HostAddrIPv6, HostAddrSVC, HostAddrBase  # , HostAddrInvalidType
@@ -320,6 +320,20 @@ class SCIONL4Packet(SCIONExtPacket):
 
     @Pure
     def get_addrs_dst_isd_as(self) -> Optional[ISD_AS]:
+        Requires(Acc(self.State(), 1/10))
+        Requires(self.get_addrs() is not None)
+        Requires(self.get_addrs_dst() is not None)
+        return Unfolding(Acc(self.State(), 1/10), self.get_addrs_dst_isd_as_1())
+
+    @Pure
+    def get_addrs_dst_isd_as_1(self) -> Optional[ISD_AS]:
+        Requires(Acc(self.addrs, 1/10))
+        Requires(Acc(self.addrs.State(), 1/10))
+        Requires(self.get_addrs_dst_1() is not None)
+        return Unfolding(Acc(self.addrs.State(), 1/10), self.get_addrs_dst_isd_as_2())
+
+    @Pure
+    def get_addrs_dst_isd_as_2(self) -> Optional[ISD_AS]:
         Requires(Acc(self.addrs, 1/10))
         Requires(Acc(self.addrs.dst, 1/10))
         Requires(Acc(self.addrs.dst.State(), 1/10))
@@ -367,7 +381,6 @@ class SCIONL4Packet(SCIONExtPacket):
         Requires(Acc(self.addrs.dst, 1/10))
         Requires(Acc(self.addrs.dst.State(), 1/10))
         return Unfolding(Acc(self.addrs.dst.State(), 1/10), self.addrs.dst.host)
-
 
     @Pure
     def get_addrs_dst_host_addr(self) -> Optional[bytes]:
@@ -436,6 +449,101 @@ class SCIONL4Packet(SCIONExtPacket):
         Requires(Acc(self.path, 1/10))
         Requires(Acc(self.path.State(), 1/10))
         return Unfolding(Acc(self.path.State(), 1/10), self.path._ofs)
+
+    @Pure
+    def get_ext_hdrs_len(self) -> int:
+        Requires(Acc(self.State(), 1/10))
+        return Unfolding(Acc(self.State(), 1/100), len(self.ext_hdrs))
+
+    @Pure
+    def get_ext_hdrs(self) -> List[ExtensionHeader]:
+        Requires(Acc(self.State(), 1/10))
+        return Unfolding(Acc(self.State(), 1/100), self.ext_hdrs)
+
+    @Pure
+    def get_path_len(self) -> int:
+        Requires(Acc(self.State(), 1/10))
+        Requires(self.get_path() is not None)
+        return Unfolding(Acc(self.State(), 1/10), len(self.path))
+
+    @Pure
+    def get_path_hof(self) -> Optional[HopOpaqueField]:
+        Requires(Acc(self.State(), 1/10))
+        Requires(self.get_path() is not None)
+        Ensures(Implies(self.get_path_hof_idx() is not None, Result() is not None))
+        Ensures(Implies(Result() is not None, Result() in self.get_path_ofs_contents()))
+        return Unfolding(Acc(self.State(), 1/10), self.path.get_hof())
+
+    @Pure
+    def get_path_ofs_contents_direct(self) -> Sequence[OpaqueField]:
+        Requires(Acc(self.State(), 1/10))
+        return Unfolding(Acc(self.State(), 1/10), self.path.get_ofs_contents())
+
+    @Pure
+    def get_path_hof_forward_only(self, hof: HopOpaqueField) -> bool:
+        Requires(Acc(self.State(), 1/10))
+        Requires(self.get_path() is not None)
+        Requires(hof in self.get_path_ofs_contents())
+        return Unfolding(Acc(self.State(), 1/10), self.get_path_hof_forward_only_1(hof))
+
+    @Pure
+    def get_path_hof_forward_only_1(self, hof: HopOpaqueField) -> bool:
+        Requires(Acc(self.path, 1/10))
+        Requires(Acc(self.path.State(), 1/10))
+        Requires(hof in self.get_path_ofs_contents_1())
+        return Unfolding(Acc(self.path.State(), 1/10), self.get_path_hof_forward_only_2(hof))
+
+    @Pure
+    def get_path_hof_forward_only_2(self, hof: HopOpaqueField) -> bool:
+        Requires(Acc(self.path, 1/10))
+        Requires(Acc(self.path._ofs, 1/10))
+        Requires(Acc(self.path._ofs.State(), 1/10))
+        Requires(hof in self.get_path_ofs_contents_2())
+        return Unfolding(Acc(self.path._ofs.State(), 1/10), hof.get_forward_only())
+
+    @Pure
+    def get_path_hof_verify_only(self, hof: HopOpaqueField) -> bool:
+        Requires(Acc(self.State(), 1/10))
+        Requires(self.get_path() is not None)
+        Requires(hof in self.get_path_ofs_contents())
+        return Unfolding(Acc(self.State(), 1/10), self.get_path_hof_verify_only_1(hof))
+
+    @Pure
+    def get_path_hof_verify_only_1(self, hof: HopOpaqueField) -> bool:
+        Requires(Acc(self.path, 1/10))
+        Requires(Acc(self.path.State(), 1/10))
+        Requires(hof in self.get_path_ofs_contents_1())
+        return Unfolding(Acc(self.path.State(), 1/10), self.get_path_hof_verify_only_2(hof))
+
+    @Pure
+    def get_path_hof_verify_only_2(self, hof: HopOpaqueField) -> bool:
+        Requires(Acc(self.path, 1/10))
+        Requires(Acc(self.path._ofs, 1/10))
+        Requires(Acc(self.path._ofs.State(), 1/10))
+        Requires(hof in self.get_path_ofs_contents_2())
+        return Unfolding(Acc(self.path._ofs.State(), 1/10), hof.get_verify_only())
+
+    @Pure
+    def get_path_ofs_contents(self) -> Sequence[OpaqueField]:
+        Requires(Acc(self.State(), 1/10))
+        Requires(self.get_path() is not None)
+        Ensures(Result() is Unfolding(Acc(self.State(), 1/10), self.path.get_ofs_contents()))
+        return Unfolding(Acc(self.State(), 1/10), self.get_path_ofs_contents_1())
+
+    @Pure
+    def get_path_ofs_contents_1(self) -> Sequence[OpaqueField]:
+        Requires(Acc(self.path, 1/10))
+        Requires(Acc(self.path.State(), 1/10))
+        Ensures(self.path is not None)
+        Ensures(Result() is self.path.get_ofs_contents())
+        return Unfolding(Acc(self.path.State(), 1/10), self.get_path_ofs_contents_2())
+
+    @Pure
+    def get_path_ofs_contents_2(self) -> Sequence[OpaqueField]:
+        Requires(Acc(self.path, 1/10))
+        Requires(Acc(self.path._ofs, 1/10))
+        Requires(Acc(self.path._ofs.State(), 1/10))
+        return Unfolding(Acc(self.path._ofs.State(), 1/10), self.path._ofs.contents())
 
 
 @Pure

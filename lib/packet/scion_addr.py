@@ -213,5 +213,3 @@ class SCIONAddr(object):
         """
         return "(%s (%s) %s)" % (self.isd_as, self.host.name(), self.host)
 
-    def State(self) -> bool:
-        return Acc(self.isd_as)

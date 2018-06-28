@@ -16,6 +16,7 @@ class ISD_AS(Serializable):
 
     def to_int(self) -> int: ...
 
+    @Predicate
     def State(self) -> bool:
         return Acc(self._isd) and Acc(self._as)
 
@@ -26,7 +27,7 @@ class SCIONAddr(object):
 
     @Predicate
     def State(self) -> bool:
-        return (Acc(self.isd_as) and
+        return (Acc(self.isd_as) and Implies(self.isd_as is not None, self.isd_as.State()) and
                 Acc(self.host) and Implies(self.host is not None, self.host.State()))
 
     @Pure
