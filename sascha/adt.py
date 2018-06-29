@@ -1,7 +1,7 @@
 from typing import NamedTuple, cast
 
 from nagini_contracts.adt import ADT
-from nagini_contracts.contracts import Sequence, Requires, Acc, Pure, Ensures
+from nagini_contracts.contracts import Sequence, Requires, Acc, Pure, Ensures, Invariant
 
 from lib.packet.opaque_field import OpaqueFieldList, InfoOpaqueField, HopOpaqueField
 from lib.packet.scion import SCIONL4Packet
@@ -95,6 +95,9 @@ def hof_to_adt(hof: HopOpaqueField) -> ADT_HOF:
 
 def map_ofs_list(ofs: OpaqueFieldList, iof_idx: int, iof: ADT_IOF) -> Sequence[ADT_HOF]:
     Requires(Acc(ofs.State(), 1/10))
+    Requires(iof.hops >= 0)
+    Requires(iof_idx >= 0)
+    Requires(iof_idx + iof.hops < ofs.get_len())
     Ensures(Acc(ofs.State(), 1/10))
     """
     Method to map the InfoOpaqueField and the HopOpaqueFields from the packet to a Nagini Sequence
@@ -107,6 +110,8 @@ def map_ofs_list(ofs: OpaqueFieldList, iof_idx: int, iof: ADT_IOF) -> Sequence[A
     # res.__add__(Sequence(iof))
     i = iof_idx + 1
     while i <= iof_idx + iof.hops:
+        Invariant(Acc(ofs.State(), 1/10))
+        Invariant(i <= iof_idx + iof.hops + 1)
         hof = hof_to_adt(cast(HopOpaqueField, ofs.get_by_idx(i)))
         res.__add__(Sequence(hof))
     return res
