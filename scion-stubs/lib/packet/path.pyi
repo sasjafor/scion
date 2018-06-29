@@ -194,11 +194,17 @@ class SCIONPath(Serializable, Sized):
         Requires(self.get_hof_idx() < self.get_ofs_len() - 2)
         # Requires(Unfolding(Acc(self.State(), 1/10), isinstance(self._ofs.get_by_idx(self._hof_idx + 1), HopOpaqueField)))
         Requires(isinstance(self.ofs_get_by_idx(self.get_hof_idx() + 1), HopOpaqueField))
+        Requires(isinstance(self.ofs_get_by_idx(self.get_hof_idx()), HopOpaqueField))
+        Requires(isinstance(self.ofs_get_by_idx(self.get_iof_idx()), InfoOpaqueField))
         # Requires(Unfolding(Acc(self.State(), 1/10), Let(cast(HopOpaqueField, self._ofs.get_by_idx(self._hof_idx + 1)), bool, lambda hof:
         #             Unfolding(Acc(self._ofs.State(), 1/10), Unfolding(Acc(hof.State(), 1/10), not hof.verify_only)))))
-        Requires(Let(cast(HopOpaqueField, Unfolding(Acc(self.State(), 1/10), self._ofs.get_by_idx(self._hof_idx + 1))), bool, lambda hof:
+        # Requires(Let(cast(HopOpaqueField, Unfolding(Acc(self.State(), 1/10), self._ofs.get_by_idx(self._hof_idx + 1))), bool, lambda hof:
+        #             not self.get_hof_verify_only(hof)))
+        # Requires(Let(cast(InfoOpaqueField, Unfolding(Acc(self.State(), 1/10), self._ofs.get_by_idx(self._iof_idx))), bool, lambda iof:
+        #                 (self.get_hof_idx() - self.get_iof_idx()) < self.get_iof_hops(iof)))
+        Requires(Let(cast(HopOpaqueField, self.ofs_get_by_idx(self.get_hof_idx() + 1)), bool, lambda hof:
                     not self.get_hof_verify_only(hof)))
-        Requires(Let(cast(InfoOpaqueField, Unfolding(Acc(self.State(), 1/10), self._ofs.get_by_idx(self._iof_idx))), bool, lambda iof:
+        Requires(Let(cast(InfoOpaqueField, self.ofs_get_by_idx(self.get_iof_idx())), bool, lambda iof:
                         (self.get_hof_idx() - self.get_iof_idx()) < self.get_iof_hops(iof)))
         # Requires(MustTerminate(3))
         Ensures(Acc(self.State()))
@@ -221,15 +227,22 @@ class SCIONPath(Serializable, Sized):
             # Invariant(Acc(self._ofs.State()))
             Invariant(self.get_iof_idx() is not None)
             Invariant(self.get_hof_idx() is not None)
+            Invariant(Old(self.get_iof_idx()) < self.get_ofs_len())
+            Invariant(isinstance(self.ofs_get_by_idx(Old(self.get_iof_idx())), InfoOpaqueField))
             # Invariant(Unfolding(self.State(), isinstance(self._hof_idx, int)))
             # Invariant(Unfolding(self.State(), isinstance(self._iof_idx, int)))
             Invariant(iof in self.get_ofs_contents())
             Invariant(self.get_hof_idx() <= Old(self.get_hof_idx()) + 1)
             Invariant(Old(self.get_hof_idx()) + 1 < self.get_ofs_len() - 1)
-            Invariant(Unfolding(Acc(self.State(), 1/10), isinstance(self._ofs.get_by_idx(Old(self.get_hof_idx()) + 1), HopOpaqueField)))
-            Invariant(Let(cast(HopOpaqueField, Unfolding(Acc(self.State(), 1/10), self._ofs.get_by_idx(Old(self.get_hof_idx()) + 1))), bool, lambda hof:
+            # Invariant(Unfolding(Acc(self.State(), 1/10), isinstance(self._ofs.get_by_idx(Old(self.get_hof_idx()) + 1), HopOpaqueField)))
+            # Invariant(Let(cast(HopOpaqueField, Unfolding(Acc(self.State(), 1/10), self._ofs.get_by_idx(Old(self.get_hof_idx()) + 1))), bool, lambda hof:
+            #             not self.get_hof_verify_only(hof)))
+            # Invariant(Let(cast(InfoOpaqueField, Unfolding(Acc(self.State(), 1/10), self._ofs.get_by_idx(self._iof_idx))), bool, lambda iof:
+            #             (self.get_hof_idx() - self.get_iof_idx()) <= self.get_iof_hops(iof)))
+            Invariant(isinstance(self.ofs_get_by_idx(Old(self.get_hof_idx()) + 1), HopOpaqueField))
+            Invariant(Let(cast(HopOpaqueField, self.ofs_get_by_idx(Old(self.get_hof_idx()) + 1)), bool, lambda hof:
                         not self.get_hof_verify_only(hof)))
-            Invariant(Let(cast(InfoOpaqueField, Unfolding(Acc(self.State(), 1/10), self._ofs.get_by_idx(self._iof_idx))), bool, lambda iof:
+            Invariant(Let(cast(InfoOpaqueField, self.ofs_get_by_idx(Old(self.get_iof_idx()))), bool, lambda iof:
                         (self.get_hof_idx() - self.get_iof_idx()) <= self.get_iof_hops(iof)))
             # Invariant(self.get_hof_idx() + 1 < self.get_ofs_len())
             # Invariant(Let(cast(HopOpaqueField, Unfolding(Acc(self.State(), 1/10), self._ofs.get_by_idx(Old(self.get_hof_idx()) + 1))), bool, lambda hof:
@@ -242,7 +255,7 @@ class SCIONPath(Serializable, Sized):
             # Invariant(Unfolding(Acc(self.State()), Implies(self._hof_idx is not None, (self._hof_idx >= 0) and (self._hof_idx < self.get_ofs_len()) and isinstance(self._ofs.get_by_idx(self._hof_idx), HopOpaqueField))))
             # Invariant(MustTerminate(2))
             Invariant(self.get_hof_idx() < self.get_ofs_len() - 1)
-            Invariant(isinstance(Unfolding(Acc(self.State(), 1/10), self._ofs.get_by_idx(self._hof_idx)), HopOpaqueField))
+            Invariant(isinstance(self.ofs_get_by_idx(self.get_hof_idx()), HopOpaqueField))
             Unfold(self.State())
             self._hof_idx += 1
             Fold(Acc(self.State()))
@@ -311,13 +324,15 @@ class SCIONPath(Serializable, Sized):
     @Pure
     def get_iof_idx(self) -> Optional[int]:
         Requires(Acc(self.State(), 1/10))
+        Ensures(Result() is Unfolding(Acc(self.State(), 1/10), self._iof_idx))
+        Ensures(Implies(Result() is not None, Result() >= 0 and Result() < self.get_ofs_len()))
         return Unfolding(Acc(self.State(), 1/10), self._iof_idx)
 
     @Pure
     def get_hof_idx(self) -> Optional[int]:
         Requires(Acc(self.State(), 1/10))
         Ensures(Result() is Unfolding(Acc(self.State(), 1/10), self._hof_idx))
-        Ensures(Result() >= 0 and Result() < self.get_ofs_len())
+        Ensures(Implies(Result() is not None, Result() >= 0 and Result() < self.get_ofs_len()))
         return Unfolding(Acc(self.State(), 1/10), self._hof_idx)
 
     @Pure
@@ -515,6 +530,7 @@ class SCIONPath(Serializable, Sized):
     def ofs_get_by_idx(self, idx: int) -> OpaqueField:
         Requires(Acc(self.State(), 1/10))
         Requires(idx >= 0 and idx < self.get_ofs_len())
+        Ensures(Result() in self.get_ofs_contents())
         return Unfolding(Acc(self.State(), 1/10), self._ofs.get_by_idx(idx))
 
 
