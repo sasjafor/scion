@@ -1,7 +1,7 @@
 from typing import NamedTuple, cast
 
 from nagini_contracts.adt import ADT
-from nagini_contracts.contracts import Sequence
+from nagini_contracts.contracts import Sequence, Requires, Acc, Pure, Ensures
 
 from lib.packet.opaque_field import OpaqueFieldList, InfoOpaqueField, HopOpaqueField
 from lib.packet.scion import SCIONL4Packet
@@ -72,26 +72,30 @@ class ADT_Packet(ADT_base, NamedTuple('ADT_Packet', [('addrs', ADT_AddrHdr), ('p
     """
     pass
 
-
+@Pure
 def iof_to_adt(iof: InfoOpaqueField) -> ADT_IOF:
+    Requires(Acc(iof.State(), 1/10))
     """
     Method to map a InfoOpaqueField to an ADT
     :param iof: the original IOF
     :return: ADT containing the same information
     """
-    return ADT_IOF(iof.up_flag, iof.shortcut, iof.peer, iof.timestamp, iof.hops)
+    return ADT_IOF(iof.get_up_flag(), iof.get_shortcut(), iof.get_peer(), iof.get_timestamp(), iof.get_hops())
 
-
+@Pure
 def hof_to_adt(hof: HopOpaqueField) -> ADT_HOF:
+    Requires(Acc(hof.State(), 1/10))
     """
     Method to map a HopOpaqueField to an ADT
     :param hof: the original HOF
     :return: ADT containing the same information
     """
-    return ADT_HOF(hof.xover, hof.verify_only, hof.forward_only, hof.exp_time, hof.ingress_if, hof.egress_if)
+    return ADT_HOF(hof.get_xover(), hof.get_verify_only(), hof.get_forward_only(), hof.get_exp_time(), hof.get_ingress_if(), hof.get_egress_if())
 
 
 def map_ofs_list(ofs: OpaqueFieldList, iof_idx: int, iof: ADT_IOF) -> Sequence[ADT_HOF]:
+    Requires(Acc(ofs.State(), 1/10))
+    Ensures(Acc(ofs.State(), 1/10))
     """
     Method to map the InfoOpaqueField and the HopOpaqueFields from the packet to a Nagini Sequence
     :param ofs: OpaqueFields from the packet
