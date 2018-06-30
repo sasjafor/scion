@@ -582,19 +582,13 @@ class Router(SCIONElement):
         prev_hof = path.get_hof_ver(ingress=ingress)
         # Check that the interface in the current hop field matches the
         # interface in the router.
-        # Unfold(Acc(self.State(), 1/10))
         if path.get_curr_if(ingress=ingress) != self.get_interface_if_id():
-            # Fold(Acc(self.State(), 1 / 10))
             raise SCIONIFVerificationError(hof, iof)
         if int(SCIONTime.get_time()) <= ts + path.get_hof_exp_time(hof) * EXP_TIME_UNIT:
             if not Unfolding(Acc(path.State(), 1/10), Unfolding(Acc(path._ofs.State(), 1/10), hof.verify_mac(self.get_of_gen_key(), ts, prev_hof))):
-                # path.hof_verify_mac(hof, self.get_of_gen_key(), ts, prev_hof):
-                # Fold(Acc(self.State(), 1 / 10))
                 raise SCIONOFVerificationError(hof, prev_hof)
         else:
-            # Fold(Acc(self.State(), 1 / 10))
             raise SCIONOFExpiredError(hof)
-        # Fold(Acc(self.State(), 1 / 10))
 
     def _egress_forward(self, t: Place, spkt: SCIONL4Packet) -> Place:
         Requires(Acc(self.State(), 1/10))
@@ -835,7 +829,7 @@ class Router(SCIONElement):
 
     def _link_type(self, if_id: int) -> Optional[str]:
         Requires(Acc(self.State(), 1/10))
-        Requires(MustTerminate(Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.topology.State(), 1/10), len(self.topology.border_routers()) + 3))))
+        Requires(MustTerminate(self.get_topology_border_routers_len() + 4))
         Ensures(Acc(self.State(), 1/10))
         """
         Returns the link type of the link corresponding to 'if_id' or None.
@@ -844,18 +838,26 @@ class Router(SCIONElement):
         border_router = self.topology.get_all_border_routers()
         Fold(Acc(self.State(), 1/10))
         border_router_enum = enumerate(border_router)
-        for i, br in border_router_enum:
+        i = 1
+        for br in border_router:
             Invariant(Acc(self.State(), 1/10))
-            Invariant(list_pred(border_router))
-            # Invariant(Forall(border_router, lambda x: (x in self.get_topology_border_routers(), [[x in border_router]])))
-            Invariant(Forall(border_router_enum, lambda x: (x in self.get_topology_border_routers())))
+            # Invariant(list_pred(border_router))
+            Invariant(i <= len(border_router) + 2)
+            Invariant(Forall(border_router, lambda x: (x in self.get_topology_border_routers(), [[x in border_router]])))
+            # Invariant(Forall(border_router_enum, lambda x: (x[1] in self.get_topology_border_routers(), [[x[1] in border_router]])))
+            # Invariant(Forall(border_router_enum, lambda x: (x[1] in border_router)))
+            # Invariant(br in border_router)
             # Invariant(Forall(border_router, lambda x: (Acc(x.State(), 1/10))))
             # Invariant(Forall(self.get_topology_border_routers(), lambda x: (Acc(Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.topology.State(), 1/10), x)).State(), 1/10), [[x in self.get_topology_border_routers()]])))
             # Invariant(Forall(self.get_topology_border_routers(), lambda x: (Acc(x.State(), 1 / 10))))
             # Invariant(i <= Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.topology.State(), 1/10), len(self.topology.border_routers()) + 2)))
-            Invariant(MustTerminate(Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.topology.State(), 1/10), len(self.topology.border_routers()) - i + 2))))
-            if Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.topology.State(), 1/10), br.get_interface_if_id())) == if_id:
-                return Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.topology.State(), 1/10), br.get_interface_link_type()))
+            # Invariant(len(border_router) == Old(self.get_topology_border_routers_len()))
+            Invariant(self.get_topology_border_routers_len() == len(border_router))
+            # Invariant(i <= self.get_topology_border_routers_len() + 2)
+            Invariant(MustTerminate(self.get_topology_border_routers_len() - i + 3))
+            if self.get_br_interface_if_id(br) == if_id:
+                return self.get_br_interface_link_type(br)
+            i = i + 1
         return None
 
     def _needs_local_processing(self, pkt: SCIONL4Packet) -> bool:
@@ -1096,3 +1098,43 @@ class Router(SCIONElement):
         Requires(Acc(self.State(), 1/10))
         return Unfolding(Acc(self.State(), 1/10), self.addr)
 
+    @Pure
+    def get_topology_border_routers_len(self) -> int:
+        Requires(Acc(self.State(), 1/10))
+        Ensures(Result() == Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.topology.State(), 1/10), len(self.topology.border_routers()))))
+        Ensures(Result() >= 0)
+        return Unfolding(Acc(self.State(), 1/10), self.get_topology_border_routers_len_1())
+
+    @Pure
+    def get_topology_border_routers_len_1(self) -> int:
+        Requires(Acc(self.topology, 1/10))
+        Requires(Acc(self.topology.State(), 1/10))
+        # Ensures(Result() == Unfolding(Acc(self.topology.State(), 1/10), len(self.topology.border_routers())))
+        Ensures(Result() >= 0)
+        return Unfolding(Acc(self.topology.State(), 1/10), len(self.topology.border_routers()))
+
+    @Pure
+    def get_br_interface_if_id(self, br: RouterElement) -> int:
+        Requires(Acc(self.State(), 1/10))
+        Requires(br in self.get_topology_border_routers())
+        return Unfolding(Acc(self.State(), 1/10), self.get_br_interface_if_id_1(br))
+
+    @Pure
+    def get_br_interface_if_id_1(self, br: RouterElement) -> int:
+        Requires(Acc(self.topology, 1/10))
+        Requires(Acc(self.topology.State(), 1/10))
+        Requires(br in self.get_topology_border_routers_1())
+        return Unfolding(Acc(self.topology.State(), 1/10), br.get_interface_if_id())
+
+    @Pure
+    def get_br_interface_link_type(self, br: RouterElement) -> Optional[str]:
+        Requires(Acc(self.State(), 1 / 10))
+        Requires(br in self.get_topology_border_routers())
+        return Unfolding(Acc(self.State(), 1 / 10), self.get_br_interface_link_type_1(br))
+
+    @Pure
+    def get_br_interface_link_type_1(self, br: RouterElement) -> Optional[str]:
+        Requires(Acc(self.topology, 1 / 10))
+        Requires(Acc(self.topology.State(), 1 / 10))
+        Requires(br in self.get_topology_border_routers_1())
+        return Unfolding(Acc(self.topology.State(), 1 / 10), br.get_interface_link_type())

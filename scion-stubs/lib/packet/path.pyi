@@ -355,7 +355,7 @@ class SCIONPath(Serializable, Sized):
     @Pure
     def get_ofs_len(self) -> int:
         Requires(Acc(self.State(), 1/10))
-        Ensures(Result() is Unfolding(Acc(self.State(), 1/10), self.state_get_ofs_len()))
+        Ensures(Result() == Unfolding(Acc(self.State(), 1/10), self.state_get_ofs_len()))
         return cast(int, Unfolding(Acc(self.State(), 1/10), self.get_ofs_len_1()))
 
     @Pure

@@ -71,6 +71,7 @@ class Topology(object):
         Ensures(Acc(self.State(), 1/10))
         Ensures(list_pred(Result()))
         Ensures(Forall(cast(List[RouterElement], Result()), lambda e: (e in self.get_border_routers(), [[e in Result()]])))
+        Ensures(len(Result()) == len(self.get_border_routers()))
         """
         Return all border routers associated to the AS.
 
