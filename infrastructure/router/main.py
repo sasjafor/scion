@@ -837,12 +837,14 @@ class Router(SCIONElement):
         Unfold(Acc(self.State(), 1/10))
         border_router = self.topology.get_all_border_routers()
         Fold(Acc(self.State(), 1/10))
-        border_router_enum = enumerate(border_router)
+        # border_router_enum = enumerate(border_router)
         i = 1
         for br in border_router:
             Invariant(Acc(self.State(), 1/10))
             # Invariant(list_pred(border_router))
-            Invariant(i <= len(border_router) + 2)
+            # Invariant(len(border_router) == Old(Unfolding(Acc(self.State(), 1/10), len(self.topology.get_border_routers()))))
+            Invariant(self.get_topology_border_routers_len() == Old(self.get_topology_border_routers_len()))
+            Invariant(i <= self.get_topology_border_routers_len() + 2)
             Invariant(Forall(border_router, lambda x: (x in self.get_topology_border_routers(), [[x in border_router]])))
             # Invariant(Forall(border_router_enum, lambda x: (x[1] in self.get_topology_border_routers(), [[x[1] in border_router]])))
             # Invariant(Forall(border_router_enum, lambda x: (x[1] in border_router)))
@@ -852,7 +854,7 @@ class Router(SCIONElement):
             # Invariant(Forall(self.get_topology_border_routers(), lambda x: (Acc(x.State(), 1 / 10))))
             # Invariant(i <= Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.topology.State(), 1/10), len(self.topology.border_routers()) + 2)))
             # Invariant(len(border_router) == Old(self.get_topology_border_routers_len()))
-            Invariant(self.get_topology_border_routers_len() == len(border_router))
+            # Invariant(self.get_topology_border_routers_len() == len(border_router))
             # Invariant(i <= self.get_topology_border_routers_len() + 2)
             Invariant(MustTerminate(self.get_topology_border_routers_len() - i + 3))
             i = i + 1
@@ -1101,7 +1103,7 @@ class Router(SCIONElement):
     @Pure
     def get_topology_border_routers_len(self) -> int:
         Requires(Acc(self.State(), 1/10))
-        Ensures(Result() == Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.topology.State(), 1/10), len(self.topology.border_routers()))))
+        Ensures(Result() == Unfolding(Acc(self.State(), 1/10), len(self.topology.get_border_routers())))
         Ensures(Result() >= 0)
         return Unfolding(Acc(self.State(), 1/10), self.get_topology_border_routers_len_1())
 
