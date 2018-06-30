@@ -855,9 +855,9 @@ class Router(SCIONElement):
             Invariant(self.get_topology_border_routers_len() == len(border_router))
             # Invariant(i <= self.get_topology_border_routers_len() + 2)
             Invariant(MustTerminate(self.get_topology_border_routers_len() - i + 3))
+            i = i + 1
             if self.get_br_interface_if_id(br) == if_id:
                 return self.get_br_interface_link_type(br)
-            i = i + 1
         return None
 
     def _needs_local_processing(self, pkt: SCIONL4Packet) -> bool:
