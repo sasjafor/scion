@@ -350,10 +350,6 @@ class SCIONPath(Serializable):
     def __eq__(self, other):  # pragma: no cover
         return self.interfaces == other.interfaces
 
-    @Predicate
-    def State(self):
-        pass
-
 
 def valid_mtu(mtu):
     """
