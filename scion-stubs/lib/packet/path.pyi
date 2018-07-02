@@ -338,12 +338,14 @@ class SCIONPath(Serializable, Sized):
     @Pure
     def get_ofs_contents(self) -> Sequence[OpaqueField]:
         Requires(Acc(self.State(), 1/10))
+        Ensures(Result() is Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self._ofs.State(), 1/10), self._ofs.contents())))
         return Unfolding(Acc(self.State(), 1/10), self.get_ofs_contents_1())
 
     @Pure
     def get_ofs_contents_1(self) -> Sequence[OpaqueField]:
         Requires(Acc(self._ofs, 1/10))
         Requires(Acc(self._ofs.State(), 1/10))
+        Ensures(Result() is Unfolding(Acc(self._ofs.State(), 1/10), self._ofs.contents()))
         return Unfolding(Acc(self._ofs.State(), 1/10), self._ofs.contents())
 
     @Pure
@@ -463,6 +465,7 @@ class SCIONPath(Serializable, Sized):
     def get_hof_exp_time(self, hof: HopOpaqueField) -> int:
         Requires(Acc(self.State(), 1/10))
         Requires(hof in self.get_ofs_contents())
+        Ensures(hof in self.get_ofs_contents())
         return Unfolding(Acc(self.State(), 1/10), self.get_hof_exp_time_1(hof))
 
     @Pure
@@ -470,6 +473,7 @@ class SCIONPath(Serializable, Sized):
         Requires(Acc(self._ofs, 1/10))
         Requires(Acc(self._ofs.State(), 1/10))
         Requires(hof in self._ofs.get_contents())
+        Ensures((hof in self._ofs.get_contents()))
         return Unfolding(Acc(self._ofs.State(), 1/10), hof.get_exp_time())
 
     @Pure
@@ -511,19 +515,30 @@ class SCIONPath(Serializable, Sized):
         Requires(iof in self._ofs.get_contents())
         return Unfolding(Acc(self._ofs.State(), 1/10), iof.get_timestamp())
 
-    @Pure
     def hof_verify_mac(self, hof: HopOpaqueField, gen_key: bytes, ts: int, prev_hof: Optional[HopOpaqueField]) -> bool:
         Requires(Acc(self.State(), 1/10))
+        Requires(Implies(prev_hof is not None, Acc(prev_hof.State(), 1/10)))
         Requires(hof in self.get_ofs_contents())
         Requires(prev_hof in self.get_ofs_contents())
+        Requires(MustTerminate(4))
+        Ensures(Acc(self.State(), 1/10))
+        Ensures(Implies(prev_hof is not None, Acc(prev_hof.State(), 1/10)))
+        Ensures(hof in self.get_ofs_contents())
+        Ensures(prev_hof in self.get_ofs_contents())
         return Unfolding(Acc(self.State(), 1/10), self.hof_verify_mac_1(hof, gen_key, ts, prev_hof))
 
-    @Pure
     def hof_verify_mac_1(self, hof: HopOpaqueField, gen_key: bytes, ts: int, prev_hof: Optional[HopOpaqueField]) -> bool:
         Requires(Acc(self._ofs, 1/10))
         Requires(Acc(self._ofs.State(), 1/10))
+        Requires(Implies(prev_hof is not None, Acc(prev_hof.State(), 1/10)))
         Requires(hof in self._ofs.get_contents())
         Requires(prev_hof in self._ofs.get_contents())
+        Requires(MustTerminate(3))
+        Ensures(Acc(self._ofs, 1/10))
+        Ensures(Acc(self._ofs.State(), 1/10))
+        Ensures(Implies(prev_hof is not None, Acc(prev_hof.State(), 1/10)))
+        Ensures(hof in self._ofs.get_contents())
+        Ensures(prev_hof in self._ofs.get_contents())
         return Unfolding(Acc(self._ofs.State(), 1/10), hof.verify_mac(gen_key, ts, prev_hof))
 
     @Pure

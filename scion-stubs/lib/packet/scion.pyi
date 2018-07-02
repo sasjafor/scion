@@ -1,6 +1,6 @@
 from lib.errors import SCIONBaseError, SCIONChecksumFailed
 from lib.packet.ext_hdr import ExtensionHeader
-from lib.packet.opaque_field import OpaqueFieldList, HopOpaqueField, OpaqueField
+from lib.packet.opaque_field import OpaqueFieldList, HopOpaqueField, OpaqueField, InfoOpaqueField
 from lib.packet.packet_base import PacketBase
 from lib.util import calc_padding, Raw
 from lib.packet.host_addr import HostAddrIPv4, HostAddrIPv6, HostAddrSVC, HostAddrBase  # , HostAddrInvalidType
@@ -524,6 +524,50 @@ class SCIONL4Packet(SCIONExtPacket):
         return Unfolding(Acc(self.path._ofs.State(), 1/10), hof.get_verify_only())
 
     @Pure
+    def get_path_iof_peer(self, iof: InfoOpaqueField) -> bool:
+        Requires(Acc(self.State(), 1/10))
+        Requires(self.get_path() is not None)
+        Requires(iof in self.get_path_ofs_contents())
+        return Unfolding(Acc(self.State(), 1/10), self.get_path_iof_peer_1(iof))
+
+    @Pure
+    def get_path_iof_peer_1(self, iof: InfoOpaqueField) -> bool:
+        Requires(Acc(self.path, 1/10))
+        Requires(Acc(self.path.State(), 1/10))
+        Requires(iof in self.get_path_ofs_contents_1())
+        return Unfolding(Acc(self.path.State(), 1/10), self.get_path_iof_peer_2(iof))
+
+    @Pure
+    def get_path_iof_peer_2(self, iof: InfoOpaqueField) -> bool:
+        Requires(Acc(self.path, 1/10))
+        Requires(Acc(self.path._ofs, 1/10))
+        Requires(Acc(self.path._ofs.State(), 1/10))
+        Requires(iof in self.get_path_ofs_contents_2())
+        return Unfolding(Acc(self.path._ofs.State(), 1/10), iof.get_peer())
+
+    @Pure
+    def get_path_iof_hops(self, iof: InfoOpaqueField) -> int:
+        Requires(Acc(self.State(), 1/10))
+        Requires(self.get_path() is not None)
+        Requires(iof in self.get_path_ofs_contents())
+        return Unfolding(Acc(self.State(), 1/10), self.get_path_iof_hops_1(iof))
+
+    @Pure
+    def get_path_iof_hops_1(self, iof: InfoOpaqueField) -> int:
+        Requires(Acc(self.path, 1/10))
+        Requires(Acc(self.path.State(), 1/10))
+        Requires(iof in self.get_path_ofs_contents_1())
+        return Unfolding(Acc(self.path.State(), 1/10), self.get_path_iof_hops_2(iof))
+
+    @Pure
+    def get_path_iof_hops_2(self, iof: InfoOpaqueField) -> int:
+        Requires(Acc(self.path, 1/10))
+        Requires(Acc(self.path._ofs, 1/10))
+        Requires(Acc(self.path._ofs.State(), 1/10))
+        Requires(iof in self.get_path_ofs_contents_2())
+        return Unfolding(Acc(self.path._ofs.State(), 1/10), iof.get_hops())
+
+    @Pure
     def get_path_ofs_contents(self) -> Sequence[OpaqueField]:
         Requires(Acc(self.State(), 1/10))
         Requires(self.get_path() is not None)
@@ -544,6 +588,23 @@ class SCIONL4Packet(SCIONExtPacket):
         Requires(Acc(self.path._ofs, 1/10))
         Requires(Acc(self.path._ofs.State(), 1/10))
         return Unfolding(Acc(self.path._ofs.State(), 1/10), self.path._ofs.contents())
+
+    @Pure
+    def path_ofs_get_by_idx(self, idx: int) -> OpaqueField:
+        Requires(Acc(self.State(), 1/10))
+        Requires(self.get_path() is not None)
+        Requires(idx >= 0 and idx < self.get_path_ofs_len())
+        Ensures(self.get_path() is not None)
+        Ensures(Result() in self.get_path_ofs_contents())
+        return Unfolding(Acc(self.State(), 1/10), self.path.ofs_get_by_idx(idx))
+
+    @Pure
+    def get_path_ofs_len(self) -> int:
+        Requires(Acc(self.State(), 1/10))
+        Requires(self.get_path() is not None)
+        Ensures(Result() == Unfolding(Acc(self.State(), 1/10), self.path.get_ofs_len()))
+        Ensures(self.get_path() is not None)
+        return Unfolding(Acc(self.State(), 1/10), self.path.get_ofs_len())
 
 
 @Pure

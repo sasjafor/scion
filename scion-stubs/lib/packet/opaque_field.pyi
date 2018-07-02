@@ -1,3 +1,5 @@
+from nagini_contracts.obligations import MustTerminate
+
 from lib.errors import SCIONIndexError
 from lib.packet.packet_base import Serializable
 from lib.defines import OPAQUE_FIELD_LEN
@@ -121,16 +123,25 @@ class HopOpaqueField(OpaqueField):
         self.egress_if = 0
         self.mac = bytes(self.MAC_LEN)
 
-    def calc_mac(self, key: bytes, ts: int, prev_hof:'HopOpaqueField'=None) -> None:
-        ...
-
-    def set_mac(self, key: bytes, ts: int, prev_hof:'HopOpaqueField'=None) -> bytes:
-        ...
-
-    @Pure
     @ContractOnly
-    def verify_mac(self, key: bytes, ts: int, prev_hof:'HopOpaqueField'=None) -> bool:  # pragma: no cover
+    def calc_mac(self, key: bytes, ts: int, prev_hof:'HopOpaqueField'=None) -> bytes:
+        Requires(Acc(self.State(), 1/10))
         Requires(Implies(prev_hof is not None, Acc(prev_hof.State(), 1/10)))
+        Requires(MustTerminate(1))
+        Ensures(Acc(self.State(), 1/10))
+        Ensures(Implies(prev_hof is not None, Acc(prev_hof.State(), 1/10)))
+        ...
+
+    def set_mac(self, key: bytes, ts: int, prev_hof:'HopOpaqueField'=None) -> None:
+        ...
+
+    def verify_mac(self, key: bytes, ts: int, prev_hof:'HopOpaqueField'=None) -> bool:  # pragma: no cover
+        Requires(Acc(self.State(), 1/10))
+        Requires(Implies(prev_hof is not None, Acc(prev_hof.State(), 1/10)))
+        Requires(MustTerminate(2))
+        Ensures(Acc(self.State(), 1/10))
+        Ensures(Implies(prev_hof is not None, Acc(prev_hof.State(), 1/10)))
+        return self.get_mac() == self.calc_mac(key, ts, prev_hof)
 
     @classmethod
     def from_values(cls, exp_time: int, ingress_if: int=0, egress_if: int=0,
@@ -182,6 +193,11 @@ class HopOpaqueField(OpaqueField):
     def get_ingress_if(self) -> int:
         Requires(Acc(self.State(), 1/10))
         return Unfolding(Acc(self.State(), 1/10), self.ingress_if)
+
+    @Pure
+    def get_mac(self) -> bytes:
+        Requires(Acc(self.State(), 1/10))
+        return Unfolding(Acc(self.State(), 1/10), self.mac)
 
 class InfoOpaqueField(OpaqueField):
     def __init__(self) -> None:  # pragma: no cover

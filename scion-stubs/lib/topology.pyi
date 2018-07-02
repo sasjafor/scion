@@ -53,10 +53,10 @@ class Topology(object):
     @Pure
     @ContractOnly
     def border_routers(self) -> Sequence[RouterElement]:
-        Requires(Acc(self.parent_border_routers, 1/10))
-        Requires(Acc(self.child_border_routers, 1/10))
-        Requires(Acc(self.peer_border_routers, 1/10))
-        Requires(Acc(self.routing_border_routers, 1/10))
+        Requires(Acc(self.parent_border_routers, 1/20))
+        Requires(Acc(self.child_border_routers, 1/20))
+        Requires(Acc(self.peer_border_routers, 1/20))
+        Requires(Acc(self.routing_border_routers, 1/20))
 
     @classmethod
     def from_file(cls, topology_file: str) -> 'Topology':
@@ -66,9 +66,9 @@ class Topology(object):
         ...
 
     def get_all_border_routers(self) -> List[RouterElement]:
-        Requires(Acc(self.State(), 1/10))
+        Requires(Acc(self.State(), 1/20))
         Requires(MustTerminate(2))
-        Ensures(Acc(self.State(), 1/10))
+        Ensures(Acc(self.State(), 1/20))
         Ensures(list_pred(Result()))
         Ensures(Forall(cast(List[RouterElement], Result()), lambda e: (e in self.get_border_routers(), [[e in Result()]])))
         Ensures(len(Result()) == len(self.get_border_routers()))
@@ -79,12 +79,12 @@ class Topology(object):
         :rtype: list
         """
         all_border_routers = [] # type: List[RouterElement]
-        Unfold(Acc(self.State(), 1/10))
+        Unfold(Acc(self.State(), 1/20))
         all_border_routers.extend(self.parent_border_routers)
         all_border_routers.extend(self.child_border_routers)
         all_border_routers.extend(self.peer_border_routers)
         all_border_routers.extend(self.routing_border_routers)
-        Fold(Acc(self.State(), 1/10))
+        Fold(Acc(self.State(), 1/20))
         return all_border_routers
 
     """
@@ -93,8 +93,8 @@ class Topology(object):
 
     @Pure
     def get_border_routers(self) -> Sequence[RouterElement]:
-        Requires(Acc(self.State(), 1/10))
-        return Unfolding(Acc(self.State(), 1/10), self.border_routers())
+        Requires(Acc(self.State(), 1/20))
+        return Unfolding(Acc(self.State(), 1/20), self.border_routers())
 
     @Pure
     def get_parent_border_routers(self) -> List[RouterElement]:
@@ -175,11 +175,23 @@ class RouterElement(Element):
 
     @Pure
     def get_interface_if_id(self) -> int:
-        Requires(Acc(self.State(), 1/10))
-        return Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.interface.State(), 1/10), self.interface.if_id))
+        Requires(Acc(self.State(), 1/20))
+        return Unfolding(Acc(self.State(), 1/20), self.get_interface_if_id_1())
+
+    @Pure
+    def get_interface_if_id_1(self) -> int:
+        Requires(Acc(self.interface, 1/20))
+        Requires(Acc(self.interface.State(), 1/20))
+        return Unfolding(Acc(self.interface.State(), 1/20), self.interface.if_id)
 
     @Pure
     def get_interface_link_type(self) -> Optional[str]:
-        Requires(Acc(self.State(), 1/10))
-        return Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.interface.State(), 1/10), self.interface.link_type))
+        Requires(Acc(self.State(), 1/20))
+        return Unfolding(Acc(self.State(), 1/20), self.get_interface_link_type_1())
+
+    @Pure
+    def get_interface_link_type_1(self) -> Optional[str]:
+        Requires(Acc(self.interface, 1/20))
+        Requires(Acc(self.interface.State(), 1/20))
+        return Unfolding(Acc(self.interface.State(), 1/20), self.interface.link_type)
 

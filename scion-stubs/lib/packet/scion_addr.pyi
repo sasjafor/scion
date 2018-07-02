@@ -1,7 +1,7 @@
 from nagini_contracts.obligations import MustTerminate
 
 from lib.packet.host_addr import HostAddrBase
-from typing import Optional
+from typing import Optional, cast
 from nagini_contracts.contracts import *
 
 from lib.packet.packet_base import Serializable
@@ -16,9 +16,31 @@ class ISD_AS(Serializable):
 
     def to_int(self) -> int: ...
 
+    @Pure
+    def __eq__(self, other: object) -> bool:  # pragma: no cover
+        Requires(Acc(self.State(), 1/10))
+        Requires(Implies(isinstance(other, ISD_AS), Acc(cast(ISD_AS, other).State(), 1/10)))
+        if not isinstance(other, ISD_AS):
+            return False
+        return self.get_isd() == other.get_isd() and self.get_as() == other.get_as()
+
     @Predicate
     def State(self) -> bool:
         return Acc(self._isd) and Acc(self._as)
+
+    """
+    Start of Performance helper functions
+    """
+
+    @Pure
+    def get_isd(self) -> int:
+        Requires(Acc(self.State(), 1/10))
+        return Unfolding(Acc(self.State(), 1/10), self._isd)
+
+    @Pure
+    def get_as(self) -> int:
+        Requires(Acc(self.State(), 1/10))
+        return Unfolding(Acc(self.State(), 1/10), self._as)
 
 class SCIONAddr(object):
     def __init__(self) -> None:  # pragma: no cover
