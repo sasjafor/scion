@@ -777,8 +777,11 @@ class Router(SCIONElement):
         Requires(Acc(self.State(), 1/10))
         Requires(Acc(prev_iof.State(), 1/10))
         Requires(Acc(prev_hof.State(), 1/10))
-        Requires(Unfolding(Acc(path.State(), 1 / 10), path._iof_idx is not None))
-        Requires(Unfolding(Acc(path.State(), 1 / 10), path._hof_idx is not None))
+        Requires(path.get_iof_idx() is not None)
+        Requires(path.get_hof_idx() is not None)
+        Requires(prev_iof in path.get_ofs_contents())
+        Requires(prev_hof in path.get_ofs_contents())
+        Requires(MustTerminate(self.get_topology_border_routers_len() + 5))
         Ensures(Acc(path.State(), 1/10))
         Ensures(Acc(self.State(), 1/10))
         Ensures(Acc(prev_iof.State(), 1/10))
@@ -804,36 +807,29 @@ class Router(SCIONElement):
         fwd_on_link_type = self._link_type(fwd_if)
         cur_iof = path.get_iof()
         cur_hof = path.get_hof()
-        Unfold(Acc(path.State(), 1/10))
-        if Unfolding(Acc(prev_iof.State(), 1/10), not prev_iof.up_flag) and Unfolding(Acc(path._ofs.State(), 1/10), Unfolding(Acc(cur_iof.State(), 1/10), cur_iof.up_flag)):
-            Fold(Acc(path.State(), 1/10))
+        if not prev_iof.get_up_flag() and path.get_iof_up_flag(cur_iof):
             raise SCIONSegmentSwitchError(
                 "Switching from down- to up-segment is not allowed.")
-        if (prev_iof.get_up_flag() and Unfolding(Acc(path._ofs.State(), 1/10), cur_iof.get_up_flag()) and
-                (fwd_on_link_type is None or fwd_on_link_type != LinkType.ROUTING)):
-            Fold(Acc(path.State(), 1 / 10))
+        if (prev_iof.get_up_flag() and path.get_iof_up_flag(cur_iof) and
+                (fwd_on_link_type is not None and fwd_on_link_type != LinkType.ROUTING)):
             raise SCIONSegmentSwitchError(
                 "Switching from up- to up-segment is not allowed "
                 "if the packet is not forwarded over a ROUTING link.")
-        if (not prev_iof.get_up_flag() and Unfolding(Acc(path._ofs.State(), 1/10), not cur_iof.get_up_flag()) and
-                (rcvd_on_link_type is None or rcvd_on_link_type != LinkType.ROUTING)):
-            Fold(Acc(path.State(), 1 / 10))
+        if (not prev_iof.get_up_flag() and not path.get_iof_up_flag(cur_iof) and
+                (rcvd_on_link_type is not None and rcvd_on_link_type != LinkType.ROUTING)):
             raise SCIONSegmentSwitchError(
                 "Switching from down- to down-segment is not "
                 "allowed if the packet was not received over a ROUTING link.")
-        if ((rcvd_on_link_type is None or rcvd_on_link_type == LinkType.ROUTING) and
-                (fwd_on_link_type is None or fwd_on_link_type == LinkType.ROUTING)):
-            Fold(Acc(path.State(), 1 / 10))
+        if ((rcvd_on_link_type is not None and rcvd_on_link_type == LinkType.ROUTING) and
+                (fwd_on_link_type is not None and fwd_on_link_type == LinkType.ROUTING)):
             raise SCIONSegmentSwitchError(
                 "Switching from core- to core-segment is not allowed.")
-        if (((rcvd_on_link_type is None or rcvd_on_link_type == LinkType.PEER) or
-             (fwd_on_link_type is None or fwd_on_link_type == LinkType.PEER)) and
-                    prev_hof.get_egress_if() != Unfolding(Acc(path._ofs.State(), 1/10),cur_hof.get_egress_if())):
-            Fold(Acc(path.State(), 1 / 10))
+        if (((rcvd_on_link_type is not None and rcvd_on_link_type == LinkType.PEER) or
+             (fwd_on_link_type is not None and fwd_on_link_type == LinkType.PEER)) and
+                    prev_hof.get_egress_if() != path.get_hof_egress_if(cur_hof)):
             raise SCIONSegmentSwitchError(
                 "Egress IF of peering HOF does not match egress IF of current "
                 "HOF.")
-        Fold(Acc(path.State(), 1 / 10))
 
     def _calc_fwding_ingress(self, spkt: SCIONL4Packet) -> Tuple[int, bool, bool]:
         Requires(Acc(spkt.State()))
@@ -857,6 +853,7 @@ class Router(SCIONElement):
         Requires(Acc(self.State(), 1/10))
         Requires(MustTerminate(self.get_topology_border_routers_len() + 4))
         Ensures(Acc(self.State(), 1/10))
+        Ensures(self.get_topology_border_routers_len() == Old(self.get_topology_border_routers_len()))
         """
         Returns the link type of the link corresponding to 'if_id' or None.
         """
