@@ -123,24 +123,26 @@ class HopOpaqueField(OpaqueField):
         self.egress_if = 0
         self.mac = bytes(self.MAC_LEN)
 
+    @Pure
     @ContractOnly
     def calc_mac(self, key: bytes, ts: int, prev_hof:'HopOpaqueField'=None) -> bytes:
         Requires(Acc(self.State(), 1/10))
         Requires(Implies(prev_hof is not None, Acc(prev_hof.State(), 1/10)))
-        Requires(MustTerminate(1))
-        Ensures(Acc(self.State(), 1/10))
-        Ensures(Implies(prev_hof is not None, Acc(prev_hof.State(), 1/10)))
+        # Requires(MustTerminate(1))
+        # Ensures(Acc(self.State(), 1/10))
+        # Ensures(Implies(prev_hof is not None, Acc(prev_hof.State(), 1/10)))
         ...
 
     def set_mac(self, key: bytes, ts: int, prev_hof:'HopOpaqueField'=None) -> None:
         ...
 
+    @Pure
     def verify_mac(self, key: bytes, ts: int, prev_hof:'HopOpaqueField'=None) -> bool:  # pragma: no cover
         Requires(Acc(self.State(), 1/10))
         Requires(Implies(prev_hof is not None, Acc(prev_hof.State(), 1/10)))
-        Requires(MustTerminate(2))
-        Ensures(Acc(self.State(), 1/10))
-        Ensures(Implies(prev_hof is not None, Acc(prev_hof.State(), 1/10)))
+        # Requires(MustTerminate(2))
+        # Ensures(Acc(self.State(), 1/10))
+        # Ensures(Implies(prev_hof is not None, Acc(prev_hof.State(), 1/10)))
         return self.get_mac() == self.calc_mac(key, ts, prev_hof)
 
     @classmethod

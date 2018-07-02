@@ -590,11 +590,19 @@ class Router(SCIONElement):
             raise SCIONIFVerificationError(hof, iof)
         Assert(hof in path.get_ofs_contents())
         if int(SCIONTime.get_time()) <= ts + path.get_hof_exp_time(hof) * EXP_TIME_UNIT:
-            assert hof is not None
-            Assert(hof in path.get_ofs_contents())
-            if not Unfolding(Acc(path.State(), 1/10), Unfolding(Acc(path._ofs.State(), 1/10), hof.verify_mac(self.get_of_gen_key(), ts, prev_hof))):
+            # assert hof is not None
+            Assert(Implies(prev_hof is not None, prev_hof in path.get_ofs_contents()))
+            Unfold(Acc(path.State(), 1/10))
+            Unfold(Acc(path._ofs.State(), 1/10))
+            # if not Unfolding(Acc(path.State(), 1/10), Unfolding(Acc(path._ofs.State(), 1/10), hof.verify_mac(self.get_of_gen_key(), ts, prev_hof))):
             # if not path.hof_verify_mac(hof, self.get_of_gen_key(), ts, prev_hof):
+            Assert(Implies(prev_hof is not None, Acc(prev_hof.State(), 1/10)))
+            if not hof.verify_mac(self.get_of_gen_key(), ts, prev_hof):
+                Fold(Acc(path.State(), 1 / 10))
+                Fold(Acc(path._ofs.State(), 1 / 10))
                 raise SCIONOFVerificationError(hof, prev_hof)
+            Fold(Acc(path.State(), 1 / 10))
+            Fold(Acc(path._ofs.State(), 1 / 10))
         else:
             raise SCIONOFExpiredError(hof)
 
@@ -675,9 +683,9 @@ class Router(SCIONElement):
         # Requires(Unfolding(Acc(spkt.State(), 1/10), Unfolding(Acc(spkt.path.State(), (1 / 10)),
         #                    Let(cast(InfoOpaqueField, spkt.path._ofs.get_by_idx(spkt.path._iof_idx)), bool,
         #                        (lambda iof: Unfolding(Acc(spkt.path._ofs.State(), (1 / 10)), not iof.get_peer()))))))
-        Requires(Unfolding(Acc(spkt.State(), 1/10), Unfolding(Acc(spkt.path.State(), (1 / 10)),
-                           Let(cast(InfoOpaqueField, spkt.path._ofs.get_by_idx(spkt.path._iof_idx)), bool,
-                               (lambda iof: not spkt.path.get_iof_peer(iof))))))
+        Requires(Unfolding(Acc(spkt.State(), 1/10),
+                           Let(cast(InfoOpaqueField, Unfolding(Acc(spkt.path.State(), (1 / 10)), spkt.path._ofs.get_by_idx(spkt.path._iof_idx))), bool,
+                               (lambda iof: not spkt.path.get_iof_peer(iof)))))
         Requires(dict_pred(SVC_TO_SERVICE))
         Requires(SVC_TO_SERVICE.__contains__(spkt.get_addrs_dst_host_addr()))
         # Requires(Let(cast(InfoOpaqueField, spkt.path_ofs_get_by_idx(spkt.get_path_iof_idx())), bool,
@@ -855,31 +863,16 @@ class Router(SCIONElement):
         Unfold(Acc(self.State(), 1/20))
         border_router = self.topology.get_all_border_routers()
         Fold(Acc(self.State(), 1/20))
-        # border_router_enum = enumerate(border_router)
-        i = 1
-        for br in border_router:
+        border_router_len = len(border_router)
+        border_router_enum = enumerate(border_router)
+        for i, br in border_router_enum:
             Invariant(Acc(self.State(), 1/10))
-            # Invariant(list_pred(border_router))
-            # Invariant(len(border_router) == Old(Unfolding(Acc(self.State(), 1/10), len(self.topology.get_border_routers()))))
-            # Invariant(self.get_topology_border_routers_len() == Old(self.get_topology_border_routers_len()))
             Invariant(Acc(list_pred(border_router), 1/20))
-            Invariant(Old(len(border_router)) == len(border_router))
-            Invariant(i <= len(border_router) + 2)
-            # Invariant(i <= self.get_topology_border_routers_len() + 2)
+            Invariant(border_router_len == len(border_router))
             Invariant(len(border_router) == self.get_topology_border_routers_len())
             Invariant(Forall(border_router, lambda x: (x in self.get_topology_border_routers(), [[x in border_router]])))
-            # Invariant(Forall(border_router_enum, lambda x: (x[1] in self.get_topology_border_routers(), [[x[1] in border_router]])))
-            # Invariant(Forall(border_router_enum, lambda x: (x[1] in border_router)))
-            # Invariant(br in border_router)
-            # Invariant(Forall(border_router, lambda x: (Acc(x.State(), 1/10))))
-            # Invariant(Forall(self.get_topology_border_routers(), lambda x: (Acc(Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.topology.State(), 1/10), x)).State(), 1/10), [[x in self.get_topology_border_routers()]])))
-            # Invariant(Forall(self.get_topology_border_routers(), lambda x: (Acc(x.State(), 1 / 10))))
-            # Invariant(i <= Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.topology.State(), 1/10), len(self.topology.border_routers()) + 2)))
-            # Invariant(len(border_router) == Old(self.get_topology_border_routers_len()))
-            # Invariant(self.get_topology_border_routers_len() == len(border_router))
-            # Invariant(i <= self.get_topology_border_routers_len() + 2)
+            Invariant(Forall(border_router_enum, lambda x: (x[1] in border_router)))
             Invariant(MustTerminate(self.get_topology_border_routers_len() - i + 3))
-            i = i + 1
             if self.get_br_interface_if_id(br) == if_id:
                 return self.get_br_interface_link_type(br)
         return None
