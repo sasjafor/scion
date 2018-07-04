@@ -67,6 +67,15 @@ class OpaqueFieldList(Sized):
 
     @Pure
     @ContractOnly
+    def get_hof_by_idx(self, idx: int) -> HopOpaqueField:
+        Requires(Acc(self.State(), 1/10))
+        Requires(idx >= 0 and idx < self.get_len())
+        # Requires(idx >= 0 and idx < Unfolding(Acc(self.State(), 1/10), len(self)))
+        Ensures(Result() is Unfolding(Acc(self.State(), 1/10), self.contents()[idx]))
+        Ensures(Result() in Unfolding(Acc(self.State(), 1/10), self.contents()))
+
+    @Pure
+    @ContractOnly
     def get_by_idx(self, idx: int) -> OpaqueField:
         Requires(Acc(self.State(), 1/10))
         Requires(idx >= 0 and idx < self.get_len())

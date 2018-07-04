@@ -568,10 +568,6 @@ class Router(SCIONElement):
         Requires(path.get_iof_idx() is not None)
         Requires(path.get_hof_idx() is not None)
         Requires(Unfolding(Acc(path.State(), (1/10)), Let(cast(InfoOpaqueField, path._ofs.get_by_idx(path._iof_idx)), bool, (lambda iof: Unfolding(Acc(path._ofs.State(), (1 / 10)), not iof.get_peer())))))
-        # Requires(Let(cast(InfoOpaqueField, Unfolding(Acc(path.State(), (1/10)), path._ofs.get_by_idx(path._iof_idx))), bool,
-        #                        (lambda iof: not path.get_iof_peer(iof))))
-        # Requires(Let(cast(InfoOpaqueField, path.ofs_get_by_idx(path.get_iof_idx())), bool,
-        #                        (lambda iof: not path.get_iof_peer(iof))))
         Requires(MustTerminate(5))
         Ensures(Acc(path.State(), 1/9))
         Ensures(Acc(self.State(), 1/9))
@@ -588,21 +584,9 @@ class Router(SCIONElement):
         # interface in the router.
         if path.get_curr_if(ingress=ingress) != self.get_interface_if_id():
             raise SCIONIFVerificationError(hof, iof)
-        Assert(hof in path.get_ofs_contents())
         if int(SCIONTime.get_time()) <= ts + path.get_hof_exp_time(hof) * EXP_TIME_UNIT:
-            # assert hof is not None
-            Assert(Implies(prev_hof is not None, prev_hof in path.get_ofs_contents()))
-            Unfold(Acc(path.State(), 1/10))
-            Unfold(Acc(path._ofs.State(), 1/10))
-            # if not Unfolding(Acc(path.State(), 1/10), Unfolding(Acc(path._ofs.State(), 1/10), hof.verify_mac(self.get_of_gen_key(), ts, prev_hof))):
-            # if not path.hof_verify_mac(hof, self.get_of_gen_key(), ts, prev_hof):
-            Assert(Implies(prev_hof is not None, Acc(prev_hof.State(), 1/10)))
-            if not hof.verify_mac(self.get_of_gen_key(), ts, prev_hof):
-                Fold(Acc(path.State(), 1 / 10))
-                Fold(Acc(path._ofs.State(), 1 / 10))
+            if not Unfolding(Acc(path.State(), 1/10), Unfolding(Acc(path._ofs.State(), 1/10), hof.verify_mac(self.get_of_gen_key(), ts, prev_hof))):
                 raise SCIONOFVerificationError(hof, prev_hof)
-            Fold(Acc(path.State(), 1 / 10))
-            Fold(Acc(path._ofs.State(), 1 / 10))
         else:
             raise SCIONOFExpiredError(hof)
 

@@ -1,7 +1,8 @@
-from typing import NamedTuple, cast
+from typing import NamedTuple, cast, Optional
 
 from nagini_contracts.adt import ADT
-from nagini_contracts.contracts import Sequence, Requires, Acc, Pure, Ensures, Invariant
+from nagini_contracts.contracts import Sequence, Requires, Acc, Pure, Ensures, Invariant, Unfolding, Unfold, Fold
+from nagini_contracts.obligations import MustTerminate
 
 from lib.packet.opaque_field import OpaqueFieldList, InfoOpaqueField, HopOpaqueField
 from lib.packet.scion import SCIONL4Packet
@@ -16,7 +17,7 @@ class ADT_base(ADT):
     """
     pass
 
-class ADT_HostAddrBase(ADT_base, NamedTuple('ADT_HostAddrBase', [('TYPE', int), ('addr', bytes)])):
+class ADT_HostAddrBase(ADT_base, NamedTuple('ADT_HostAddrBase', [('TYPE', Optional[int]), ('addr', Optional[bytes])])):
     """
     Constructor for ADT_HostAddrBase
     """
@@ -98,6 +99,8 @@ def map_ofs_list(ofs: OpaqueFieldList, iof_idx: int, iof: ADT_IOF) -> Sequence[A
     Requires(iof.hops >= 0)
     Requires(iof_idx >= 0)
     Requires(iof_idx + iof.hops < ofs.get_len())
+    # Requires(iof_idx + iof.hops < Unfolding(Acc(ofs.State(), 1/10), len(ofs)))
+    Requires(MustTerminate(iof.hops + 2))
     Ensures(Acc(ofs.State(), 1/10))
     """
     Method to map the InfoOpaqueField and the HopOpaqueFields from the packet to a Nagini Sequence
@@ -106,49 +109,78 @@ def map_ofs_list(ofs: OpaqueFieldList, iof_idx: int, iof: ADT_IOF) -> Sequence[A
     :return: sequence of OpaqueField ADTs
     """
     res = Sequence() # type: Sequence[ADT_HOF]
+    if iof.hops == 0:
+        return res
     # iof = iof_to_adt(cast(InfoOpaqueField, ofs.get_by_idx(iof_idx)))
     # res.__add__(Sequence(iof))
     i = iof_idx + 1
     while i <= iof_idx + iof.hops:
         Invariant(Acc(ofs.State(), 1/10))
-        Invariant(i <= iof_idx + iof.hops)
-        Invariant(i < ofs.get_len())
-        hof = hof_to_adt(cast(HopOpaqueField, ofs.get_by_idx(i)))
-        res.__add__(Sequence(hof))
+        Invariant(i >= 0)
+        # Invariant(i <= iof_idx + iof.hops + 1)
+        # Invariant(i < ofs.get_len())
+        Invariant(MustTerminate(iof.hops + iof_idx - i + 1))
+        hof = cast(HopOpaqueField, ofs.get_hof_by_idx(i))
+        hof_adt = Unfolding(Acc(ofs.State(), 1/10), hof_to_adt(hof))
+        res.__add__(Sequence(hof_adt))
+        i = i + 1
     return res
 
 
-def map_scion_packet_to_adt(packet: SCIONL4Packet) -> ADT_Packet:
+def map_scion_packet_to_adt(pkt: SCIONL4Packet) -> ADT_Packet:
+    Requires(Acc(pkt.State(), 1 / 10))
+    Requires(pkt.get_path() is not None)
+    # Requires(pkt.get_path_iof_idx() is not None)
+    Requires(Unfolding(Acc(pkt.State(), 1 / 10), pkt.path.get_iof_idx() is not None))
+    Requires(pkt.get_path_hof_idx() is not None)
+    Ensures(Acc(pkt.State(), 1 / 10))
     """
     Method to map a SCIONPacket to the ADT defined in this file
     :param packet: the packet to be mapped
     :return: ADT containing the same information as the packet
     """
-    pkt_addrs = packet.addrs
-    pkt_path = packet.path
-    pkt_addrs_src = packet.addrs.src
-    pkt_addrs_dst = packet.addrs.dst
-    pkt_addrs_src_isd_as = pkt_addrs_src.isd_as
-    pkt_addrs_dst_isd_as = pkt_addrs_dst.isd_as
-    pkt_addrs_src_host = pkt_addrs_src.host
-    pkt_addrs_dst_host = pkt_addrs_dst.host
 
-    src_isd_as = ADT_ISD_AS(pkt_addrs_src_isd_as._isd, pkt_addrs_src_isd_as._as)
-    dst_isd_as = ADT_ISD_AS(pkt_addrs_dst_isd_as._isd, pkt_addrs_dst_isd_as._as)
+    iof_idx = pkt.get_path_iof_idx()
 
-    src_host = ADT_HostAddrBase(pkt_addrs_src_host.TYPE, pkt_addrs_src_host.addr)
-    dst_host = ADT_HostAddrBase(pkt_addrs_dst_host.TYPE, pkt_addrs_dst_host.addr)
+    Unfold(Acc(pkt.State(), 1 / 10))
+
+    iof = pkt.path.get_iof()
+
+    Unfold(Acc(pkt.path.State(), 1 / 10))
+    Unfold(Acc(pkt.addrs.State(), 1 / 10))
+    Unfold(Acc(pkt.addrs.src.State(), 1 / 10))
+    Unfold(Acc(pkt.addrs.dst.State(), 1 / 10))
+    Unfold(Acc(pkt.addrs.src.host.State(), 1 / 10))
+    Unfold(Acc(pkt.addrs.dst.host.State(), 1 / 10))
+    Unfold(Acc(pkt.addrs.src.isd_as.State(), 1 / 10))
+    Unfold(Acc(pkt.addrs.dst.isd_as.State(), 1 / 10))
+
+    src_isd_as = ADT_ISD_AS(pkt.addrs.src.isd_as._isd, pkt.addrs.src.isd_as._as)
+    dst_isd_as = ADT_ISD_AS(pkt.addrs.dst.isd_as._isd, pkt.addrs.dst.isd_as._as)
+
+    src_host = ADT_HostAddrBase(pkt.addrs.src.host.TYPE, pkt.addrs.src.host.addr)
+    dst_host = ADT_HostAddrBase(pkt.addrs.dst.host.TYPE, pkt.addrs.dst.host.addr)
 
     src = ADT_Address(src_isd_as, src_host)
     dst = ADT_Address(dst_isd_as, dst_host)
 
-    ofs = pkt_path._ofs
-    iof_idx = pkt_path._iof_idx
+    ofs = pkt.path._ofs
 
-    iof = iof_to_adt(cast(InfoOpaqueField, ofs.get_by_idx(iof_idx)))
-    ofs_seq = map_ofs_list(ofs, iof_idx, iof)
+    # iof_adt = iof_to_adt(cast(InfoOpaqueField, pkt.path._ofs.get_by_idx(pkt.path._iof_idx)))
+    iof_adt = iof_to_adt(iof)
+    ofs_seq = map_ofs_list(ofs, iof_idx, iof_adt)
 
-    addrs = ADT_AddrHdr(src, dst, pkt_addrs._total_len)
-    path = ADT_Path(pkt_path.A_HOFS, pkt_path.B_HOFS, pkt_path.C_HOFS, iof, ofs_seq, pkt_path._iof_idx, pkt_path._hof_idx)
+    addrs = ADT_AddrHdr(src, dst, pkt.addrs._total_len)
+    path = ADT_Path(pkt.path.A_HOFS, pkt.path.B_HOFS, pkt.path.C_HOFS, iof_adt, ofs_seq, pkt.path._iof_idx, pkt.path._hof_idx)
+
+    Fold(Acc(pkt.addrs.src.isd_as.State(), 1 / 10))
+    Fold(Acc(pkt.addrs.dst.isd_as.State(), 1 / 10))
+    Fold(Acc(pkt.addrs.src.host.State(), 1 / 10))
+    Fold(Acc(pkt.addrs.dst.host.State(), 1 / 10))
+    Fold(Acc(pkt.addrs.src.State(), 1 / 10))
+    Fold(Acc(pkt.addrs.dst.State(), 1 / 10))
+    Fold(Acc(pkt.addrs.State(), 1 / 10))
+    Fold(Acc(pkt.path.State(), 1 / 10))
+    Fold(Acc(pkt.State(), 1 / 10))
 
     return ADT_Packet(addrs, path)
