@@ -116,6 +116,36 @@ class OpaqueFieldList(Sized):
         Requires(Acc(self.State(), 1/10))
         return Unfolding(Acc(self.State(), 1/10), self.contents())
 
+    @Pure
+    def get_iof_peer(self, iof: InfoOpaqueField) -> bool:
+        Requires(Acc(self.State(), 1/10))
+        Requires(iof in self.get_contents())
+        return Unfolding(Acc(self.State(), 1/10), iof.get_peer())
+
+    @Pure
+    def get_iof_shortcut(self, iof: InfoOpaqueField) -> bool:
+        Requires(Acc(self.State(), 1/10))
+        Requires(iof in self.get_contents())
+        return Unfolding(Acc(self.State(), 1/10), iof.get_shortcut())
+
+    @Pure
+    def get_iof_up_flag(self, iof: InfoOpaqueField) -> bool:
+        Requires(Acc(self.State(), 1/10))
+        Requires(iof in self.get_contents())
+        return Unfolding(Acc(self.State(), 1/10), iof.get_up_flag())
+
+    @Pure
+    def get_iof_hops(self, iof: InfoOpaqueField) -> int:
+        Requires(Acc(self.State(), 1/10))
+        Requires(iof in self.get_contents())
+        return Unfolding(Acc(self.State(), 1/10), iof.get_hops())
+
+    @Pure
+    def get_hof_xover(self, hof: HopOpaqueField) -> bool:
+        Requires(Acc(self.State(), 1/10))
+        Requires(hof in self.get_contents())
+        return Unfolding(Acc(self.State(), 1/10), hof.get_xover())
+
 
 class HopOpaqueField(OpaqueField):
     NAME = "HopOpaqueField"
