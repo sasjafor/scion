@@ -146,6 +146,12 @@ class OpaqueFieldList(Sized):
         Requires(hof in self.get_contents())
         return Unfolding(Acc(self.State(), 1/10), hof.get_xover())
 
+    @Pure
+    def get_hof_verify_only(self, hof: HopOpaqueField) -> bool:
+        Requires(Acc(self.State(), 1/10))
+        Requires(hof in self.get_contents())
+        return Unfolding(Acc(self.State(), 1/10), hof.get_verify_only())
+
 
 class HopOpaqueField(OpaqueField):
     NAME = "HopOpaqueField"

@@ -13,7 +13,7 @@ from lib.packet.scmp.ext import SCMPExt
 from lib.sibra.ext.ext import SibraExtBase
 from lib.types import AddrType, L4Proto
 
-from typing import List, Optional, Sized, Tuple, Union
+from typing import List, Optional, Sized, Tuple, Union, cast
 from nagini_contracts.contracts import *
 from nagini_contracts.io_builtins import MustTerminate
 
@@ -292,6 +292,26 @@ class SCIONL4Packet(SCIONExtPacket):
     def State(self) -> bool:
         return (Acc(self.l4_hdr) and
                 Implies(self.l4_hdr is not None, self.l4_hdr.State()))
+
+    # @Predicate
+    # def IncPrecondition(self) -> bool:
+    #     return  (Let(self.path, bool, lambda path:
+    #             path.get_hof_idx() < path.get_ofs_len() - 1 and
+    #             Let(cast(HopOpaqueField, Unfolding(Acc(path.State(), 1/10), path._ofs.get_by_idx(path.get_hof_idx() + 1))), bool, lambda hof:
+    #                 not path.get_hof_verify_only(hof)) and
+    #             path.get_hof_idx() - path.get_iof_idx() < path.get_iof_hops(cast(InfoOpaqueField, path.ofs_get_by_idx(path.get_iof_idx()))) and
+    #             Let(cast(InfoOpaqueField, path.ofs_get_by_idx(path.get_iof_idx())), bool, lambda iof:
+    #                     Implies((Let(cast(HopOpaqueField, path.ofs_get_by_idx(path.get_hof_idx() + 1)), bool, lambda hof:
+    #                                 not path.get_hof_xover(hof) or
+    #                                 path.get_iof_shortcut(iof)
+    #                                 ) and
+    #                                 (path.get_hof_idx() != path.get_iof_idx() + path.get_iof_hops(iof))),
+    #                             path.get_hof_idx() + 2 < path.get_ofs_len() and
+    #                             isinstance(path.ofs_get_by_idx(path.get_hof_idx() + 2), HopOpaqueField) and
+    #                             path.ofs_get_by_idx(path.get_hof_idx() + 2) is not path.ofs_get_by_idx(path.get_hof_idx() + 1)
+    #                             )
+    #                 ) and
+    #             Implies(path.get_hof_idx() < path.get_ofs_len() - 2, isinstance(path.ofs_get_by_idx(path.get_hof_idx() + 2), HopOpaqueField))))
 
     def update(self) -> None:
         ...

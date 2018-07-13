@@ -820,6 +820,24 @@ class Router(SCIONElement):
         Requires(spkt.get_path() is not None)
         Requires(spkt.get_path_iof_idx() is not None)
         Requires(spkt.get_path_hof_idx() is not None)
+        # Requires(Let(Unfolding(Acc(spkt.State(), 1/10), spkt.path), bool, lambda path:
+        #         path.get_hof_idx() < path.get_ofs_len() - 1 and
+        #         Let(cast(HopOpaqueField, Unfolding(Acc(path.State(), 1/10), path._ofs.get_by_idx(path.get_hof_idx() + 1))), bool, lambda hof:
+        #             not path.get_hof_verify_only(hof)) and
+        #         path.get_hof_idx() - path.get_iof_idx() < path.get_iof_hops(cast(InfoOpaqueField, path.ofs_get_by_idx(path.get_iof_idx()))) and
+        #         Let(cast(InfoOpaqueField, path.ofs_get_by_idx(path.get_iof_idx())), bool, lambda iof:
+        #                 Implies((Let(cast(HopOpaqueField, path.ofs_get_by_idx(path.get_hof_idx() + 1)), bool, lambda hof:
+        #                             not path.get_hof_xover(hof) or
+        #                             path.get_iof_shortcut(iof)
+        #                             ) and
+        #                             (path.get_hof_idx() != path.get_iof_idx() + path.get_iof_hops(iof))),
+        #                         path.get_hof_idx() + 2 < path.get_ofs_len() and
+        #                         isinstance(path.ofs_get_by_idx(path.get_hof_idx() + 2), HopOpaqueField) and
+        #                         path.ofs_get_by_idx(path.get_hof_idx() + 2) is not path.ofs_get_by_idx(path.get_hof_idx() + 1)
+        #                         )
+        #             ) and
+        #         Implies(path.get_hof_idx() < path.get_ofs_len() - 2, isinstance(path.ofs_get_by_idx(path.get_hof_idx() + 2), HopOpaqueField))))
+        Requires(MustTerminate(3))
         Ensures(Acc(spkt.State()))
         Unfold(Acc(spkt.State()))
         path = spkt.path
@@ -828,6 +846,7 @@ class Router(SCIONElement):
         skipped_vo = False
         if path.get_hof_xover(hof):
             skipped_vo = path.inc_hof_idx()
+            # Fold(Acc(spkt.path.IncPrecondition(), 1/10))
             incd = True
         result = path.get_fwd_if(), incd, skipped_vo
         Fold(Acc(spkt.State()))
