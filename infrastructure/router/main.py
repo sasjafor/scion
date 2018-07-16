@@ -723,19 +723,23 @@ class Router(SCIONElement):
         # stupid.
         spkt_isd_as = spkt.get_addrs_dst_isd_as()
         self_isd_as = self.get_addr_isd_as()
-        if ((spkt_isd_as is None and self.addr.isd_as is None) or (spkt_isd_as is not None and self.eq_isd_as(spkt))) and spkt.path_call_is_on_last_segment():
+        if ((spkt_isd_as is None and self_isd_as is None) or (spkt_isd_as is not None and self.eq_isd_as(spkt))) and spkt.path_call_is_on_last_segment():
             # Fold(Acc(spkt.State(), 1/4))
             self.deliver(t, spkt)
             return t
         if ingress:
+            Unfold(Acc(spkt.State(), 1 / 4))
             prev_if = path.get_curr_if()
             prev_iof = path.get_iof()
             prev_hof = path.get_hof()
             prev_iof_idx = path.get_of_idxs()[0]
+            Fold(Acc(spkt.State(), 1 / 4))
             # Fold(Acc(spkt.State(), 1/4))
             fwd_if, path_incd, skipped_vo = self._calc_fwding_ingress(spkt)
-            # Unfold(Acc(spkt.State(), 1/4))
+            Unfold(Acc(spkt.State(), 1 / 10))
+            assert path is not None
             cur_iof_idx = path.get_of_idxs()[0]
+            Fold(Acc(spkt.State(), 1 / 10))
             if prev_iof_idx != cur_iof_idx:
                 self._validate_segment_switch(
                     path, fwd_if, prev_if, prev_iof, prev_hof)
@@ -744,8 +748,9 @@ class Router(SCIONElement):
                 raise SCIONSegmentSwitchError("Skipped verify only field, but "
                                               "did not switch segments.")
         else:
-            assert False
+            Unfold(Acc(spkt.State(), 1 / 4))
             fwd_if = path.get_fwd_if()
+            Fold(Acc(spkt.State(), 1 / 4))
             path_incd = False
         try:
             br = self.ifid2br[fwd_if]
@@ -860,6 +865,9 @@ class Router(SCIONElement):
                 Implies(path.get_hof_idx() < path.get_ofs_len() - 2, isinstance(path.ofs_get_by_idx(path.get_hof_idx() + 2), HopOpaqueField)))))
         Requires(MustTerminate(3))
         Ensures(Acc(spkt.State()))
+        Ensures(spkt.get_path() is not None)
+        Ensures(spkt.get_path_iof_idx() is not None)
+        Ensures(spkt.get_path_hof_idx() is not None)
         Unfold(Acc(spkt.State()))
         path = spkt.path
         hof = path.get_hof()

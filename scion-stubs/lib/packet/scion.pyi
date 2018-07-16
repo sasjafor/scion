@@ -626,10 +626,12 @@ class SCIONL4Packet(SCIONExtPacket):
         Ensures(self.get_path() is not None)
         return Unfolding(Acc(self.State(), 1/10), self.path.get_ofs_len())
 
+    @Pure
     def path_call_is_on_last_segment(self) -> bool:
         Requires(Acc(self.State(), 1/10))
         Requires(self.get_path() is not None)
-        Ensures(Acc(self.State(), 1/10))
+        Requires(self.get_path_hof_idx() is not None)
+        # Ensures(Acc(self.State(), 1/10))
         return Unfolding(Acc(self.State(), 1/10), self.path.is_on_last_segment())
 
 

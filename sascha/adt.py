@@ -93,15 +93,33 @@ def hof_to_adt(hof: HopOpaqueField) -> ADT_HOF:
     """
     return ADT_HOF(hof.get_xover(), hof.get_verify_only(), hof.get_forward_only(), hof.get_exp_time(), hof.get_ingress_if(), hof.get_egress_if())
 
-
-def map_ofs_list(ofs: OpaqueFieldList, iof_idx: int, iof: ADT_IOF) -> Sequence[ADT_HOF]:
+@Pure
+def map_ofs_list_rec(seq: Sequence[ADT_HOF], ofs: OpaqueFieldList, curr_idx: int, last_idx: int) -> Sequence[ADT_HOF]:
     Requires(Acc(ofs.State(), 1/10))
+    Requires(last_idx < ofs.get_len())
+    Requires(curr_idx >= 0)
+    Requires(curr_idx <= last_idx)
+    Requires(curr_idx < ofs.get_len())
+    """
+    Method to map the InfoOpaqueField and the HopOpaqueFields from the packet to a Nagini Sequence
+    :param ofs: OpaqueFields from the packet
+    :param iof_idx: index of the InfoOpaqueField that precedes the HopOpaqueFields
+    :return: sequence of OpaqueField ADTs
+    """
+    hof = ofs.get_hof_by_idx(curr_idx)
+    hof_adt = Unfolding(Acc(ofs.State(), 1/10), hof_to_adt(hof))
+    hof_seq = Sequence(hof_adt) # type: Sequence[ADT_HOF]
+    res = seq.__add__(hof_seq)
+    if curr_idx == last_idx:
+        return res
+    return map_ofs_list_rec(res, ofs, curr_idx + 1, last_idx)
+
+@Pure
+def map_ofs_list(ofs: OpaqueFieldList, iof_idx: int, iof: ADT_IOF) -> Sequence[ADT_HOF]:
+    Requires(Acc(ofs.State(), 1 / 10))
     Requires(iof.hops >= 0)
     Requires(iof_idx >= 0)
     Requires(iof_idx + iof.hops < ofs.get_len())
-    # Requires(iof_idx + iof.hops < Unfolding(Acc(ofs.State(), 1/10), len(ofs)))
-    Requires(MustTerminate(iof.hops + 2))
-    Ensures(Acc(ofs.State(), 1/10))
     """
     Method to map the InfoOpaqueField and the HopOpaqueFields from the packet to a Nagini Sequence
     :param ofs: OpaqueFields from the packet
@@ -111,21 +129,7 @@ def map_ofs_list(ofs: OpaqueFieldList, iof_idx: int, iof: ADT_IOF) -> Sequence[A
     res = Sequence() # type: Sequence[ADT_HOF]
     if iof.hops == 0:
         return res
-    # iof = iof_to_adt(cast(InfoOpaqueField, ofs.get_by_idx(iof_idx)))
-    # res.__add__(Sequence(iof))
-    i = iof_idx + 1
-    while i <= iof_idx + iof.hops:
-        Invariant(Acc(ofs.State(), 1/10))
-        Invariant(i >= 0)
-        # Invariant(i <= iof_idx + iof.hops + 1)
-        # Invariant(i < ofs.get_len())
-        Invariant(MustTerminate(iof.hops + iof_idx - i + 1))
-        hof = cast(HopOpaqueField, ofs.get_hof_by_idx(i))
-        hof_adt = Unfolding(Acc(ofs.State(), 1/10), hof_to_adt(hof))
-        res.__add__(Sequence(hof_adt))
-        i = i + 1
-    return res
-
+    return map_ofs_list_rec(res, ofs, iof_idx + 1, iof_idx + iof.hops)
 
 def map_scion_packet_to_adt(pkt: SCIONL4Packet) -> ADT_Packet:
     Requires(Acc(pkt.State(), 1 / 10))
