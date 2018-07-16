@@ -360,6 +360,155 @@ class SCIONL4Packet(SCIONExtPacket):
         return Unfolding(Acc(self.addrs.dst.State(), 1/10), self.addrs.dst.isd_as)
 
     @Pure
+    def get_addrs_src_isd_as(self) -> Optional[ISD_AS]:
+        Requires(Acc(self.State(), 1/10))
+        Requires(self.get_addrs() is not None)
+        Requires(self.get_addrs_src() is not None)
+        return Unfolding(Acc(self.State(), 1/10), self.get_addrs_src_isd_as_1())
+
+    @Pure
+    def get_addrs_src_isd_as_1(self) -> Optional[ISD_AS]:
+        Requires(Acc(self.addrs, 1/10))
+        Requires(Acc(self.addrs.State(), 1/10))
+        Requires(self.get_addrs_src_1() is not None)
+        return Unfolding(Acc(self.addrs.State(), 1/10), self.get_addrs_src_isd_as_2())
+
+    @Pure
+    def get_addrs_src_isd_as_2(self) -> Optional[ISD_AS]:
+        Requires(Acc(self.addrs, 1/10))
+        Requires(Acc(self.addrs.src, 1/10))
+        Requires(Acc(self.addrs.src.State(), 1/10))
+        return Unfolding(Acc(self.addrs.src.State(), 1/10), self.addrs.src.isd_as)
+
+    @Pure
+    def get_addrs_dst_isd_as_isd(self) -> int:
+        Requires(Acc(self.State(), 1/10))
+        Requires(self.get_addrs() is not None)
+        Requires(self.get_addrs_dst() is not None)
+        Requires(self.get_addrs_dst_isd_as() is not None)
+        return Unfolding(Acc(self.State(), 1/10), self.get_addrs_dst_isd_as_isd_1())
+
+    @Pure
+    def get_addrs_dst_isd_as_isd_1(self) -> int:
+        Requires(Acc(self.addrs, 1/10))
+        Requires(Acc(self.addrs.State(), 1/10))
+        Requires(self.get_addrs_dst_1() is not None)
+        Requires(self.get_addrs_dst_isd_as_1() is not None)
+        return Unfolding(Acc(self.addrs.State(), 1/10), self.get_addrs_dst_isd_as_isd_2())
+
+    @Pure
+    def get_addrs_dst_isd_as_isd_2(self) -> int:
+        Requires(Acc(self.addrs, 1/10))
+        Requires(Acc(self.addrs.dst, 1/10))
+        Requires(Acc(self.addrs.dst.State(), 1/10))
+        Requires(self.get_addrs_dst_isd_as_2() is not None)
+        return Unfolding(Acc(self.addrs.dst.State(), 1/10), self.get_addrs_dst_isd_as_isd_3())
+
+    @Pure
+    def get_addrs_dst_isd_as_isd_3(self) -> int:
+        Requires(Acc(self.addrs, 1/10))
+        Requires(Acc(self.addrs.dst, 1/10))
+        Requires(Acc(self.addrs.dst.isd_as, 1/10))
+        Requires(Acc(self.addrs.dst.isd_as.State(), 1/10))
+        return Unfolding(Acc(self.addrs.dst.isd_as.State(), 1/10), self.addrs.dst.isd_as._isd)
+    
+    @Pure
+    def get_addrs_dst_isd_as_as(self) -> int:
+        Requires(Acc(self.State(), 1/10))
+        Requires(self.get_addrs() is not None)
+        Requires(self.get_addrs_dst() is not None)
+        Requires(self.get_addrs_dst_isd_as() is not None)
+        return Unfolding(Acc(self.State(), 1/10), self.get_addrs_dst_isd_as_as_1())
+
+    @Pure
+    def get_addrs_dst_isd_as_as_1(self) -> int:
+        Requires(Acc(self.addrs, 1/10))
+        Requires(Acc(self.addrs.State(), 1/10))
+        Requires(self.get_addrs_dst_1() is not None)
+        Requires(self.get_addrs_dst_isd_as_1() is not None)
+        return Unfolding(Acc(self.addrs.State(), 1/10), self.get_addrs_dst_isd_as_as_2())
+
+    @Pure
+    def get_addrs_dst_isd_as_as_2(self) -> int:
+        Requires(Acc(self.addrs, 1/10))
+        Requires(Acc(self.addrs.dst, 1/10))
+        Requires(Acc(self.addrs.dst.State(), 1/10))
+        Requires(self.get_addrs_dst_isd_as_2() is not None)
+        return Unfolding(Acc(self.addrs.dst.State(), 1/10), self.get_addrs_dst_isd_as_as_3())
+
+    @Pure
+    def get_addrs_dst_isd_as_as_3(self) -> int:
+        Requires(Acc(self.addrs, 1/10))
+        Requires(Acc(self.addrs.dst, 1/10))
+        Requires(Acc(self.addrs.dst.isd_as, 1/10))
+        Requires(Acc(self.addrs.dst.isd_as.State(), 1/10))
+        return Unfolding(Acc(self.addrs.dst.isd_as.State(), 1/10), self.addrs.dst.isd_as._as)
+
+    @Pure
+    def get_addrs_src_isd_as_isd(self) -> int:
+        Requires(Acc(self.State(), 1/10))
+        Requires(self.get_addrs() is not None)
+        Requires(self.get_addrs_src() is not None)
+        Requires(self.get_addrs_src_isd_as() is not None)
+        return Unfolding(Acc(self.State(), 1/10), self.get_addrs_src_isd_as_isd_1())
+
+    @Pure
+    def get_addrs_src_isd_as_isd_1(self) -> int:
+        Requires(Acc(self.addrs, 1/10))
+        Requires(Acc(self.addrs.State(), 1/10))
+        Requires(self.get_addrs_src_1() is not None)
+        Requires(self.get_addrs_src_isd_as_1() is not None)
+        return Unfolding(Acc(self.addrs.State(), 1/10), self.get_addrs_src_isd_as_isd_2())
+
+    @Pure
+    def get_addrs_src_isd_as_isd_2(self) -> int:
+        Requires(Acc(self.addrs, 1/10))
+        Requires(Acc(self.addrs.src, 1/10))
+        Requires(Acc(self.addrs.src.State(), 1/10))
+        Requires(self.get_addrs_src_isd_as_2() is not None)
+        return Unfolding(Acc(self.addrs.src.State(), 1/10), self.get_addrs_src_isd_as_isd_3())
+
+    @Pure
+    def get_addrs_src_isd_as_isd_3(self) -> int:
+        Requires(Acc(self.addrs, 1/10))
+        Requires(Acc(self.addrs.src, 1/10))
+        Requires(Acc(self.addrs.src.isd_as, 1/10))
+        Requires(Acc(self.addrs.src.isd_as.State(), 1/10))
+        return Unfolding(Acc(self.addrs.src.isd_as.State(), 1/10), self.addrs.src.isd_as._isd)
+    
+    @Pure
+    def get_addrs_src_isd_as_as(self) -> int:
+        Requires(Acc(self.State(), 1/10))
+        Requires(self.get_addrs() is not None)
+        Requires(self.get_addrs_src() is not None)
+        Requires(self.get_addrs_src_isd_as() is not None)
+        return Unfolding(Acc(self.State(), 1/10), self.get_addrs_src_isd_as_as_1())
+
+    @Pure
+    def get_addrs_src_isd_as_as_1(self) -> int:
+        Requires(Acc(self.addrs, 1/10))
+        Requires(Acc(self.addrs.State(), 1/10))
+        Requires(self.get_addrs_src_1() is not None)
+        Requires(self.get_addrs_src_isd_as_1() is not None)
+        return Unfolding(Acc(self.addrs.State(), 1/10), self.get_addrs_src_isd_as_as_2())
+
+    @Pure
+    def get_addrs_src_isd_as_as_2(self) -> int:
+        Requires(Acc(self.addrs, 1/10))
+        Requires(Acc(self.addrs.src, 1/10))
+        Requires(Acc(self.addrs.src.State(), 1/10))
+        Requires(self.get_addrs_src_isd_as_2() is not None)
+        return Unfolding(Acc(self.addrs.src.State(), 1/10), self.get_addrs_src_isd_as_as_3())
+
+    @Pure
+    def get_addrs_src_isd_as_as_3(self) -> int:
+        Requires(Acc(self.addrs, 1/10))
+        Requires(Acc(self.addrs.src, 1/10))
+        Requires(Acc(self.addrs.src.isd_as, 1/10))
+        Requires(Acc(self.addrs.src.isd_as.State(), 1/10))
+        return Unfolding(Acc(self.addrs.src.isd_as.State(), 1/10), self.addrs.src.isd_as._as)
+
+    @Pure
     def get_addrs(self) -> Optional[SCIONAddrHdr]:
         Requires(Acc(self.State(), 1/10))
         return Unfolding(Acc(self.State(), 1/10), self.addrs)
@@ -368,6 +517,18 @@ class SCIONL4Packet(SCIONExtPacket):
     def get_path(self) -> Optional[SCIONPath]:
         Requires(Acc(self.State(), 1/10))
         return Unfolding(Acc(self.State(), 1/10), self.path)
+
+    @Pure
+    def get_addrs_total_len(self) -> Optional[int]:
+        Requires(Acc(self.State(), 1/10))
+        Requires(self.get_addrs() is not None)
+        return Unfolding(Acc(self.State(), 1/10), self.get_addrs_total_len_1())
+
+    @Pure
+    def get_addrs_total_len_1(self) -> Optional[int]:
+        Requires(Acc(self.addrs, 1/10))
+        Requires(Acc(self.addrs.State(), 1/10))
+        return Unfolding(Acc(self.addrs.State(), 1/10), self.addrs._total_len)
 
     @Pure
     def get_addrs_dst(self) -> Optional[SCIONAddr]:
@@ -433,6 +594,71 @@ class SCIONL4Packet(SCIONExtPacket):
         Requires(Acc(self.addrs.dst.host, 1/10))
         Requires(Acc(self.addrs.dst.host.State(), 1/10))
         return Unfolding(Acc(self.addrs.dst.host.State(), 1/10), self.addrs.dst.host.addr)
+
+    @Pure
+    def get_addrs_src(self) -> Optional[SCIONAddr]:
+        Requires(Acc(self.State(), 1/10))
+        Requires(self.get_addrs() is not None)
+        return Unfolding(Acc(self.State(), 1/10), self.get_addrs_src_1())
+
+    @Pure
+    def get_addrs_src_1(self) -> Optional[SCIONAddr]:
+        Requires(Acc(self.addrs, 1/10))
+        Requires(Acc(self.addrs.State(), 1/10))
+        return Unfolding(Acc(self.addrs.State(), 1/10), self.addrs.src)
+    
+    @Pure
+    def get_addrs_src_host(self) -> Optional[HostAddrBase]:
+        Requires(Acc(self.State(), 1/10))
+        Requires(self.get_addrs() is not None)
+        Requires(self.get_addrs_src() is not None)
+        return Unfolding(Acc(self.State(), 1/10), self.get_addrs_src_host_1())
+
+    @Pure
+    def get_addrs_src_host_1(self) -> Optional[HostAddrBase]:
+        Requires(Acc(self.addrs, 1/10))
+        Requires(Acc(self.addrs.State(), 1/10))
+        Requires(self.get_addrs_src_1() is not None)
+        return Unfolding(Acc(self.addrs.State(), 1/10), self.get_addrs_src_host_2())
+
+    @Pure
+    def get_addrs_src_host_2(self) -> Optional[HostAddrBase]:
+        Requires(Acc(self.addrs, 1/10))
+        Requires(Acc(self.addrs.src, 1/10))
+        Requires(Acc(self.addrs.src.State(), 1/10))
+        return Unfolding(Acc(self.addrs.src.State(), 1/10), self.addrs.src.host)
+
+    @Pure
+    def get_addrs_src_host_addr(self) -> Optional[bytes]:
+        Requires(Acc(self.State(), 1/10))
+        Requires(self.get_addrs() is not None)
+        Requires(self.get_addrs_src() is not None)
+        Requires(self.get_addrs_src_host() is not None)
+        return Unfolding(Acc(self.State(), 1 / 10), self.get_addrs_src_host_addr_1())
+
+    @Pure
+    def get_addrs_src_host_addr_1(self) -> Optional[bytes]:
+        Requires(Acc(self.addrs, 1/10))
+        Requires(Acc(self.addrs.State(), 1/10))
+        Requires(self.get_addrs_src_1() is not None)
+        Requires(self.get_addrs_src_host_1() is not None)
+        return Unfolding(Acc(self.addrs.State(), 1/10), self.get_addrs_src_host_addr_2())
+
+    @Pure
+    def get_addrs_src_host_addr_2(self) -> Optional[bytes]:
+        Requires(Acc(self.addrs, 1/10))
+        Requires(Acc(self.addrs.src, 1/10))
+        Requires(Acc(self.addrs.src.State(), 1/10))
+        Requires(self.get_addrs_src_host_2() is not None)
+        return Unfolding(Acc(self.addrs.src.State(), 1/10), self.get_addrs_src_host_addr_3())
+
+    @Pure
+    def get_addrs_src_host_addr_3(self) -> Optional[bytes]:
+        Requires(Acc(self.addrs, 1/10))
+        Requires(Acc(self.addrs.src, 1/10))
+        Requires(Acc(self.addrs.src.host, 1/10))
+        Requires(Acc(self.addrs.src.host.State(), 1/10))
+        return Unfolding(Acc(self.addrs.src.host.State(), 1/10), self.addrs.src.host.addr)
 
     @Pure
     def get_path_hof_idx(self) -> Optional[int]:
@@ -633,6 +859,12 @@ class SCIONL4Packet(SCIONExtPacket):
         Requires(self.get_path_hof_idx() is not None)
         # Ensures(Acc(self.State(), 1/10))
         return Unfolding(Acc(self.State(), 1/10), self.path.is_on_last_segment())
+
+    @Pure
+    def get_path_iof(self) -> Optional[InfoOpaqueField]:
+        Requires(Acc(self.State(), 1/10))
+        Requires(self.get_path() is not None)
+        return Unfolding(Acc(self.State(), 1/10), self.path.get_iof())
 
 
 @Pure

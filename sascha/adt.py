@@ -131,13 +131,15 @@ def map_ofs_list(ofs: OpaqueFieldList, iof_idx: int, iof: ADT_IOF) -> Sequence[A
         return res
     return map_ofs_list_rec(res, ofs, iof_idx + 1, iof_idx + iof.hops)
 
+@Pure
 def map_scion_packet_to_adt(pkt: SCIONL4Packet) -> ADT_Packet:
     Requires(Acc(pkt.State(), 1 / 10))
     Requires(pkt.get_path() is not None)
+    Requires(pkt.get_addrs() is not None)
     # Requires(pkt.get_path_iof_idx() is not None)
     Requires(Unfolding(Acc(pkt.State(), 1 / 10), pkt.path.get_iof_idx() is not None))
     Requires(pkt.get_path_hof_idx() is not None)
-    Ensures(Acc(pkt.State(), 1 / 10))
+    # Ensures(Acc(pkt.State(), 1 / 10))
     """
     Method to map a SCIONPacket to the ADT defined in this file
     :param packet: the packet to be mapped
@@ -146,45 +148,109 @@ def map_scion_packet_to_adt(pkt: SCIONL4Packet) -> ADT_Packet:
 
     iof_idx = pkt.get_path_iof_idx()
 
-    Unfold(Acc(pkt.State(), 1 / 10))
+    iof = pkt.get_path_iof()
 
-    iof = pkt.path.get_iof()
+    src_isd_as = ADT_ISD_AS(pkt.get_addrs_src_isd_as_isd(), pkt.get_addrs_src_isd_as_as())
+    dst_isd_as = ADT_ISD_AS(pkt.get_addrs_dst_isd_as_isd(), pkt.get_addrs_dst_isd_as_as())
 
-    Unfold(Acc(pkt.path.State(), 1 / 10))
-    Unfold(Acc(pkt.addrs.State(), 1 / 10))
-    Unfold(Acc(pkt.addrs.src.State(), 1 / 10))
-    Unfold(Acc(pkt.addrs.dst.State(), 1 / 10))
-    Unfold(Acc(pkt.addrs.src.host.State(), 1 / 10))
-    Unfold(Acc(pkt.addrs.dst.host.State(), 1 / 10))
-    Unfold(Acc(pkt.addrs.src.isd_as.State(), 1 / 10))
-    Unfold(Acc(pkt.addrs.dst.isd_as.State(), 1 / 10))
-
-    src_isd_as = ADT_ISD_AS(pkt.addrs.src.isd_as._isd, pkt.addrs.src.isd_as._as)
-    dst_isd_as = ADT_ISD_AS(pkt.addrs.dst.isd_as._isd, pkt.addrs.dst.isd_as._as)
-
-    src_host = ADT_HostAddrBase(pkt.addrs.src.host.TYPE, pkt.addrs.src.host.addr)
-    dst_host = ADT_HostAddrBase(pkt.addrs.dst.host.TYPE, pkt.addrs.dst.host.addr)
+    src_host = ADT_HostAddrBase(pkt.get_addrs_src_host().TYPE, pkt.get_addrs_src_host_addr())
+    dst_host = ADT_HostAddrBase(pkt.get_addrs_dst_host().TYPE, pkt.get_addrs_dst_host_addr())
 
     src = ADT_Address(src_isd_as, src_host)
     dst = ADT_Address(dst_isd_as, dst_host)
 
-    ofs = pkt.path._ofs
+    ofs = pkt.get_path_ofs()
 
-    # iof_adt = iof_to_adt(cast(InfoOpaqueField, pkt.path._ofs.get_by_idx(pkt.path._iof_idx)))
-    iof_adt = iof_to_adt(iof)
+    # iof_adt = iof_to_adt(iof)
+    iof_adt = call_iof_to_adt(pkt, iof)
     ofs_seq = map_ofs_list(ofs, iof_idx, iof_adt)
 
-    addrs = ADT_AddrHdr(src, dst, pkt.addrs._total_len)
-    path = ADT_Path(pkt.path.A_HOFS, pkt.path.B_HOFS, pkt.path.C_HOFS, iof_adt, ofs_seq, pkt.path._iof_idx, pkt.path._hof_idx)
-
-    Fold(Acc(pkt.addrs.src.isd_as.State(), 1 / 10))
-    Fold(Acc(pkt.addrs.dst.isd_as.State(), 1 / 10))
-    Fold(Acc(pkt.addrs.src.host.State(), 1 / 10))
-    Fold(Acc(pkt.addrs.dst.host.State(), 1 / 10))
-    Fold(Acc(pkt.addrs.src.State(), 1 / 10))
-    Fold(Acc(pkt.addrs.dst.State(), 1 / 10))
-    Fold(Acc(pkt.addrs.State(), 1 / 10))
-    Fold(Acc(pkt.path.State(), 1 / 10))
-    Fold(Acc(pkt.State(), 1 / 10))
+    addrs = ADT_AddrHdr(src, dst, pkt.get_addrs_total_len())
+    path = ADT_Path(pkt.get_path().A_HOFS, pkt.get_path().B_HOFS, pkt.get_path().C_HOFS, iof_adt, ofs_seq, pkt.get_path_iof_idx(), pkt.get_path_hof_idx())
 
     return ADT_Packet(addrs, path)
+
+
+
+"""
+start of performance helper functions
+"""
+
+@Pure
+def call_iof_to_adt(spkt: SCIONL4Packet, iof: InfoOpaqueField) -> ADT_IOF:
+    Requires(Acc(spkt.State(), 1/10))
+    Requires(spkt.get_path() is not None)
+    return Unfolding(Acc(spkt.State(), 1/10), call_iof_to_adt_1(spkt, iof))
+
+@Pure
+def call_iof_to_adt_1(spkt: SCIONL4Packet, iof: InfoOpaqueField) -> ADT_IOF:
+    Requires(Acc(spkt.path, 1 / 10))
+    Requires(Acc(spkt.path.State(), 1/10))
+    return Unfolding(Acc(spkt.path.State(), 1 / 10), call_iof_to_adt_2(spkt, iof))
+
+@Pure
+def call_iof_to_adt_2(spkt: SCIONL4Packet, iof: InfoOpaqueField) -> ADT_IOF:
+    Requires(Acc(spkt.path, 1 / 10))
+    Requires(Acc(spkt.path._ofs, 1/10))
+    Requires(Acc(spkt.path._ofs.State(), 1 / 10))
+    return Unfolding(Acc(spkt.path._ofs.State(), 1 / 10), iof_to_adt(iof))
+
+
+# @Pure
+# def map_scion_packet_to_adt(pkt: SCIONL4Packet) -> ADT_Packet:
+#     Requires(Acc(pkt.State(), 1 / 10))
+#     Requires(pkt.get_path() is not None)
+#     # Requires(pkt.get_path_iof_idx() is not None)
+#     Requires(Unfolding(Acc(pkt.State(), 1 / 10), pkt.path.get_iof_idx() is not None))
+#     Requires(pkt.get_path_hof_idx() is not None)
+#     # Ensures(Acc(pkt.State(), 1 / 10))
+#     """
+#     Method to map a SCIONPacket to the ADT defined in this file
+#     :param packet: the packet to be mapped
+#     :return: ADT containing the same information as the packet
+#     """
+#
+#     iof_idx = pkt.get_path_iof_idx()
+#
+#     Unfold(Acc(pkt.State(), 1 / 10))
+#
+#     iof = pkt.path.get_iof()
+#
+#     Unfold(Acc(pkt.path.State(), 1 / 10))
+#     Unfold(Acc(pkt.addrs.State(), 1 / 10))
+#     Unfold(Acc(pkt.addrs.src.State(), 1 / 10))
+#     Unfold(Acc(pkt.addrs.dst.State(), 1 / 10))
+#     Unfold(Acc(pkt.addrs.src.host.State(), 1 / 10))
+#     Unfold(Acc(pkt.addrs.dst.host.State(), 1 / 10))
+#     Unfold(Acc(pkt.addrs.src.isd_as.State(), 1 / 10))
+#     Unfold(Acc(pkt.addrs.dst.isd_as.State(), 1 / 10))
+#
+#     src_isd_as = ADT_ISD_AS(pkt.addrs.src.isd_as._isd, pkt.addrs.src.isd_as._as)
+#     dst_isd_as = ADT_ISD_AS(pkt.addrs.dst.isd_as._isd, pkt.addrs.dst.isd_as._as)
+#
+#     src_host = ADT_HostAddrBase(pkt.addrs.src.host.TYPE, pkt.addrs.src.host.addr)
+#     dst_host = ADT_HostAddrBase(pkt.addrs.dst.host.TYPE, pkt.addrs.dst.host.addr)
+#
+#     src = ADT_Address(src_isd_as, src_host)
+#     dst = ADT_Address(dst_isd_as, dst_host)
+#
+#     ofs = pkt.path._ofs
+#
+#     # iof_adt = iof_to_adt(cast(InfoOpaqueField, pkt.path._ofs.get_by_idx(pkt.path._iof_idx)))
+#     iof_adt = iof_to_adt(iof)
+#     ofs_seq = map_ofs_list(ofs, iof_idx, iof_adt)
+#
+#     addrs = ADT_AddrHdr(src, dst, pkt.addrs._total_len)
+#     path = ADT_Path(pkt.path.A_HOFS, pkt.path.B_HOFS, pkt.path.C_HOFS, iof_adt, ofs_seq, pkt.path._iof_idx, pkt.path._hof_idx)
+#
+#     Fold(Acc(pkt.addrs.src.isd_as.State(), 1 / 10))
+#     Fold(Acc(pkt.addrs.dst.isd_as.State(), 1 / 10))
+#     Fold(Acc(pkt.addrs.src.host.State(), 1 / 10))
+#     Fold(Acc(pkt.addrs.dst.host.State(), 1 / 10))
+#     Fold(Acc(pkt.addrs.src.State(), 1 / 10))
+#     Fold(Acc(pkt.addrs.dst.State(), 1 / 10))
+#     Fold(Acc(pkt.addrs.State(), 1 / 10))
+#     Fold(Acc(pkt.path.State(), 1 / 10))
+#     Fold(Acc(pkt.State(), 1 / 10))
+#
+#     return ADT_Packet(addrs, path)
