@@ -456,7 +456,7 @@ class SCIONL4Packet(SCIONExtPacket):
     def get_path_iof_idx_1(self) -> Optional[int]:
         Requires(Acc(self.path, 1/10))
         Requires(Acc(self.path.State(), 1/10))
-        return Unfolding(Acc(self.path.State(), 1 / 10), self.path._hof_idx)
+        return Unfolding(Acc(self.path.State(), 1 / 10), self.path._iof_idx)
 
     @Pure
     def get_path_ofs(self) -> OpaqueFieldList:
@@ -625,6 +625,12 @@ class SCIONL4Packet(SCIONExtPacket):
         Ensures(Result() == Unfolding(Acc(self.State(), 1/10), self.path.get_ofs_len()))
         Ensures(self.get_path() is not None)
         return Unfolding(Acc(self.State(), 1/10), self.path.get_ofs_len())
+
+    def path_call_is_on_last_segment(self) -> bool:
+        Requires(Acc(self.State(), 1/10))
+        Requires(self.get_path() is not None)
+        Ensures(Acc(self.State(), 1/10))
+        return Unfolding(Acc(self.State(), 1/10), self.path.is_on_last_segment())
 
 
 @Pure
