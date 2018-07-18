@@ -172,6 +172,7 @@ class Router(SCIONElement):
                 Acc(self._remote_sock) and Acc(self._udp_sock) and
                 Acc(self.of_gen_key) and
                 Acc(self.if_states) and dict_pred(self.if_states) and
+                Forall(self.if_states, lambda x: (self.if_states[x].State())) and
                 Acc(self.pre_ext_handlers) and
                 Acc(self.post_ext_handlers))
 
@@ -607,7 +608,7 @@ class Router(SCIONElement):
     def handle_data(self, t: Place, spkt: SCIONL4Packet, from_local_as: bool, drop_on_error: bool=False) -> Place:
         Requires(Acc(spkt.State()))
         Requires(Acc(self.State(), 1/2))
-        Requires(isinstance(self.get_topology_mtu(), int))
+        Requires(self.get_topology_mtu() is not None)
         Requires(spkt.get_path() is not None)
         Requires(spkt.get_addrs() is not None)
         Requires(spkt.get_addrs_dst() is not None)
@@ -686,7 +687,7 @@ class Router(SCIONElement):
         Requires(Acc(spkt.State()))
         Requires(Acc(self.State(), 1/2))
         # Requires(Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.topology.State(), 1/10), isinstance(self.topology.mtu, int))))
-        Requires(isinstance(self.get_topology_mtu(), int))
+        Requires(self.get_topology_mtu() is not None)
         Requires(spkt.get_path() is not None)
         Requires(spkt.get_addrs() is not None)
         Requires(spkt.get_addrs_dst() is not None)
@@ -724,7 +725,7 @@ class Router(SCIONElement):
                     Implies(path.get_hof_idx() < path.get_ofs_len() - 2,
                         isinstance(path.ofs_get_by_idx(path.get_hof_idx() + 2), HopOpaqueField))))
                  )
-        Requires(Unfolding(Acc(self.State(), 1 / 10), self.ifid2br.__contains__(spkt.get_path_fwd_if())))
+        # Requires(Unfolding(Acc(self.State(), 1 / 10), self.ifid2br.__contains__(spkt.get_path_fwd_if())))
         # Requires(Let(cast(InfoOpaqueField, spkt.path_ofs_get_by_idx(spkt.get_path_iof_idx())), bool,
         #             (lambda iof: not spkt.get_path_iof_peer(iof))))
         # Requires(Let(cast(HopOpaqueField, spkt.path_ofs_get_by_idx(spkt.get_path_hof_idx() + 1)), bool, lambda hof:
@@ -747,7 +748,8 @@ class Router(SCIONElement):
             #  raise SCMPOversizePkt("Packet larger than mtu", mtu)
             pass
         Unfold(Acc(spkt.State(), 1/4))
-        self.verify_hof(path, ingress=ingress)
+        # self.verify_hof(path, ingress=ingress)
+        self.verify_hof(spkt.path, ingress=ingress)
         hof = spkt.path.get_hof()
         Fold(Acc(spkt.State(), 1/4))
         if spkt.get_path_hof_verify_only(hof):
@@ -799,7 +801,8 @@ class Router(SCIONElement):
             logging.error("Cannot forward packet, fwd_if is invalid (%s):\n%s",
                           fwd_if, spkt)
             raise SCMPBadIF(fwd_if) from None
-        if not self.if_states[fwd_if].is_active:
+        # if not self.if_states[fwd_if].is_active:
+        if not self.get_if_states_elem_is_active(fwd_if):
             if drop_on_error:
                 logging.debug("IF is down, but drop_on_error is set, dropping")
                 # Fold(Acc(spkt.State(), 1 / 4))
@@ -1028,7 +1031,8 @@ class Router(SCIONElement):
     #     self.handle_request(meta.packet, meta.addr, meta.from_local_as)
 
     def handle_request(self, t: Place, packet: bytes, _: object, from_local_socket: bool = True, sock: object = None) -> Place:
-
+        Requires(Acc(self.State(), 1 / 2))
+        Requires(self.get_topology_mtu() is not None)
         """
         Main routine to handle incoming SCION packets.
 
@@ -1062,13 +1066,12 @@ class Router(SCIONElement):
                 log_exception("Error parsing payload:\n%s" % hex_str(packet))
                 return t
             handler = False  # self._get_handler(pkt)
-            assert False
         else:
             # It's a normal packet, just forward it.
             handler = True # self.handle_data
         logging.debug("handle_request (from_local_as? %s):"
                       "\n  %s\n  %s\n  handler: %s",
-                      from_local_as, pkt.cmn_hdr, pkt.addrs, handler)
+                      from_local_as, pkt.get_cmn_hdr(), pkt.get_addrs(), handler)
         if not handler:
             return t
         try:
@@ -1292,9 +1295,20 @@ class Router(SCIONElement):
     @ContractOnly
     def get_ifid2br_elem(self, fwd_if: int) -> RouterElement:
         Requires(Acc(self.State(), 1/10))
-        Requires(Unfolding(Acc(self.State(), 1/10), self.ifid2br.__contains__(fwd_if)))
+        # Requires(Unfolding(Acc(self.State(), 1/10), self.ifid2br.__contains__(fwd_if)))
         Ensures(Result() in self.get_topology_border_routers())
         return Unfolding(Acc(self.State(), 1/10), self.ifid2br[fwd_if])
+
+    @Pure
+    def get_if_states_elem_is_active(self, fwd_if: int) -> bool:
+        Requires(Acc(self.State(), 1 / 10))
+        Requires(Unfolding(Acc(self.State(), 1/10), self.if_states.__contains__(fwd_if)))
+        return Unfolding(Acc(self.State(), 1 / 10), self.get_if_states_elem_is_active_1(self.if_states[fwd_if]))
+
+    @Pure
+    def get_if_states_elem_is_active_1(self, if_state: InterfaceState) -> bool:
+        Requires(Acc(if_state.State(), 1 / 10))
+        return Unfolding(Acc(if_state.State(), 1 / 10), if_state.is_active)
 
     # @Pure
     # def get_ifid2br_elem_1(self, fwd_if: int) -> RouterElement:

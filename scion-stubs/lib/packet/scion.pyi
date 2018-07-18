@@ -293,26 +293,6 @@ class SCIONL4Packet(SCIONExtPacket):
         return (Acc(self.l4_hdr) and
                 Implies(self.l4_hdr is not None, self.l4_hdr.State()))
 
-    # @Predicate
-    # def IncPrecondition(self) -> bool:
-    #     return  (Let(self.path, bool, lambda path:
-    #             path.get_hof_idx() < path.get_ofs_len() - 1 and
-    #             Let(cast(HopOpaqueField, Unfolding(Acc(path.State(), 1/10), path._ofs.get_by_idx(path.get_hof_idx() + 1))), bool, lambda hof:
-    #                 not path.get_hof_verify_only(hof)) and
-    #             path.get_hof_idx() - path.get_iof_idx() < path.get_iof_hops(cast(InfoOpaqueField, path.ofs_get_by_idx(path.get_iof_idx()))) and
-    #             Let(cast(InfoOpaqueField, path.ofs_get_by_idx(path.get_iof_idx())), bool, lambda iof:
-    #                     Implies((Let(cast(HopOpaqueField, path.ofs_get_by_idx(path.get_hof_idx() + 1)), bool, lambda hof:
-    #                                 not path.get_hof_xover(hof) or
-    #                                 path.get_iof_shortcut(iof)
-    #                                 ) and
-    #                                 (path.get_hof_idx() != path.get_iof_idx() + path.get_iof_hops(iof))),
-    #                             path.get_hof_idx() + 2 < path.get_ofs_len() and
-    #                             isinstance(path.ofs_get_by_idx(path.get_hof_idx() + 2), HopOpaqueField) and
-    #                             path.ofs_get_by_idx(path.get_hof_idx() + 2) is not path.ofs_get_by_idx(path.get_hof_idx() + 1)
-    #                             )
-    #                 ) and
-    #             Implies(path.get_hof_idx() < path.get_ofs_len() - 2, isinstance(path.ofs_get_by_idx(path.get_hof_idx() + 2), HopOpaqueField))))
-
     def update(self) -> None:
         ...
 
@@ -512,6 +492,11 @@ class SCIONL4Packet(SCIONExtPacket):
     def get_addrs(self) -> Optional[SCIONAddrHdr]:
         Requires(Acc(self.State(), 1/10))
         return Unfolding(Acc(self.State(), 1/10), self.addrs)
+
+    @Pure
+    def get_cmn_hdr(self) -> Optional[SCIONCommonHdr]:
+        Requires(Acc(self.State(), 1/10))
+        return Unfolding(Acc(self.State(), 1/10), self.cmn_hdr)
 
     @Pure
     def get_path(self) -> Optional[SCIONPath]:
@@ -869,6 +854,12 @@ class SCIONL4Packet(SCIONExtPacket):
     @Pure
     def get_path_fwd_if(self) -> int:
         Requires(Acc(self.State(), 1/10))
+        Requires(self.get_path() is not None)
+        Requires(self.get_path_iof_idx() is not None)
+        Requires(self.get_path_hof_idx() is not None)
+        Ensures(self.get_path() is not None)
+        Ensures(self.get_path_iof_idx() is not None)
+        Ensures(self.get_path_hof_idx() is not None)
         return Unfolding(Acc(self.State(), 1/10), self.path.get_fwd_if())
 
 

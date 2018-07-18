@@ -289,10 +289,28 @@ class SCIONElement(object):
     #         #               scmp.type, scmp_type_name(scmp.type), pkt)
     #     return None
 
-    def _parse_packet(self, packet: bytes) -> SCIONL4Packet:
+    @ContractOnly
+    def _parse_packet(self, packet: bytes) -> Optional[SCIONL4Packet]:
         # Ensures(Result() is not None) # assuming well formed packet, not necessary, just return packet type for sure
-        Ensures(Acc(Result().State()))
-        Ensures(Unfolding(Result().State(), len(Result().ext_hdrs) == 0))
+        # Ensures(Acc(Result().State()))
+        Ensures(Result().get_ext_hdrs_len() == 0)
+        Ensures(Result().get_addrs() is not None)
+        Ensures(Result().get_path() is not None)
+        Ensures(Result().get_addrs() is not None)
+        Ensures(Result().get_addrs_dst() is not None)
+        Ensures(Result().get_path_iof_idx() is not None)
+        Ensures(Result().get_path_hof_idx() is not None)
+        Ensures(Result().get_addrs_dst_host() is not None)
+        Ensures(Implies(is_wellformed_packet(packet),   Result() is not None and
+                                                        Result().State() and
+                                                        Result().get_ext_hdrs_len() == 0 and
+                                                        Result().get_addrs() is not None and
+                                                        Result().get_path() is not None and
+                                                        Result().get_addrs() is not None and
+                                                        Result().get_addrs_dst() is not None and
+                                                        Result().get_path_iof_idx() is not None and
+                                                        Result().get_path_hof_idx() is not None and
+                                                        Result().get_addrs_dst_host() is not None))
         # Ensures(Implies(is_wellformed_packet(packet), Result() is not None and
         #                                               Result().State() and
         #                                               Result().matches(packet)))
