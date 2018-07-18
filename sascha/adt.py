@@ -1,7 +1,8 @@
 from typing import NamedTuple, cast, Optional
 
 from nagini_contracts.adt import ADT
-from nagini_contracts.contracts import Sequence, Requires, Acc, Pure, Ensures, Invariant, Unfolding, Unfold, Fold
+from nagini_contracts.contracts import Sequence, Requires, Acc, Pure, Ensures, Invariant, Unfolding, Unfold, Fold, \
+    Implies, Result, Let
 from nagini_contracts.obligations import MustTerminate
 
 from lib.packet.opaque_field import OpaqueFieldList, InfoOpaqueField, HopOpaqueField
@@ -51,7 +52,7 @@ class ADT_Address(ADT_base, NamedTuple('ADT_Address', [('isd_as', ADT_ISD_AS), (
     pass
 
 
-class ADT_AddrHdr(ADT_base, NamedTuple('ADT_AddrHdr', [('src', ADT_Address), ('dst', ADT_Address), ('total_len', int)])):
+class ADT_AddrHdr(ADT_base, NamedTuple('ADT_AddrHdr', [('src', ADT_Address), ('dst', ADT_Address), ('total_len', Optional[int])])):
     """
     Constructor for ADT_AddrHdr
     """
@@ -76,6 +77,8 @@ class ADT_Packet(ADT_base, NamedTuple('ADT_Packet', [('addrs', ADT_AddrHdr), ('p
 @Pure
 def iof_to_adt(iof: InfoOpaqueField) -> ADT_IOF:
     Requires(Acc(iof.State(), 1/10))
+    Ensures(Result().hops == iof.get_hops())
+    # Ensures(Implies(iof.get_hops() >= 0, Result().hops >= 0))
     """
     Method to map a InfoOpaqueField to an ADT
     :param iof: the original IOF
@@ -136,10 +139,17 @@ def map_scion_packet_to_adt(pkt: SCIONL4Packet) -> ADT_Packet:
     Requires(Acc(pkt.State(), 1 / 10))
     Requires(pkt.get_path() is not None)
     Requires(pkt.get_addrs() is not None)
-    # Requires(pkt.get_path_iof_idx() is not None)
-    Requires(Unfolding(Acc(pkt.State(), 1 / 10), pkt.path.get_iof_idx() is not None))
+    Requires(pkt.get_addrs_src() is not None)
+    Requires(pkt.get_addrs_dst() is not None)
+    Requires(pkt.get_addrs_src_isd_as() is not None)
+    Requires(pkt.get_addrs_dst_isd_as() is not None)
+    Requires(pkt.get_addrs_src_host() is not None)
+    Requires(pkt.get_addrs_dst_host() is not None)
+    # Requires(Unfolding(Acc(pkt.State(), 1 / 10), pkt.path.get_iof_idx() is not None))
+    Requires(pkt.get_path_iof_idx() is not None)
     Requires(pkt.get_path_hof_idx() is not None)
-    # Ensures(Acc(pkt.State(), 1 / 10))
+    Requires(Let(cast(InfoOpaqueField, Unfolding(Acc(pkt.State(), 1/10), Unfolding(Acc(pkt.path.State(), 1/10), pkt.path._ofs.get_by_idx(pkt.path._iof_idx)))), bool, lambda iof:
+                 pkt.get_path_iof_hops(iof) >= 0 and pkt.get_path_iof_idx() + pkt.get_path_iof_hops(iof) < pkt.get_path_ofs_len()))
     """
     Method to map a SCIONPacket to the ADT defined in this file
     :param packet: the packet to be mapped
@@ -159,11 +169,10 @@ def map_scion_packet_to_adt(pkt: SCIONL4Packet) -> ADT_Packet:
     src = ADT_Address(src_isd_as, src_host)
     dst = ADT_Address(dst_isd_as, dst_host)
 
-    ofs = pkt.get_path_ofs()
+    # ofs = pkt.get_path_ofs()
 
-    # iof_adt = iof_to_adt(iof)
     iof_adt = call_iof_to_adt(pkt, iof)
-    ofs_seq = map_ofs_list(ofs, iof_idx, iof_adt)
+    ofs_seq = call_map_ofs_list(pkt, iof_idx, iof_adt)
 
     addrs = ADT_AddrHdr(src, dst, pkt.get_addrs_total_len())
     path = ADT_Path(pkt.get_path().A_HOFS, pkt.get_path().B_HOFS, pkt.get_path().C_HOFS, iof_adt, ofs_seq, pkt.get_path_iof_idx(), pkt.get_path_hof_idx())
@@ -171,32 +180,58 @@ def map_scion_packet_to_adt(pkt: SCIONL4Packet) -> ADT_Packet:
     return ADT_Packet(addrs, path)
 
 
-
 """
 start of performance helper functions
 """
 
-@Pure
-def call_iof_to_adt(spkt: SCIONL4Packet, iof: InfoOpaqueField) -> ADT_IOF:
-    Requires(Acc(spkt.State(), 1/10))
-    Requires(spkt.get_path() is not None)
-    return Unfolding(Acc(spkt.State(), 1/10), call_iof_to_adt_1(spkt, iof))
 
 @Pure
-def call_iof_to_adt_1(spkt: SCIONL4Packet, iof: InfoOpaqueField) -> ADT_IOF:
-    Requires(Acc(spkt.path, 1 / 10))
-    Requires(Acc(spkt.path.State(), 1/10))
-    return Unfolding(Acc(spkt.path.State(), 1 / 10), call_iof_to_adt_2(spkt, iof))
+def call_iof_to_adt(pkt: SCIONL4Packet, iof: InfoOpaqueField) -> ADT_IOF:
+    Requires(Acc(pkt.State(), 1/10))
+    Requires(pkt.get_path() is not None)
+    Requires(iof in pkt.get_path_ofs_contents())
+    return Unfolding(Acc(pkt.State(), 1/10), call_iof_to_adt_1(pkt, iof))
+
 
 @Pure
-def call_iof_to_adt_2(spkt: SCIONL4Packet, iof: InfoOpaqueField) -> ADT_IOF:
-    Requires(Acc(spkt.path, 1 / 10))
-    Requires(Acc(spkt.path._ofs, 1/10))
-    Requires(Acc(spkt.path._ofs.State(), 1 / 10))
-    return Unfolding(Acc(spkt.path._ofs.State(), 1 / 10), iof_to_adt(iof))
+def call_iof_to_adt_1(pkt: SCIONL4Packet, iof: InfoOpaqueField) -> ADT_IOF:
+    Requires(Acc(pkt.path, 1 / 10))
+    Requires(Acc(pkt.path.State(), 1/10))
+    Requires(iof in pkt.get_path_ofs_contents_1())
+    return Unfolding(Acc(pkt.path.State(), 1 / 10), call_iof_to_adt_2(pkt, iof))
 
 
-# @Pure
+@Pure
+def call_iof_to_adt_2(pkt: SCIONL4Packet, iof: InfoOpaqueField) -> ADT_IOF:
+    Requires(Acc(pkt.path, 1 / 10))
+    Requires(Acc(pkt.path._ofs, 1/10))
+    Requires(Acc(pkt.path._ofs.State(), 1 / 10))
+    Requires(iof in pkt.get_path_ofs_contents_2())
+    return Unfolding(Acc(pkt.path._ofs.State(), 1 / 10), iof_to_adt(iof))
+
+
+@Pure
+def call_map_ofs_list(pkt: SCIONL4Packet, iof_idx: int, iof_adt: ADT_IOF) -> Sequence[ADT_HOF]:
+    Requires(Acc(pkt.State(), 1/10))
+    Requires(pkt.get_path() is not None)
+    Requires(iof_adt.hops >= 0)
+    Requires(iof_idx >= 0)
+    Requires(iof_idx + iof_adt.hops < pkt.get_path_ofs_len())
+    return Unfolding(Acc(pkt.State(), 1 / 10), call_map_ofs_list_1(pkt, iof_idx, iof_adt))
+
+
+@Pure
+def call_map_ofs_list_1(pkt: SCIONL4Packet, iof_idx: int, iof_adt: ADT_IOF) -> Sequence[ADT_HOF]:
+    Requires(Acc(pkt.path, 1/10))
+    Requires(pkt.path is not None)
+    Requires(Acc(pkt.path.State(), 1 / 10))
+    Requires(iof_adt.hops >= 0)
+    Requires(iof_idx >= 0)
+    Requires(iof_idx + iof_adt.hops < pkt.path.get_ofs_len())
+    return Unfolding(Acc(pkt.path.State(), 1 / 10), map_ofs_list(pkt.path._ofs, iof_idx, iof_adt))
+
+
+    # @Pure
 # def map_scion_packet_to_adt(pkt: SCIONL4Packet) -> ADT_Packet:
 #     Requires(Acc(pkt.State(), 1 / 10))
 #     Requires(pkt.get_path() is not None)

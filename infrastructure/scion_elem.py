@@ -798,4 +798,7 @@ class SCIONElement(object):
 
     @Predicate
     def State(self) -> bool:
-        return Acc(self.addr) and Acc(self.addr.State()) and Acc(self.topology) and Acc(self.topology.State())
+        return (Acc(self.addr) and Acc(self.addr.State()) and
+                Acc(self.topology) and Acc(self.topology.State()) and
+                Acc(self.ifid2br) and dict_pred(self.ifid2br) and
+                Forall(self.ifid2br, lambda x: (self.ifid2br[x] in self.topology.get_border_routers(), [[self.ifid2br[x] in self.topology.get_border_routers()]])))

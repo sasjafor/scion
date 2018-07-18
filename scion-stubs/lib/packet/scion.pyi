@@ -866,6 +866,11 @@ class SCIONL4Packet(SCIONExtPacket):
         Requires(self.get_path() is not None)
         return Unfolding(Acc(self.State(), 1/10), self.path.get_iof())
 
+    @Pure
+    def get_path_fwd_if(self) -> int:
+        Requires(Acc(self.State(), 1/10))
+        return Unfolding(Acc(self.State(), 1/10), self.path.get_fwd_if())
+
 
 @Pure
 @ContractOnly

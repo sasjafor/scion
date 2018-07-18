@@ -224,6 +224,7 @@ class SCIONPath(Serializable, Sized):
         Ensures(Acc(self.State()))
         Ensures(self.get_iof_idx() is not None)
         Ensures(self.get_hof_idx() is not None)
+        Ensures(self.get_ofs_contents() == Old(self.get_ofs_contents()))
         """
         Increment the HOF idx to next routing HOF.
 
