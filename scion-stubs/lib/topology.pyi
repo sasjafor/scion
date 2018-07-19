@@ -18,6 +18,19 @@ class Element(object):
                 Acc(self.port) and
                 Acc(self.name))
 
+    """
+    Start of performance helper functions
+    """
+    
+    @Pure
+    def get_addr(self) -> Optional[HostAddrBase]:
+        Requires(Acc(self.State(), 1/10))
+        return Unfolding(Acc(self.State(), 1/10), self.addr)
+    
+    @Pure
+    def get_port(self) -> Optional[int]:
+        Requires(Acc(self.State(), 1/10))
+        return Unfolding(Acc(self.State(), 1/10), self.port)
 
 class Topology(object):
     def __init__(self) -> None:  # pragma: no cover
@@ -48,7 +61,9 @@ class Topology(object):
                 Forall(self.child_border_routers, lambda x: (x in self.border_routers())) and
                 Forall(self.peer_border_routers, lambda x: (x in self.border_routers())) and
                 Forall(self.routing_border_routers, lambda x: (x in self.border_routers())) and
-                Forall(self.border_routers(), lambda e: (e.State())))
+                Forall(self.border_routers(), lambda e: (e.State())) and
+                Forall(self.border_routers(), lambda e: (e.get_addr() is not None)) and
+                Forall(self.border_routers(), lambda e: (e.get_port() is not None)))
 
     @Pure
     @ContractOnly

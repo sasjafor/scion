@@ -247,7 +247,3 @@ class Topology(object):
         else:
             logging.critical("Could not find server: %s", server_id)
             raise SCIONKeyError from None
-
-    def State(self):
-        # TODO
-        pass

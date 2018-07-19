@@ -86,6 +86,7 @@ from lib.packet.scmp.errors import (
 )
 from lib.packet.scmp.types import SCMPClass
 # from lib.packet.scmp.util import scmp_type_name
+from lib.packet.svc import SVC_TO_SERVICE
 from lib.socket import ReliableSocket, SocketMgr, TCPSocketWrapper
 from lib.tcp.socket import SCIONTCPSocket, SockOpt
 from lib.thread import thread_safety_net, kill_self
@@ -94,7 +95,7 @@ from lib.types import AddrType, L4Proto, PayloadClass
 from lib.topology import Topology
 from lib.util import hex_str, Raw
 
-from typing import Optional, Tuple, Callable, Dict, Type, List
+from typing import Optional, Tuple, Callable, Dict, Type, List, cast
 from lib.packet.scion import SCIONExtPacket
 from lib.topology import RouterElement
 
@@ -291,16 +292,17 @@ class SCIONElement(object):
 
     @ContractOnly
     def _parse_packet(self, packet: bytes) -> Optional[SCIONL4Packet]:
+        Requires(dict_pred(SVC_TO_SERVICE))
         # Ensures(Result() is not None) # assuming well formed packet, not necessary, just return packet type for sure
         # Ensures(Acc(Result().State()))
-        Ensures(Result().get_ext_hdrs_len() == 0)
-        Ensures(Result().get_addrs() is not None)
-        Ensures(Result().get_path() is not None)
-        Ensures(Result().get_addrs() is not None)
-        Ensures(Result().get_addrs_dst() is not None)
-        Ensures(Result().get_path_iof_idx() is not None)
-        Ensures(Result().get_path_hof_idx() is not None)
-        Ensures(Result().get_addrs_dst_host() is not None)
+        # Ensures(Result().get_ext_hdrs_len() == 0)
+        # Ensures(Result().get_addrs() is not None)
+        # Ensures(Result().get_path() is not None)
+        # Ensures(Result().get_addrs() is not None)
+        # Ensures(Result().get_addrs_dst() is not None)
+        # Ensures(Result().get_path_iof_idx() is not None)
+        # Ensures(Result().get_path_hof_idx() is not None)
+        # Ensures(Result().get_addrs_dst_host() is not None)
         Ensures(Implies(is_wellformed_packet(packet),   Result() is not None and
                                                         Result().State() and
                                                         Result().get_ext_hdrs_len() == 0 and
@@ -310,7 +312,9 @@ class SCIONElement(object):
                                                         Result().get_addrs_dst() is not None and
                                                         Result().get_path_iof_idx() is not None and
                                                         Result().get_path_hof_idx() is not None and
-                                                        Result().get_addrs_dst_host() is not None))
+                                                        Result().get_addrs_dst_host() is not None) and
+                                                        dict_pred(SVC_TO_SERVICE) and
+                                                        SVC_TO_SERVICE.__contains__(cast(SCIONL4Packet, Result()).get_addrs_dst_host_addr()))
         # Ensures(Implies(is_wellformed_packet(packet), Result() is not None and
         #                                               Result().State() and
         #                                               Result().matches(packet)))
