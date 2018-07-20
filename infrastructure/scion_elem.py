@@ -59,6 +59,7 @@ from lib.msg_meta import (
 )
 from lib.packet.ext.one_hop_path import OneHopPathExt
 from lib.packet.host_addr import HostAddrNone, HostAddrBase
+from lib.packet.opaque_field import HopOpaqueField, InfoOpaqueField
 from lib.packet.packet_base import PayloadRaw
 from lib.packet.path import SCIONPath
 from lib.packet.scion import (
@@ -312,9 +313,31 @@ class SCIONElement(object):
                                                         Result().get_addrs_dst() is not None and
                                                         Result().get_path_iof_idx() is not None and
                                                         Result().get_path_hof_idx() is not None and
-                                                        Result().get_addrs_dst_host() is not None) and
+                                                        Result().get_addrs_dst_host() is not None and
                                                         dict_pred(SVC_TO_SERVICE) and
-                                                        SVC_TO_SERVICE.__contains__(cast(SCIONL4Packet, Result()).get_addrs_dst_host_addr()))
+                                                        SVC_TO_SERVICE.__contains__(cast(SCIONL4Packet, Result()).get_addrs_dst_host_addr()) and
+                                                        (Unfolding(Acc(cast(SCIONL4Packet, Result()).State(), 1 / 10), Let(cast(SCIONL4Packet, Result()).path, bool, lambda path:
+                                                            path.get_hof_idx() < path.get_ofs_len() - 1 and
+                                                            Let(cast(HopOpaqueField, Unfolding(Acc(path.State(), 1 / 10), path._ofs.get_by_idx(path._hof_idx + 1))), bool, lambda hof:
+                                                                not path.get_hof_verify_only(hof)) and
+                                                            path.get_hof_idx() - path.get_iof_idx() < path.get_iof_hops(cast(InfoOpaqueField, path.ofs_get_by_idx(path.get_iof_idx()))) and
+                                                            Let(cast(InfoOpaqueField, path.ofs_get_by_idx(path.get_iof_idx())), bool, lambda iof:
+                                                                Implies(
+                                                                    (Let(cast(HopOpaqueField, path.ofs_get_by_idx(path.get_hof_idx() + 1)), bool, lambda hof:
+                                                                        not path.get_hof_xover(hof) or
+                                                                        path.get_iof_shortcut(iof)
+                                                                    ) and
+                                                                    (path.get_hof_idx() != path.get_iof_idx() + path.get_iof_hops(iof))),
+                                                                    path.get_hof_idx() + 2 < path.get_ofs_len() and
+                                                                    isinstance(path.ofs_get_by_idx(path.get_hof_idx() + 2), HopOpaqueField) and
+                                                                    path.ofs_get_by_idx(path.get_hof_idx() + 2) is not path.ofs_get_by_idx(path.get_hof_idx() + 1)
+                                                                )
+                                                            ) and
+                                                        Implies(path.get_hof_idx() < path.get_ofs_len() - 2,
+                                                            isinstance(path.ofs_get_by_idx(path.get_hof_idx() + 2), HopOpaqueField))))
+                                                        )
+                        )
+                )
         # Ensures(Implies(is_wellformed_packet(packet), Result() is not None and
         #                                               Result().State() and
         #                                               Result().matches(packet)))
@@ -461,23 +484,23 @@ class SCIONElement(object):
     #     return SCIONL4Packet.from_values(
     #         cmn_hdr, addr_hdr, path, ext_hdrs, udp_hdr, payload)
 
-    def send(self, t: Place, packet: SCIONL4Packet, dst: HostAddrBase, dst_port: int) -> Place:
-        """
-        Send *packet* to *dst* (to port *dst_port*) using the local socket.
-        Calling ``packet.pack()`` should return :class:`bytes`, and
-        ``dst.__str__()`` should return a string representing an IP address.
-
-        :param packet: the packet to be sent to the destination.
-        :param str dst: the destination IP address.
-        :param int dst_port: the destination port number.
-        """
-        # assert not isinstance(packet.addrs.src.host, HostAddrNone)
-        # assert not isinstance(packet.addrs.dst.host, HostAddrNone)
-        # assert isinstance(packet, SCIONBasePacket)
-        # assert isinstance(dst_port, int), dst_port
-        # if not self._udp_sock:
-        #     return False
-        # return self._udp_sock.send(packet.pack(), (dst, dst_port))
+    # def send(self, t: Place, packet: SCIONL4Packet, dst: HostAddrBase, dst_port: int) -> Place:
+    #     """
+    #     Send *packet* to *dst* (to port *dst_port*) using the local socket.
+    #     Calling ``packet.pack()`` should return :class:`bytes`, and
+    #     ``dst.__str__()`` should return a string representing an IP address.
+    #
+    #     :param packet: the packet to be sent to the destination.
+    #     :param str dst: the destination IP address.
+    #     :param int dst_port: the destination port number.
+    #     """
+    #     # assert not isinstance(packet.addrs.src.host, HostAddrNone)
+    #     # assert not isinstance(packet.addrs.dst.host, HostAddrNone)
+    #     # assert isinstance(packet, SCIONBasePacket)
+    #     # assert isinstance(dst_port, int), dst_port
+    #     # if not self._udp_sock:
+    #     #     return False
+    #     # return self._udp_sock.send(packet.pack(), (dst, dst_port))
 
     # def send_meta(self, msg, meta, next_hop_port=None):
     #     assert isinstance(meta, MetadataBase)
