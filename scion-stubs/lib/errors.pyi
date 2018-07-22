@@ -1,4 +1,6 @@
-from nagini_contracts.contracts import Requires
+from typing import Tuple
+
+from nagini_contracts.contracts import Requires, Ensures, Acc
 from nagini_contracts.obligations import MustTerminate
 
 
@@ -10,7 +12,8 @@ class SCIONBaseException(Exception):
     """
     def __init__(self, *args: object) -> None:
         Requires(MustTerminate(1))
-        self.args_ = args
+        Ensures(Acc(self.args_))
+        self.args_ = args # type: Tuple[object, ...]
 
 
 class SCIONBaseError(SCIONBaseException):

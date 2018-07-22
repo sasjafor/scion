@@ -294,7 +294,7 @@ class SCIONElement(object):
     @ContractOnly
     def _parse_packet(self, packet: bytes) -> Optional[SCIONL4Packet]:
         Requires(dict_pred(SVC_TO_SERVICE))
-        # Ensures(Result() is not None) # assuming well formed packet, not necessary, just return packet type for sure
+        # Ensures(Result() is not None)
         # Ensures(Acc(Result().State()))
         # Ensures(Result().get_ext_hdrs_len() == 0)
         # Ensures(Result().get_addrs() is not None)
@@ -304,6 +304,7 @@ class SCIONElement(object):
         # Ensures(Result().get_path_iof_idx() is not None)
         # Ensures(Result().get_path_hof_idx() is not None)
         # Ensures(Result().get_addrs_dst_host() is not None)
+        Ensures(dict_pred(SVC_TO_SERVICE))
         Ensures(Implies(is_wellformed_packet(packet),   Result() is not None and
                                                         Result().State() and
                                                         Result().get_ext_hdrs_len() == 0 and
@@ -314,7 +315,6 @@ class SCIONElement(object):
                                                         Result().get_path_iof_idx() is not None and
                                                         Result().get_path_hof_idx() is not None and
                                                         Result().get_addrs_dst_host() is not None and
-                                                        dict_pred(SVC_TO_SERVICE) and
                                                         SVC_TO_SERVICE.__contains__(cast(SCIONL4Packet, Result()).get_addrs_dst_host_addr()) and
                                                         (Unfolding(Acc(cast(SCIONL4Packet, Result()).State(), 1 / 10), Let(cast(SCIONL4Packet, Result()).path, bool, lambda path:
                                                             path.get_hof_idx() < path.get_ofs_len() - 1 and

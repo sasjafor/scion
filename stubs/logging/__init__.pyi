@@ -12,7 +12,9 @@ def debug(msg: str, *args: object) -> None:
     Requires(MustTerminate(1))
     ...
 
-def info(msg: str, *args: object) -> None: ...
+def info(msg: str, *args: object) -> None:
+    Requires(MustTerminate(1))
+    ...
 
 
 CRITICAL = 50
