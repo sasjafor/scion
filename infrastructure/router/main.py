@@ -1387,11 +1387,11 @@ class Router(SCIONElement):
         return Unfolding(Acc(self.State(), 1/10), self.ifid2br[fwd_if])
 
     @Pure
-    @ContractOnly
+    # @ContractOnly
     def get_if_states_elem_is_active(self, fwd_if: int) -> bool:
         Requires(Acc(self.State(), 1 / 10))
-        # Requires(Unfolding(Acc(self.State(), 1/10), self.if_states.__contains__(fwd_if)))
-        return Unfolding(Acc(self.State(), 1 / 10), self.get_if_states_elem_is_active_1(self.if_states[fwd_if]))
+        Requires(Unfolding(Acc(self.State(), 1/10), self.if_states.__contains__(fwd_if)))
+        return Unfolding(Acc(self.State(), 1 / 10), self.get_if_states_elem_is_active_1(cast(InterfaceState, self.if_states[fwd_if])))
 
     @Pure
     def get_if_states_elem_is_active_1(self, if_state: InterfaceState) -> bool:

@@ -263,6 +263,7 @@ class SCIONPath(Serializable, Sized):
                     )
                 )
             Invariant(Implies(self.get_hof_idx() < self.get_ofs_len() - 2, isinstance(self.ofs_get_by_idx(self.get_hof_idx() + 2), HopOpaqueField)))
+            Invariant(self.get_ofs_contents() is Old(self.get_ofs_contents()))
             Invariant(MustTerminate(1))
             Unfold(self.State())
             self._hof_idx += 1
