@@ -342,9 +342,12 @@ class SCIONElement(object):
                             Implies(path.get_hof_idx() < path.get_ofs_len() - 2,
                                 isinstance(path.ofs_get_by_idx(path.get_hof_idx() + 2), HopOpaqueField))))
                         ) and
-                        Let(cast(InfoOpaqueField, Unfolding(Acc(Result().State(), 1 / 10), Unfolding(Acc(Result().path.State(), 1 / 10), Result().path._ofs.get_by_idx(Result().path._iof_idx)))), bool, lambda iof:
-                            Result().get_path_iof_hops(iof) >= 0 and
-                            Result().get_path_iof_idx() + Result().get_path_iof_hops(iof) < Result().get_path_ofs_len()) and
+                        Let(cast(InfoOpaqueField, Unfolding(Acc(cast(SCIONL4Packet, Result()).State(), 1 / 10),
+                                                            Unfolding(Acc(cast(SCIONL4Packet, Result()).path.State(), 1 / 10),
+                                                                      cast(SCIONL4Packet, Result()).path._ofs.get_by_idx(
+                                                                          cast(SCIONL4Packet, Result()).path._iof_idx)))), bool, lambda iof:
+                            cast(SCIONL4Packet, Result()).get_path_iof_hops(iof) >= 0 and
+                            cast(SCIONL4Packet, Result()).get_path_iof_idx() + cast(SCIONL4Packet, Result()).get_path_iof_hops(iof) < cast(SCIONL4Packet, Result()).get_path_ofs_len()) and
                         map_scion_packet_to_adt(Result()) == self.bytes_to_adt(packet)
                         )
                 )
