@@ -536,12 +536,17 @@ class Router(SCIONElement):
             Requires(spkt.get_path_hof_idx() is not None),
             Requires(spkt.get_ext_hdrs_len() == 0),
             Requires(MustTerminate(4)),
+            # Requires(token(t)),
+            # Requires(Implies(not (not force and spkt.get_addrs_dst_isd_as() != self.get_addr_isd_as()) and
+            #                  not (spkt.get_path_len() and ((not force and spkt.get_path_hof_forward_only(spkt.get_path_hof())) or
+            #                                                 spkt.get_path_hof_verify_only(spkt.get_path_hof()))),
+            #             udp_send(t, packed(spkt), str(spkt.get_addrs_dst_host()), SCION_UDP_EH_DATA_PORT, t2))),
             Ensures(Acc(spkt.State(), 1/9)),
             Ensures(Acc(self.State(), 1/9)),
             Ensures(dict_pred(SVC_TO_SERVICE)),
             Exsures(SCIONBaseError, Acc(spkt.State(), 1/9)),
             Exsures(SCIONBaseError, Acc(self.State(), 1/9)),
-            Exsures(SCIONBaseException, dict_pred(SVC_TO_SERVICE))
+            Exsures(SCIONBaseError, dict_pred(SVC_TO_SERVICE))
         ))
         """
         Forwards the packet to the end destination within the current AS.
@@ -551,7 +556,10 @@ class Router(SCIONElement):
             If set, allow packets to be delivered locally that would otherwise
             be disallowed.
         """
-        if not force and spkt.get_addrs_dst_isd_as() != self.get_addr_isd_as():
+        # if not force and spkt.get_addrs_dst_isd_as() != self.get_addr_isd_as():
+        spkt_isd_as = spkt.get_addrs_dst_isd_as()
+        self_isd_as = self.get_addr_isd_as()
+        if not force and not ((spkt_isd_as is None and self_isd_as is None) or (spkt_isd_as is not None and self.eq_isd_as(spkt))):
             logging.error("Tried to deliver a non-local packet:\n%s", spkt)
             raise SCMPDeliveryNonLocal
         if spkt.get_path_len():

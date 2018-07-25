@@ -307,7 +307,8 @@ class SCIONElement(object):
         # Ensures(Result().get_path_hof_idx() is not None)
         # Ensures(Result().get_addrs_dst_host() is not None)
         Ensures(dict_pred(SVC_TO_SERVICE))
-        Ensures(Implies(is_wellformed_packet(packet), Result() is not None and
+        Ensures(Implies(is_wellformed_packet(packet),
+                        Result() is not None and
                         Result().State() and
                         Result().get_ext_hdrs_len() == 0 and
                         Result().get_addrs() is not None and
@@ -340,8 +341,11 @@ class SCIONElement(object):
                             ) and
                             Implies(path.get_hof_idx() < path.get_ofs_len() - 2,
                                 isinstance(path.ofs_get_by_idx(path.get_hof_idx() + 2), HopOpaqueField))))
-                            ) and
-                            map_scion_packet_to_adt(Result()) == self.bytes_to_adt(packet)
+                        ) and
+                        Let(cast(InfoOpaqueField, Unfolding(Acc(Result().State(), 1 / 10), Unfolding(Acc(Result().path.State(), 1 / 10), Result().path._ofs.get_by_idx(Result().path._iof_idx)))), bool, lambda iof:
+                            Result().get_path_iof_hops(iof) >= 0 and
+                            Result().get_path_iof_idx() + Result().get_path_iof_hops(iof) < Result().get_path_ofs_len()) and
+                        map_scion_packet_to_adt(Result()) == self.bytes_to_adt(packet)
                         )
                 )
         # Ensures(Implies(is_wellformed_packet(packet), Result() is not None and
