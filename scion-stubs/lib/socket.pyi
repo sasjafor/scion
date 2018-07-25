@@ -18,6 +18,7 @@ class UDPSocket(Socket):
                  reuse: bool=False) -> None:
         ...
 
+    @ContractOnly
     def send(self, t: Place, data: bytes, dst: Tuple[str, int]=None) -> Tuple[bool, Place]:
         IOExists1(Place)(lambda t2: (
             Requires(MustTerminate(1)),

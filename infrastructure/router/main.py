@@ -212,20 +212,19 @@ class Router(SCIONElement):
     #     SCIONElement.run(self)
 
     def send(self, t: Place, packet: SCIONL4Packet, dst: HostAddrBase, dst_port: int) -> Place:
-        # IOExists1(Place)(lambda t2: (
-        #     Requires(Acc(self.State(), 1/9) and Acc(packet.State(), 1/8) and Unfolding(Acc(packet.State(), 1/100), len(packet.ext_hdrs) == 0)),
-        #     Requires(token(t, 2) and udp_send(t, packed(packet), str(dst), dst_port, t2)),
-        #     Ensures(Acc(self.State(), 1/9) and Acc(packet.State(), 1/8) and Result() is t2 and token(t2))
-        # ))
-        Requires(Acc(self.State(), 1/10))
-        Requires(Acc(packet.State(), 1/9))
-        Requires(packet.get_ext_hdrs_len() == 0)
-        Requires(MustTerminate(3))
-        Ensures(Acc(self.State(), 1/10))
-        Ensures(Acc(packet.State(), 1/9))
-        Exsures(SCIONBaseError, Acc(self.State(), 1/10))
-        Exsures(SCIONBaseError, Acc(packet.State(), 1/9))
-        Exsures(SCIONBaseError, Acc(RaisedException().args_))
+        IOExists1(Place)(lambda t2: (
+            Requires(Acc(self.State(), 1 / 10)),
+            Requires(Acc(packet.State(), 1 / 9)),
+            Requires(packet.get_ext_hdrs_len() == 0),
+            Requires(MustTerminate(3)),
+            Requires(token(t, 2) and udp_send(t, packed(packet), str(dst), dst_port, t2)),
+            Ensures(Acc(self.State(), 1 / 10)),
+            Ensures(Acc(packet.State(), 1 / 9)),
+            Exsures(SCIONBaseError, Acc(self.State(), 1 / 10)),
+            Exsures(SCIONBaseError, Acc(packet.State(), 1 / 9)),
+            Exsures(SCIONBaseError, Acc(RaisedException().args_)),
+            Ensures(Result() is t2 and token(t2))
+        ))
         """
         Send a packet to dst (class of that object must implement
         __str__ which returns IP addr string) using port and local or remote
@@ -525,28 +524,30 @@ class Router(SCIONElement):
         self.handle_data(t, rev_pkt, ingress, drop_on_error=True)
 
     def deliver(self, t: Place, spkt: SCIONL4Packet, force: bool=True) -> None:
-        Requires(Acc(spkt.State(), 1/9))
-        Requires(Acc(self.State(), 1/9))
-        Requires(dict_pred(SVC_TO_SERVICE))
-        Requires(spkt.get_addrs() is not None)
-        Requires(spkt.get_path() is not None)
-        Requires(spkt.get_addrs_dst() is not None)
-        Requires(spkt.get_addrs_dst_host() is not None)
-        Requires(SVC_TO_SERVICE.__contains__(spkt.get_addrs_dst_host_addr()))
-        Requires(spkt.get_path_hof_idx() is not None)
-        Requires(spkt.get_ext_hdrs_len() == 0)
-        Requires(MustTerminate(4))
-        Ensures(Acc(spkt.State(), 1/9))
-        Ensures(Acc(self.State(), 1/9))
-        Ensures(dict_pred(SVC_TO_SERVICE))
-        Exsures(SCIONBaseError, Acc(spkt.State(), 1/9))
-        Exsures(SCIONBaseError, Acc(self.State(), 1/9))
-        Exsures(SCIONBaseException, dict_pred(SVC_TO_SERVICE))
+        IOExists1(Place)(lambda t2: (
+            Requires(Acc(spkt.State(), 1/9)),
+            Requires(Acc(self.State(), 1/9)),
+            Requires(dict_pred(SVC_TO_SERVICE)),
+            Requires(spkt.get_addrs() is not None),
+            Requires(spkt.get_path() is not None),
+            Requires(spkt.get_addrs_dst() is not None),
+            Requires(spkt.get_addrs_dst_host() is not None),
+            Requires(SVC_TO_SERVICE.__contains__(spkt.get_addrs_dst_host_addr())),
+            Requires(spkt.get_path_hof_idx() is not None),
+            Requires(spkt.get_ext_hdrs_len() == 0),
+            Requires(MustTerminate(4)),
+            Ensures(Acc(spkt.State(), 1/9)),
+            Ensures(Acc(self.State(), 1/9)),
+            Ensures(dict_pred(SVC_TO_SERVICE)),
+            Exsures(SCIONBaseError, Acc(spkt.State(), 1/9)),
+            Exsures(SCIONBaseError, Acc(self.State(), 1/9)),
+            Exsures(SCIONBaseException, dict_pred(SVC_TO_SERVICE))
+        ))
         """
         Forwards the packet to the end destination within the current AS.
-        #     :param spkt: The SCION Packet to forward.
-        :type spkt: :class:`lib.packet.scion.SCIONPacket`
-        :param bool force:
+            :param spkt: The SCION Packet to forward.
+            :type spkt: :class:`lib.packet.scion.SCIONPacket`
+            :param bool force:
             If set, allow packets to be delivered locally that would otherwise
             be disallowed.
         """
@@ -607,17 +608,20 @@ class Router(SCIONElement):
             raise SCIONOFExpiredError(hof)
 
     def _egress_forward(self, t: Place, spkt: SCIONL4Packet) -> Place:
-        Requires(Acc(self.State(), 1/10))
-        Requires(Acc(spkt.State(), 1/9))
-        Requires(self.get_interface_to_addr() is not None)
-        # Requires(Unfolding(Acc(spkt.State(), 1/10), len(spkt.ext_hdrs) == 0))
-        Requires(spkt.get_ext_hdrs_len() == 0)
-        Requires(MustTerminate(4))
-        Ensures(Acc(self.State(), 1/10))
-        Ensures(Acc(spkt.State(), 1/9))
-        Exsures(SCIONBaseError, Acc(self.State(), 1/10))
-        Exsures(SCIONBaseError, Acc(spkt.State(), 1/9))
-        Exsures(SCIONBaseError, Acc(RaisedException().args_))
+        IOExists1(Place)(lambda t2: (
+            Requires(Acc(self.State(), 1/10)),
+            Requires(Acc(spkt.State(), 1/9)),
+            Requires(self.get_interface_to_addr() is not None),
+            Requires(spkt.get_ext_hdrs_len() == 0),
+            Requires(MustTerminate(4)),
+            Requires(token(t, 3) and udp_send(t, packed(spkt), str(self.get_interface_to_addr()), self.get_interface_to_udp_port(), t2)),
+            Ensures(Acc(self.State(), 1/10)),
+            Ensures(Acc(spkt.State(), 1/9)),
+            Exsures(SCIONBaseError, Acc(self.State(), 1/10)),
+            Exsures(SCIONBaseError, Acc(spkt.State(), 1/9)),
+            Exsures(SCIONBaseError, Acc(RaisedException().args_)),
+            Ensures(Result() is t2 and token(t2))
+        ))
         addr = self.get_interface_to_addr()
         port = self.get_interface_to_udp_port()
         logging.debug("Forwarding to remote interface: %s:%s",
