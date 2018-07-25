@@ -748,22 +748,22 @@ class Router(SCIONElement):
         Ensures(Acc(spkt.State()))
         Ensures(Acc(self.State(), 1/2))
         Ensures(dict_pred(SVC_TO_SERVICE))
-        Exsures(SCMPNonRoutingHOF, Acc(spkt.State()))
-        Exsures(SCIONSegmentSwitchError, Acc(spkt.State()))
-        Exsures(SCMPBadIF, Acc(spkt.State()))
-        Exsures(SCIONIFVerificationError, Acc(spkt.State()))
-        Exsures(SCIONOFVerificationError, Acc(spkt.State()))
-        Exsures(SCIONOFExpiredError, Acc(spkt.State()))
-        Exsures(SCMPBadExtOrder, Acc(spkt.State()))
-        Exsures(SCMPBadHopByHop, Acc(spkt.State()))
-        Exsures(SCMPTooManyHopByHop, Acc(spkt.State()))
+        # Exsures(SCMPNonRoutingHOF, Acc(spkt.State()))
+        # Exsures(SCIONSegmentSwitchError, Acc(spkt.State()))
+        # Exsures(SCMPBadIF, Acc(spkt.State()))
+        # Exsures(SCIONIFVerificationError, Acc(spkt.State()))
+        # Exsures(SCIONOFVerificationError, Acc(spkt.State()))
+        # Exsures(SCIONOFExpiredError, Acc(spkt.State()))
+        # Exsures(SCMPBadExtOrder, Acc(spkt.State()))
+        # Exsures(SCMPBadHopByHop, Acc(spkt.State()))
+        # Exsures(SCMPTooManyHopByHop, Acc(spkt.State()))
         Exsures(SCIONBaseException, Acc(spkt.State()))
         Exsures(SCIONBaseException, Acc(self.State(), 1/2))
         Exsures(SCIONBaseException, dict_pred(SVC_TO_SERVICE))
         # Exsures(SCIONSegmentSwitchError, Acc(RaisedException().args_))
-        Exsures(SCIONIFVerificationError, Acc(RaisedException().args_))
-        Exsures(SCIONOFVerificationError, Acc(RaisedException().args_))
-        Exsures(SCIONSegmentSwitchError, Acc(RaisedException().args_))
+        # Exsures(SCIONIFVerificationError, Acc(RaisedException().args_))
+        # Exsures(SCIONOFVerificationError, Acc(RaisedException().args_))
+        # Exsures(SCIONSegmentSwitchError, Acc(RaisedException().args_))
         Exsures(SCIONBaseException, Acc(RaisedException().args_))
         Exsures(SCIONIFVerificationError, len(RaisedException().args_) >= 2)
         Exsures(SCIONOFVerificationError, len(RaisedException().args_) >= 2)
@@ -785,7 +785,11 @@ class Router(SCIONElement):
         # assert spkt.get_ext_hdrs_len() == 0
         Unfold(Acc(spkt.State(), 1/4))
         # self.verify_hof(path, ingress=ingress)
-        self.verify_hof(spkt.path, ingress=ingress)
+        try:
+            self.verify_hof(spkt.path, ingress=ingress)
+        finally:
+            Fold(Acc(spkt.State(), 1/4))
+        Unfold(Acc(spkt.State(), 1 / 4))
         hof = spkt.path.get_hof()
         Fold(Acc(spkt.State(), 1/4))
         # assert spkt.get_ext_hdrs_len() == 0
@@ -820,8 +824,10 @@ class Router(SCIONElement):
             # path = spkt.path # seemingly necessary after call to _calc_fwding_ingress
             cur_iof_idx = path.get_of_idxs()[0]
             if prev_iof_idx != cur_iof_idx:
-                self._validate_segment_switch(
-                    path, fwd_if, prev_if, prev_iof, prev_hof)
+                try:
+                    self._validate_segment_switch(path, fwd_if, prev_if, prev_iof, prev_hof)
+                finally:
+                    Fold(Acc(spkt.State(), 1/10))
                 Fold(Acc(spkt.State(), 1 / 10))
                 # Assert(Acc(spkt.State()))
             elif skipped_vo:
@@ -1382,12 +1388,12 @@ class Router(SCIONElement):
     @ContractOnly
     def get_ifid2br_elem(self, fwd_if: int) -> RouterElement:
         Requires(Acc(self.State(), 1/10))
-        # Requires(Unfolding(Acc(self.State(), 1/10), self.ifid2br.__contains__(fwd_if)))
+        Requires(Unfolding(Acc(self.State(), 1/10), self.ifid2br.__contains__(fwd_if)))
         Ensures(Result() in self.get_topology_border_routers())
         return Unfolding(Acc(self.State(), 1/10), self.ifid2br[fwd_if])
 
     @Pure
-    # @ContractOnly
+    @ContractOnly
     def get_if_states_elem_is_active(self, fwd_if: int) -> bool:
         Requires(Acc(self.State(), 1 / 10))
         Requires(Unfolding(Acc(self.State(), 1/10), self.if_states.__contains__(fwd_if)))
