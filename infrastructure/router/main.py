@@ -541,7 +541,8 @@ class Router(SCIONElement):
         Ensures(dict_pred(SVC_TO_SERVICE))
         Exsures(SCIONBaseError, Acc(spkt.State(), 1/9))
         Exsures(SCIONBaseError, Acc(self.State(), 1/9))
-        Exsures(SCIONBaseException, dict_pred(SVC_TO_SERVICE))
+        Exsures(SCIONBaseError, Acc(RaisedException().args_))
+        Exsures(SCIONBaseError, dict_pred(SVC_TO_SERVICE))
         """
         Forwards the packet to the end destination within the current AS.
         #     :param spkt: The SCION Packet to forward.
@@ -576,7 +577,6 @@ class Router(SCIONElement):
         Requires(Acc(self.State(), 1/9))
         Requires(path.get_iof_idx() is not None)
         Requires(path.get_hof_idx() is not None)
-        # Requires(Unfolding(Acc(path.State(), (1/10)), Let(cast(InfoOpaqueField, path._ofs.get_by_idx(path._iof_idx)), bool, (lambda iof: Unfolding(Acc(path._ofs.State(), (1 / 10)), not iof.get_peer())))))
         Requires(Implies(not ingress,
                          path.get_hof_idx() + 1 < path.get_ofs_len() and
                          isinstance(path.ofs_get_by_idx(path.get_hof_idx() + 1), HopOpaqueField) and
@@ -589,13 +589,11 @@ class Router(SCIONElement):
         Ensures(path.get_iof_idx() is not None)
         Ensures(path.get_hof_idx() is not None)
         Ensures(valid_hof(path))
-        # Exsures(SCIONOFExpiredError, Acc(path.State(), 1/9))
-        # Exsures(SCIONOFExpiredError, Acc(self.State(), 1/9))
         Exsures(SCIONBaseError, Acc(path.State(), 1/9))
         Exsures(SCIONBaseError, Acc(self.State(), 1/9))
         Exsures(SCIONBaseError, Acc(RaisedException().args_))
-        Exsures(SCIONIFVerificationError, len(RaisedException().args_) >= 2)
-        Exsures(SCIONOFVerificationError, len(RaisedException().args_) >= 2)
+        Exsures(SCIONIFVerificationError, len(RaisedException().args_) == 2)
+        Exsures(SCIONOFVerificationError, len(RaisedException().args_) == 2)
         #Exsures(SCIONBaseError, not valid_hof(path))
         """Verify freshness and authentication of an opaque field."""
         iof = path.get_iof()
@@ -725,9 +723,14 @@ class Router(SCIONElement):
         Requires(spkt.get_path_hof_idx() is not None)
         Requires(spkt.get_addrs_dst_host() is not None)
         Requires(spkt.get_ext_hdrs_len() == 0)
-        Requires(Unfolding(Acc(spkt.State(), 1/10),
-                           Let(cast(InfoOpaqueField, Unfolding(Acc(spkt.path.State(), (1 / 10)), spkt.path._ofs.get_by_idx(spkt.path._iof_idx))), bool,
-                               (lambda iof: not spkt.path.get_iof_peer(iof)))))
+        Requires(Implies(not ingress,
+                         Let(spkt.get_path(), bool, lambda path:
+                            Unfolding(Acc(spkt.State(), 1/10),
+                                path.get_hof_idx() + 1 < path.get_ofs_len() and
+                                isinstance(path.ofs_get_by_idx(path.get_hof_idx() + 1), HopOpaqueField) and
+                                path.ofs_get_by_idx(path.get_hof_idx() + 1) is not path.ofs_get_by_idx(path.get_hof_idx())
+                         )))
+                 )
         Requires(dict_pred(SVC_TO_SERVICE))
         Requires(SVC_TO_SERVICE.__contains__(spkt.get_addrs_dst_host_addr()))
         # Requires(Unfolding(Acc(spkt.State(), 1 / 10), Let(spkt.path, bool, lambda path:
@@ -767,12 +770,12 @@ class Router(SCIONElement):
         Exsures(SCIONBaseException, Acc(self.State(), 1/2))
         Exsures(SCIONBaseException, dict_pred(SVC_TO_SERVICE))
         # Exsures(SCIONSegmentSwitchError, Acc(RaisedException().args_))
-        # Exsures(SCIONIFVerificationError, Acc(RaisedException().args_))
-        # Exsures(SCIONOFVerificationError, Acc(RaisedException().args_))
         # Exsures(SCIONSegmentSwitchError, Acc(RaisedException().args_))
         Exsures(SCIONBaseException, Acc(RaisedException().args_))
-        Exsures(SCIONIFVerificationError, len(RaisedException().args_) >= 2)
-        Exsures(SCIONOFVerificationError, len(RaisedException().args_) >= 2)
+        # Exsures(SCIONIFVerificationError, Acc(RaisedException().args_))
+        # Exsures(SCIONOFVerificationError, Acc(RaisedException().args_))
+        Exsures(SCIONIFVerificationError, len(RaisedException().args_) == 2)
+        Exsures(SCIONOFVerificationError, len(RaisedException().args_) == 2)
         Exsures(SCIONSegmentSwitchError, len(RaisedException().args_) >= 1)
         # Exsures(SCIONBaseException, True)
         # Exsures(SCIONBaseError, Unfolding(Rd(spkt.State()), spkt.path != None))
@@ -1294,7 +1297,6 @@ class Router(SCIONElement):
     def get_topology_border_routers_len_1(self) -> int:
         Requires(Acc(self.topology, 1/10))
         Requires(Acc(self.topology.State(), 1/10))
-        # Ensures(Result() == Unfolding(Acc(self.topology.State(), 1/10), len(self.topology.border_routers())))
         Ensures(Result() >= 0)
         return Unfolding(Acc(self.topology.State(), 1/10), len(self.topology.border_routers()))
 
@@ -1327,41 +1329,28 @@ class Router(SCIONElement):
     @Pure
     def eq_isd_as(self, spkt: SCIONL4Packet) -> bool:
         Requires(Acc(self.State(), 1/10))
-        # Requires(Acc(self.addr, 1 / 10))
-        # Requires(Acc(self.addr.isd_as, 1 / 10))
-        # Requires(Acc(self.addr.isd_as.State(), 1 / 10))
         Requires(Acc(spkt.State(), 1 / 10))
         Requires(spkt.get_addrs() is not None)
         Requires(spkt.get_addrs_dst() is not None)
         Requires(spkt.get_addrs_dst_isd_as() is not None)
-        # Requires(Implies(isinstance(other, ISD_AS), Acc(cast(ISD_AS, other).State(), 1 / 10)))
         return Unfolding(Acc(spkt.State(), 1 / 10), self.eq_isd_as_1(spkt))
 
     @Pure
     def eq_isd_as_1(self, spkt: SCIONL4Packet) -> bool:
         Requires(Acc(self.State(), 1 / 10))
-        # Requires(Acc(self.addr, 1 / 10))
-        # Requires(Acc(self.addr.isd_as, 1 / 10))
-        # Requires(Acc(self.addr.isd_as.State(), 1 / 10))
         Requires(Acc(spkt.addrs, 1 / 10))
         Requires(Acc(spkt.addrs.State(), 1 / 10))
         Requires(spkt.get_addrs_dst_1() is not None)
         Requires(spkt.get_addrs_dst_isd_as_1() is not None)
-        # Requires(Implies(isinstance(other, ISD_AS), Acc(cast(ISD_AS, other).State(), 1 / 10)))
         return Unfolding(Acc(spkt.addrs.State(), 1 / 10), self.eq_isd_as_2(spkt))
 
     @Pure
     def eq_isd_as_2(self, spkt: SCIONL4Packet) -> bool:
         Requires(Acc(self.State(), 1 / 10))
-        # Requires(Acc(self.addr, 1 / 10))
-        # Requires(Acc(self.addr.isd_as, 1 / 10))
-        # Requires(Acc(self.addr.isd_as.State(), 1 / 10))
         Requires(Acc(spkt.addrs, 1 / 10))
         Requires(Acc(spkt.addrs.dst, 1 / 10))
         Requires(Acc(spkt.addrs.dst.State(), 1 / 10))
         Requires(spkt.get_addrs_dst_isd_as_2() is not None)
-        # Requires(Implies(isinstance(other, ISD_AS), Acc(cast(ISD_AS, other).State(), 1 / 10)))
-        # return Unfolding(Acc(spkt.addrs.dst.State(), 1 / 10), spkt.addrs.dst.isd_as == other)
         return Unfolding(Acc(spkt.addrs.dst.State(), 1 / 10), self.eq_isd_as_3(spkt))
 
     @Pure
@@ -1372,7 +1361,6 @@ class Router(SCIONElement):
         Requires(Acc(spkt.addrs.dst.isd_as, 1 / 10))
         Requires(Acc(spkt.addrs.dst.isd_as.State(), 1 / 10))
         Requires(spkt.addrs.dst.isd_as is not None)
-        # Requires(Implies(isinstance(other, ISD_AS), Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.addr.State(), 1/10), Acc(cast(ISD_AS, other).State(), 1 / 10)))))
         return Unfolding(Acc(self.State(), 1 / 10), self.eq_isd_as_4(spkt))
 
     @Pure
@@ -1384,7 +1372,6 @@ class Router(SCIONElement):
         Requires(Acc(spkt.addrs.dst.isd_as, 1 / 10))
         Requires(Acc(spkt.addrs.dst.isd_as.State(), 1 / 10))
         Requires(spkt.addrs.dst.isd_as is not None)
-        # Requires(Implies(isinstance(other, ISD_AS), Unfolding(Acc(self.addr.State(), 1/10), Acc(cast(ISD_AS, other).State(), 1 / 10))))
         return Unfolding(Acc(self.addr.State(), 1 / 10), spkt.addrs.dst.isd_as == self.addr.isd_as)
 
     @Pure
@@ -1423,12 +1410,10 @@ class Router(SCIONElement):
     #     return self.ifid2br[fwd_if]
 
     @Pure
-    @ContractOnly
     def get_br_addr(self, br: RouterElement) -> Optional[HostAddrBase]:
         Requires(Acc(self.State(), 1/10))
         Requires(br in self.get_topology_border_routers())
         Ensures(br in self.get_topology_border_routers())
-        # Ensures(Implies(br in self.get_topology_border_routers(), Result() is not None))
         Ensures(Result() is not None)
         return Unfolding(Acc(self.State(), 1 / 10), self.get_br_addr_1(br))
 
@@ -1438,13 +1423,11 @@ class Router(SCIONElement):
         Requires(Acc(self.topology.State(), 1 / 10))
         Requires(br in self.topology.get_border_routers())
         Ensures(br in self.topology.get_border_routers())
-        # Ensures(Implies(br in self.topology.get_border_routers(), Result() is not None))
         Ensures(Result() is not None)
         return Unfolding(Acc(self.topology.State(), 1 / 10), self.get_br_addr_2(br))
 
     @Pure
     def get_br_addr_2(self, br: RouterElement) -> Optional[HostAddrBase]:
-        Requires(Acc(br.State(), 1 / 10))
         Requires(Acc(self.topology, 1/10))
         Requires(Acc(self.topology.parent_border_routers, 1 / 20))
         Requires(Acc(self.topology.child_border_routers, 1 / 20))
@@ -1454,26 +1437,36 @@ class Router(SCIONElement):
         Requires(Forall(self.topology.border_routers(), lambda e: (e.get_addr() is not None)))
         Requires(br in self.topology.border_routers())
         Ensures(br in self.topology.border_routers())
-        # Ensures(Implies(br in self.topology.border_routers(), Result() is not None))
         Ensures(Result() is not None)
         return Unfolding(Acc(br.State(), 1 / 10), br.addr)
 
     @Pure
-    @ContractOnly
     def get_br_port(self, br: RouterElement) -> Optional[int]:
         Requires(Acc(self.State(), 1 / 10))
         Requires(br in self.get_topology_border_routers())
+        Ensures(br in self.get_topology_border_routers())
         Ensures(Result() is not None)
         return Unfolding(Acc(self.State(), 1 / 10), self.get_br_port_1(br))
 
     @Pure
     def get_br_port_1(self, br: RouterElement) -> Optional[int]:
-        Requires(Acc(self.topology, 1/10))
+        Requires(Acc(self.topology, 1 / 10))
         Requires(Acc(self.topology.State(), 1 / 10))
         Requires(br in self.topology.get_border_routers())
+        Ensures(br in self.topology.get_border_routers())
+        Ensures(Result() is not None)
         return Unfolding(Acc(self.topology.State(), 1 / 10), self.get_br_port_2(br))
 
     @Pure
     def get_br_port_2(self, br: RouterElement) -> Optional[int]:
-        Requires(Acc(br.State(), 1 / 10))
+        Requires(Acc(self.topology, 1 / 10))
+        Requires(Acc(self.topology.parent_border_routers, 1 / 20))
+        Requires(Acc(self.topology.child_border_routers, 1 / 20))
+        Requires(Acc(self.topology.peer_border_routers, 1 / 20))
+        Requires(Acc(self.topology.routing_border_routers, 1 / 20))
+        Requires(Forall(self.topology.border_routers(), lambda e: (Acc(e.State(), 1 / 10))))
+        Requires(Forall(self.topology.border_routers(), lambda e: (e.get_port() is not None)))
+        Requires(br in self.topology.border_routers())
+        Ensures(br in self.topology.border_routers())
+        Ensures(Result() is not None)
         return Unfolding(Acc(br.State(), 1 / 10), br.port)
