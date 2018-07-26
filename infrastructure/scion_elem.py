@@ -306,7 +306,7 @@ class SCIONElement(object):
         # Ensures(Result().get_addrs_dst_host() is not None)
         Ensures(dict_pred(SVC_TO_SERVICE))
         Ensures(Implies(is_wellformed_packet(packet),   Result() is not None and
-                                                        Result().State() and
+                                                        cast(SCIONL4Packet, Result()).State() and
                                                         Result().get_ext_hdrs_len() == 0 and
                                                         Result().get_addrs() is not None and
                                                         Result().get_path() is not None and
