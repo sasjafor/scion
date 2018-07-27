@@ -212,20 +212,16 @@ class Router(SCIONElement):
     #     SCIONElement.run(self)
 
     def send(self, t: Place, packet: SCIONL4Packet, dst: HostAddrBase, dst_port: int) -> Place:
-        # IOExists1(Place)(lambda t2: (
-        #     Requires(Acc(self.State(), 1/9) and Acc(packet.State(), 1/8) and Unfolding(Acc(packet.State(), 1/100), len(packet.ext_hdrs) == 0)),
-        #     Requires(token(t, 2) and udp_send(t, packed(packet), str(dst), dst_port, t2)),
-        #     Ensures(Acc(self.State(), 1/9) and Acc(packet.State(), 1/8) and Result() is t2 and token(t2))
-        # ))
-        Requires(Acc(self.State(), 1/10))
-        Requires(Acc(packet.State(), 1/9))
-        Requires(packet.get_ext_hdrs_len() == 0)
-        Requires(MustTerminate(3))
-        Ensures(Acc(self.State(), 1/10))
-        Ensures(Acc(packet.State(), 1/9))
-        # Exsures(SCIONBaseError, Acc(self.State(), 1/10))
-        # Exsures(SCIONBaseError, Acc(packet.State(), 1/9))
-        # Exsures(SCIONBaseError, Acc(RaisedException().args_))
+        IOExists1(Place)(lambda t2: (
+            Requires(Acc(self.State(), 1 / 10)),
+            Requires(Acc(packet.State(), 1 / 8)),
+            Requires(packet.get_ext_hdrs_len() == 0),
+            Requires(MustTerminate(3)),
+            Requires(token(t, 2) and udp_send(t, packed(packet), str(dst), dst_port, t2)),
+            Ensures(Acc(self.State(), 1 / 10)),
+            Ensures(Acc(packet.State(), 1 / 8)),
+            Ensures(Result() is t2 and token(t2))
+        ))
         """
         Send a packet to dst (class of that object must implement
         __str__ which returns IP addr string) using port and local or remote
@@ -518,41 +514,68 @@ class Router(SCIONElement):
         # then drop the packet as the interface is down.
         self.handle_data(t, rev_pkt, ingress, drop_on_error=True)
 
-    def deliver(self, t: Place, spkt: SCIONL4Packet, force: bool=True) -> None:
-        Requires(Acc(spkt.State(), 1/9))
-        Requires(Acc(self.State(), 1/9))
-        Requires(dict_pred(SVC_TO_SERVICE))
-        Requires(spkt.get_addrs() is not None)
-        Requires(spkt.get_path() is not None)
-        Requires(spkt.get_addrs_dst() is not None)
-        Requires(spkt.get_addrs_dst_host() is not None)
-        Requires(spkt.get_path_hof_idx() is not None)
-        Requires(spkt.get_ext_hdrs_len() == 0)
-        Requires(MustTerminate(4))
-        Ensures(Acc(spkt.State(), 1/9))
-        Ensures(Acc(self.State(), 1/9))
-        Ensures(dict_pred(SVC_TO_SERVICE))
-        Exsures(SCMPDeliveryNonLocal, Acc(spkt.State(), 1/9))
-        Exsures(SCMPDeliveryNonLocal, Acc(self.State(), 1/9))
-        Exsures(SCMPDeliveryNonLocal, Acc(RaisedException().args_))
-        Exsures(SCMPDeliveryNonLocal, dict_pred(SVC_TO_SERVICE))
-        Exsures(SCMPDeliveryFwdOnly, Acc(spkt.State(), 1 / 9))
-        Exsures(SCMPDeliveryFwdOnly, Acc(self.State(), 1 / 9))
-        Exsures(SCMPDeliveryFwdOnly, Acc(RaisedException().args_))
-        Exsures(SCMPDeliveryFwdOnly, dict_pred(SVC_TO_SERVICE))
-        Exsures(SCMPNonRoutingHOF, Acc(spkt.State(), 1 / 9))
-        Exsures(SCMPNonRoutingHOF, Acc(self.State(), 1 / 9))
-        Exsures(SCMPNonRoutingHOF, Acc(RaisedException().args_))
-        Exsures(SCMPNonRoutingHOF, dict_pred(SVC_TO_SERVICE))
-        Exsures(SCMPUnknownHost, Acc(spkt.State(), 1 / 9))
-        Exsures(SCMPUnknownHost, Acc(self.State(), 1 / 9))
-        Exsures(SCMPUnknownHost, Acc(RaisedException().args_))
-        Exsures(SCMPUnknownHost, dict_pred(SVC_TO_SERVICE))
+    def deliver(self, t: Place, spkt: SCIONL4Packet, force: bool=True) -> Place:
+        IOExists1(Place)(lambda t2: (
+            Requires(Acc(spkt.State(), 1/9)),
+            Requires(Acc(self.State(), 1/9)),
+            Requires(dict_pred(SVC_TO_SERVICE)),
+            Requires(spkt.get_addrs() is not None),
+            Requires(spkt.get_path() is not None),
+            Requires(spkt.get_addrs_dst() is not None),
+            Requires(spkt.get_addrs_dst_host() is not None),
+            # Requires(SVC_TO_SERVICE.__contains__(spkt.get_addrs_dst_host_addr())),
+            Requires(spkt.get_path_hof_idx() is not None),
+            Requires(spkt.get_ext_hdrs_len() == 0),
+            Requires(MustTerminate(4)),
+            Requires(token(t, 3)),
+            # Requires(not (not force and not ((spkt.get_addrs_dst_isd_as() is None and self.get_addr_isd_as() is None) or (spkt.get_addrs_dst_isd_as() is not None and self.eq_isd_as(spkt))))),
+            # Requires(not (spkt.get_path_len() and ((not force and spkt.get_path_hof_forward_only(spkt.get_path_hof()))))),
+            # Requires(not (spkt.get_path_len() and spkt.get_path_hof_verify_only(spkt.get_path_hof()))),
+            # Requires(not (spkt.get_addrs_dst_host().TYPE is not None and spkt.get_addrs_dst_host().TYPE == AddrType.SVC and
+            #                       not SVC_TO_SERVICE.__contains__(spkt.get_addrs_dst_host_addr()))),
+            Requires(Implies(not (not force and not ((spkt.get_addrs_dst_isd_as() is None and self.get_addr_isd_as() is None) or (spkt.get_addrs_dst_isd_as() is not None and self.eq_isd_as(spkt)))) and
+                             not (spkt.get_path_len() and ((not force and spkt.get_path_hof_forward_only(spkt.get_path_hof())))) and
+                             not (spkt.get_path_len() and spkt.get_path_hof_verify_only(spkt.get_path_hof())) and
+                             not (spkt.get_addrs_dst_host().TYPE is not None and spkt.get_addrs_dst_host().TYPE == AddrType.SVC and
+                                  not SVC_TO_SERVICE.__contains__(spkt.get_addrs_dst_host_addr())),
+                                udp_send(t, packed(spkt), str(spkt.get_addrs_dst_host()), SCION_UDP_EH_DATA_PORT, t2))),
+            # Requires(udp_send(t, packed(spkt), str(spkt.get_addrs_dst_host()), SCION_UDP_EH_DATA_PORT, t2)),
+            # Requires(Implies(not (not force and spkt.get_addrs_dst_isd_as() != self.get_addr_isd_as()) and
+            #                  not (spkt.get_path_len() and ((not force and spkt.get_path_hof_forward_only(spkt.get_path_hof())) or
+            #                                                 spkt.get_path_hof_verify_only(spkt.get_path_hof()))),
+            #             udp_send(t, packed(spkt), str(spkt.get_addrs_dst_host()), SCION_UDP_EH_DATA_PORT, t2))),
+            Ensures(Acc(spkt.State(), 1/9)),
+            Ensures(Acc(self.State(), 1/9)),
+            Ensures(dict_pred(SVC_TO_SERVICE)),
+            Exsures(SCMPDeliveryNonLocal, Acc(spkt.State(), 1/9)),
+            Exsures(SCMPDeliveryNonLocal, Acc(self.State(), 1/9)),
+            Exsures(SCMPDeliveryNonLocal, Acc(RaisedException().args_)),
+            Exsures(SCMPDeliveryNonLocal, dict_pred(SVC_TO_SERVICE)),
+            Exsures(SCMPDeliveryFwdOnly, Acc(spkt.State(), 1 / 9)),
+            Exsures(SCMPDeliveryFwdOnly, Acc(self.State(), 1 / 9)),
+            Exsures(SCMPDeliveryFwdOnly, Acc(RaisedException().args_)),
+            Exsures(SCMPDeliveryFwdOnly, dict_pred(SVC_TO_SERVICE)),
+            Exsures(SCMPNonRoutingHOF, Acc(spkt.State(), 1 / 9)),
+            Exsures(SCMPNonRoutingHOF, Acc(self.State(), 1 / 9)),
+            Exsures(SCMPNonRoutingHOF, Acc(RaisedException().args_)),
+            Exsures(SCMPNonRoutingHOF, dict_pred(SVC_TO_SERVICE)),
+            Exsures(SCMPUnknownHost, Acc(spkt.State(), 1 / 9)),
+            Exsures(SCMPUnknownHost, Acc(self.State(), 1 / 9)),
+            Exsures(SCMPUnknownHost, Acc(RaisedException().args_)),
+            Exsures(SCMPUnknownHost, dict_pred(SVC_TO_SERVICE)),
+            # Exsures(SCIONBaseError, spkt.get_addrs() is not None and spkt.get_path() is not None and spkt.get_addrs_dst() is not None and spkt.get_addrs_dst_host() is not None and spkt.get_path_hof_idx() is not None),
+            # Exsures(SCMPDeliveryNonLocal, (not force and not ((spkt.get_addrs_dst_isd_as() is None and self.get_addr_isd_as() is None) or (spkt.get_addrs_dst_isd_as() is not None and self.eq_isd_as(spkt))))),
+            # Exsures(SCMPDeliveryFwdOnly, (spkt.get_path_len() != 0 and ((not force and spkt.get_path_hof_forward_only(spkt.get_path_hof()))))),
+            # Exsures(SCMPNonRoutingHOF, (spkt.get_path_len() != 0 and spkt.get_path_hof_verify_only(spkt.get_path_hof()))),
+            # Exsures(SCMPUnknownHost, (spkt.get_addrs_dst_host().TYPE is not None and spkt.get_addrs_dst_host().TYPE == AddrType.SVC and
+            #                       not SVC_TO_SERVICE.__contains__(spkt.get_addrs_dst_host_addr()))),
+            Ensures(Result() is t2 and token(t2))
+        ))
         """
         Forwards the packet to the end destination within the current AS.
-        #     :param spkt: The SCION Packet to forward.
-        :type spkt: :class:`lib.packet.scion.SCIONPacket`
-        :param bool force:
+            :param spkt: The SCION Packet to forward.
+            :type spkt: :class:`lib.packet.scion.SCIONPacket`
+            :param bool force:
             If set, allow packets to be delivered locally that would otherwise
             be disallowed.
         """
@@ -579,7 +602,7 @@ class Router(SCIONElement):
             else:
                 # logging.error("Unable to deliver path mgmt packet: %s", e)
                 raise SCMPUnknownHost
-        self.send(t, spkt, addr, SCION_UDP_EH_DATA_PORT)
+        return self.send(t, spkt, addr, SCION_UDP_EH_DATA_PORT)
 
     def verify_hof(self, path: SCIONPath, ingress: bool = True) -> None:
         Requires(Acc(path.State(), 1/9))
@@ -620,17 +643,17 @@ class Router(SCIONElement):
             raise SCIONOFExpiredError(hof)
 
     def _egress_forward(self, t: Place, spkt: SCIONL4Packet) -> Place:
-        Requires(Acc(self.State(), 1/10))
-        Requires(Acc(spkt.State(), 1/9))
-        Requires(self.get_interface_to_addr() is not None)
-        # Requires(Unfolding(Acc(spkt.State(), 1/10), len(spkt.ext_hdrs) == 0))
-        Requires(spkt.get_ext_hdrs_len() == 0)
-        Requires(MustTerminate(4))
-        Ensures(Acc(self.State(), 1/10))
-        Ensures(Acc(spkt.State(), 1/9))
-        # Exsures(SCIONBaseError, Acc(self.State(), 1/10))
-        # Exsures(SCIONBaseError, Acc(spkt.State(), 1/9))
-        # Exsures(SCIONBaseError, Acc(RaisedException().args_))
+        IOExists1(Place)(lambda t2: (
+            Requires(Acc(self.State(), 1/10)),
+            Requires(Acc(spkt.State(), 1/9)),
+            Requires(self.get_interface_to_addr() is not None),
+            Requires(spkt.get_ext_hdrs_len() == 0),
+            Requires(MustTerminate(4)),
+            Requires(token(t, 3) and udp_send(t, packed(spkt), str(self.get_interface_to_addr()), self.get_interface_to_udp_port(), t2)),
+            Ensures(Acc(self.State(), 1/10)),
+            Ensures(Acc(spkt.State(), 1/9)),
+            Ensures(Result() is t2 and token(t2))
+        ))
         addr = self.get_interface_to_addr()
         port = self.get_interface_to_udp_port()
         logging.debug("Forwarding to remote interface: %s:%s",

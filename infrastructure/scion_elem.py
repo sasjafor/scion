@@ -103,6 +103,8 @@ from lib.topology import RouterElement
 from nagini_contracts.contracts import *
 from nagini_contracts.io_builtins import Place, token, IOOperation, IOExists1, Terminates
 
+from sascha.adt import ADT_Packet, map_scion_packet_to_adt
+
 MAX_QUEUE = 50
 
 list_object = List[object]
@@ -306,42 +308,53 @@ class SCIONElement(object):
         # Ensures(Result().get_path_hof_idx() is not None)
         # Ensures(Result().get_addrs_dst_host() is not None)
         Ensures(dict_pred(SVC_TO_SERVICE))
-        Ensures(Implies(is_wellformed_packet(packet),   Result() is not None and
-                                                        cast(SCIONL4Packet, Result()).State() and
-                                                        Result().get_ext_hdrs_len() == 0 and
-                                                        Result().get_addrs() is not None and
-                                                        Result().get_path() is not None and
-                                                        Result().get_addrs() is not None and
-                                                        Result().get_addrs_dst() is not None and
-                                                        Result().get_path_iof_idx() is not None and
-                                                        Result().get_path_hof_idx() is not None and
-                                                        Result().get_addrs_dst_host() is not None and
-                                                        Implies(from_local_as, Let(cast(SCIONL4Packet, Result()).get_path(), bool, lambda path:
+        Ensures(Implies(is_wellformed_packet(packet),
+                        Result() is not None and
+                        Result().State() and
+                        Result().get_ext_hdrs_len() == 0 and
+                        Result().get_addrs() is not None and
+                        Result().get_path() is not None and
+                        Result().get_addrs() is not None and
+                        Result().get_addrs_src() is not None and
+                        Result().get_addrs_dst() is not None and
+                        Result().get_addrs_src_isd_as() is not None and
+                        Result().get_addrs_dst_isd_as() is not None and
+                        Result().get_addrs_src_host() is not None and
+                        Result().get_addrs_dst_host() is not None and
+                        Result().get_path_iof_idx() is not None and
+                        Result().get_path_hof_idx() is not None and
+                        Implies(from_local_as, Let(cast(SCIONL4Packet, Result()).get_path(), bool, lambda path:
                                                             Unfolding(Acc(cast(SCIONL4Packet, Result()).State(), 1 / 10),
                                                                 path.get_hof_idx() + 1 < path.get_ofs_len() and
                                                                 isinstance(path.ofs_get_by_idx(path.get_hof_idx() + 1), HopOpaqueField) and
                                                                 path.ofs_get_by_idx(path.get_hof_idx() + 1) is not path.ofs_get_by_idx(path.get_hof_idx())
                                                         ))) and
-                                                        (Unfolding(Acc(cast(SCIONL4Packet, Result()).State(), 1 / 10), Let(cast(SCIONL4Packet, Result()).path, bool, lambda path:
-                                                            path.get_hof_idx() < path.get_ofs_len() - 1 and
-                                                            Let(cast(HopOpaqueField, Unfolding(Acc(path.State(), 1 / 10), path._ofs.get_by_idx(path._hof_idx + 1))), bool, lambda hof:
-                                                                not path.get_hof_verify_only(hof)) and
-                                                            path.get_hof_idx() - path.get_iof_idx() < path.get_iof_hops(cast(InfoOpaqueField, path.ofs_get_by_idx(path.get_iof_idx()))) and
-                                                            Let(cast(InfoOpaqueField, path.ofs_get_by_idx(path.get_iof_idx())), bool, lambda iof:
-                                                                Implies(
-                                                                    (Let(cast(HopOpaqueField, path.ofs_get_by_idx(path.get_hof_idx() + 1)), bool, lambda hof:
-                                                                        not path.get_hof_xover(hof) or
-                                                                        path.get_iof_shortcut(iof)
-                                                                    ) and
-                                                                    (path.get_hof_idx() != path.get_iof_idx() + path.get_iof_hops(iof))),
-                                                                    path.get_hof_idx() + 2 < path.get_ofs_len() and
-                                                                    isinstance(path.ofs_get_by_idx(path.get_hof_idx() + 2), HopOpaqueField) and
-                                                                    path.ofs_get_by_idx(path.get_hof_idx() + 2) is not path.ofs_get_by_idx(path.get_hof_idx() + 1)
-                                                                )
-                                                            ) and
-                                                        Implies(path.get_hof_idx() < path.get_ofs_len() - 2,
-                                                            isinstance(path.ofs_get_by_idx(path.get_hof_idx() + 2), HopOpaqueField))))
-                                                        )
+                        (Unfolding(Acc(cast(SCIONL4Packet, Result()).State(), 1 / 10), Let(cast(SCIONL4Packet, Result()).path, bool, lambda path:
+                            path.get_hof_idx() < path.get_ofs_len() - 1 and
+                            Let(cast(HopOpaqueField, Unfolding(Acc(path.State(), 1 / 10), path._ofs.get_by_idx(path._hof_idx + 1))), bool, lambda hof:
+                                not path.get_hof_verify_only(hof)) and
+                            path.get_hof_idx() - path.get_iof_idx() < path.get_iof_hops(cast(InfoOpaqueField, path.ofs_get_by_idx(path.get_iof_idx()))) and
+                            Let(cast(InfoOpaqueField, path.ofs_get_by_idx(path.get_iof_idx())), bool, lambda iof:
+                                Implies((Let(cast(HopOpaqueField, path.ofs_get_by_idx(path.get_hof_idx() + 1)), bool, lambda hof:
+                                            not path.get_hof_xover(hof) or
+                                            path.get_iof_shortcut(iof)
+                                        ) and
+                                        (path.get_hof_idx() != path.get_iof_idx() + path.get_iof_hops(iof))),
+                                        path.get_hof_idx() + 2 < path.get_ofs_len() and
+                                        isinstance(path.ofs_get_by_idx(path.get_hof_idx() + 2), HopOpaqueField) and
+                                        path.ofs_get_by_idx(path.get_hof_idx() + 2) is not path.ofs_get_by_idx(path.get_hof_idx() + 1)
+                                )
+                            ) and
+                            Implies(path.get_hof_idx() < path.get_ofs_len() - 2,
+                                isinstance(path.ofs_get_by_idx(path.get_hof_idx() + 2), HopOpaqueField))))
+                        ) and
+                        Let(cast(InfoOpaqueField, Unfolding(Acc(cast(SCIONL4Packet, Result()).State(), 1 / 10),
+                                                            Unfolding(Acc(cast(SCIONL4Packet, Result()).path.State(), 1 / 10),
+                                                                      cast(SCIONL4Packet, Result()).path._ofs.get_by_idx(
+                                                                          cast(SCIONL4Packet, Result()).path._iof_idx)))), bool, lambda iof:
+                            cast(SCIONL4Packet, Result()).get_path_iof_hops(iof) >= 0 and
+                            cast(SCIONL4Packet, Result()).get_path_iof_idx() + cast(SCIONL4Packet, Result()).get_path_iof_hops(iof) < cast(SCIONL4Packet, Result()).get_path_ofs_len()) and
+                        map_scion_packet_to_adt(Result()) == self.bytes_to_adt(packet)
                         )
                 )
         Ensures(Implies(not is_wellformed_packet(packet), Result() is None))
@@ -855,3 +868,9 @@ class SCIONElement(object):
                 Acc(self.topology) and Acc(self.topology.State()) and
                 Acc(self.ifid2br) and dict_pred(self.ifid2br) and
                 Forall(self.ifid2br, lambda x: (self.ifid2br[x] in self.topology.get_border_routers(), [[self.ifid2br[x] in self.topology.get_border_routers()]])))
+
+    @Pure
+    @ContractOnly
+    def bytes_to_adt(self, packet: bytes) -> ADT_Packet:
+        Requires(is_wellformed_packet(packet))
+        ...

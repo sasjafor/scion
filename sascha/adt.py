@@ -145,7 +145,6 @@ def map_scion_packet_to_adt(pkt: SCIONL4Packet) -> ADT_Packet:
     Requires(pkt.get_addrs_dst_isd_as() is not None)
     Requires(pkt.get_addrs_src_host() is not None)
     Requires(pkt.get_addrs_dst_host() is not None)
-    # Requires(Unfolding(Acc(pkt.State(), 1 / 10), pkt.path.get_iof_idx() is not None))
     Requires(pkt.get_path_iof_idx() is not None)
     Requires(pkt.get_path_hof_idx() is not None)
     Requires(Let(cast(InfoOpaqueField, Unfolding(Acc(pkt.State(), 1/10), Unfolding(Acc(pkt.path.State(), 1/10), pkt.path._ofs.get_by_idx(pkt.path._iof_idx)))), bool, lambda iof:
