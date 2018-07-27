@@ -214,14 +214,14 @@ class Router(SCIONElement):
     def send(self, t: Place, packet: SCIONL4Packet, dst: HostAddrBase, dst_port: int) -> Place:
         IOExists1(Place)(lambda t2: (
             Requires(Acc(self.State(), 1 / 10)),
-            Requires(Acc(packet.State(), 1 / 9)),
+            Requires(Acc(packet.State(), 1 / 8)),
             Requires(packet.get_ext_hdrs_len() == 0),
             Requires(MustTerminate(3)),
             Requires(token(t, 2) and udp_send(t, packed(packet), str(dst), dst_port, t2)),
             Ensures(Acc(self.State(), 1 / 10)),
-            Ensures(Acc(packet.State(), 1 / 9)),
+            Ensures(Acc(packet.State(), 1 / 8)),
             Exsures(SCIONBaseError, Acc(self.State(), 1 / 10)),
-            Exsures(SCIONBaseError, Acc(packet.State(), 1 / 9)),
+            Exsures(SCIONBaseError, Acc(packet.State(), 1 / 8)),
             Exsures(SCIONBaseError, Acc(RaisedException().args_)),
             Ensures(Result() is t2 and token(t2))
         ))
@@ -259,9 +259,9 @@ class Router(SCIONElement):
         Ensures(Acc(spkt.State(), 1/9))
         Ensures(Acc(self.State(), 1/10))
         Ensures(len(Result()) == 0)
-        Exsures(SCIONBaseError, Acc(spkt.State(), 1/9))
-        Exsures(SCIONBaseError, Acc(self.State(), 1/10))
-        Exsures(SCIONBaseError, Acc(RaisedException().args_))
+        # Exsures(SCIONBaseError, Acc(spkt.State(), 1/9))
+        # Exsures(SCIONBaseError, Acc(self.State(), 1/10))
+        # Exsures(SCIONBaseError, Acc(RaisedException().args_))
         if pre_routing_phase:
             prefix = "pre"
             handlers = self.get_pre_ext_handlers() # type: Dict[int, bool]
@@ -523,7 +523,7 @@ class Router(SCIONElement):
         # then drop the packet as the interface is down.
         self.handle_data(t, rev_pkt, ingress, drop_on_error=True)
 
-    def deliver(self, t: Place, spkt: SCIONL4Packet, force: bool=True) -> None:
+    def deliver(self, t: Place, spkt: SCIONL4Packet, force: bool=True) -> Place:
         IOExists1(Place)(lambda t2: (
             Requires(Acc(spkt.State(), 1/9)),
             Requires(Acc(self.State(), 1/9)),
@@ -532,11 +532,23 @@ class Router(SCIONElement):
             Requires(spkt.get_path() is not None),
             Requires(spkt.get_addrs_dst() is not None),
             Requires(spkt.get_addrs_dst_host() is not None),
-            Requires(SVC_TO_SERVICE.__contains__(spkt.get_addrs_dst_host_addr())),
+            # Requires(SVC_TO_SERVICE.__contains__(spkt.get_addrs_dst_host_addr())),
             Requires(spkt.get_path_hof_idx() is not None),
             Requires(spkt.get_ext_hdrs_len() == 0),
             Requires(MustTerminate(4)),
-            # Requires(token(t)),
+            Requires(token(t, 3)),
+            # Requires(not (not force and not ((spkt.get_addrs_dst_isd_as() is None and self.get_addr_isd_as() is None) or (spkt.get_addrs_dst_isd_as() is not None and self.eq_isd_as(spkt))))),
+            # Requires(not (spkt.get_path_len() and ((not force and spkt.get_path_hof_forward_only(spkt.get_path_hof()))))),
+            # Requires(not (spkt.get_path_len() and spkt.get_path_hof_verify_only(spkt.get_path_hof()))),
+            # Requires(not (spkt.get_addrs_dst_host().TYPE is not None and spkt.get_addrs_dst_host().TYPE == AddrType.SVC and
+            #                       not SVC_TO_SERVICE.__contains__(spkt.get_addrs_dst_host_addr()))),
+            Requires(Implies(not (not force and not ((spkt.get_addrs_dst_isd_as() is None and self.get_addr_isd_as() is None) or (spkt.get_addrs_dst_isd_as() is not None and self.eq_isd_as(spkt)))) and
+                             not (spkt.get_path_len() and ((not force and spkt.get_path_hof_forward_only(spkt.get_path_hof())))) and
+                             not (spkt.get_path_len() and spkt.get_path_hof_verify_only(spkt.get_path_hof())) and
+                             not (spkt.get_addrs_dst_host().TYPE is not None and spkt.get_addrs_dst_host().TYPE == AddrType.SVC and
+                                  not SVC_TO_SERVICE.__contains__(spkt.get_addrs_dst_host_addr())),
+                                udp_send(t, packed(spkt), str(spkt.get_addrs_dst_host()), SCION_UDP_EH_DATA_PORT, t2))),
+            # Requires(udp_send(t, packed(spkt), str(spkt.get_addrs_dst_host()), SCION_UDP_EH_DATA_PORT, t2)),
             # Requires(Implies(not (not force and spkt.get_addrs_dst_isd_as() != self.get_addr_isd_as()) and
             #                  not (spkt.get_path_len() and ((not force and spkt.get_path_hof_forward_only(spkt.get_path_hof())) or
             #                                                 spkt.get_path_hof_verify_only(spkt.get_path_hof()))),
@@ -546,7 +558,14 @@ class Router(SCIONElement):
             Ensures(dict_pred(SVC_TO_SERVICE)),
             Exsures(SCIONBaseError, Acc(spkt.State(), 1/9)),
             Exsures(SCIONBaseError, Acc(self.State(), 1/9)),
-            Exsures(SCIONBaseError, dict_pred(SVC_TO_SERVICE))
+            Exsures(SCIONBaseError, dict_pred(SVC_TO_SERVICE)),
+            # Exsures(SCIONBaseError, spkt.get_addrs() is not None and spkt.get_path() is not None and spkt.get_addrs_dst() is not None and spkt.get_addrs_dst_host() is not None and spkt.get_path_hof_idx() is not None),
+            # Exsures(SCMPDeliveryNonLocal, (not force and not ((spkt.get_addrs_dst_isd_as() is None and self.get_addr_isd_as() is None) or (spkt.get_addrs_dst_isd_as() is not None and self.eq_isd_as(spkt))))),
+            # Exsures(SCMPDeliveryFwdOnly, (spkt.get_path_len() != 0 and ((not force and spkt.get_path_hof_forward_only(spkt.get_path_hof()))))),
+            # Exsures(SCMPNonRoutingHOF, (spkt.get_path_len() != 0 and spkt.get_path_hof_verify_only(spkt.get_path_hof()))),
+            # Exsures(SCMPUnknownHost, (spkt.get_addrs_dst_host().TYPE is not None and spkt.get_addrs_dst_host().TYPE == AddrType.SVC and
+            #                       not SVC_TO_SERVICE.__contains__(spkt.get_addrs_dst_host_addr()))),
+            Ensures(Result() is t2 and token(t2))
         ))
         """
         Forwards the packet to the end destination within the current AS.
@@ -572,13 +591,15 @@ class Router(SCIONElement):
         addr = spkt.get_addrs_dst_host()
         if addr.TYPE is not None and addr.TYPE == AddrType.SVC:
             # Send request to any server.
-            try:
+            # try:
+            if SVC_TO_SERVICE.__contains__(spkt.get_addrs_dst_host_addr()):
                 service = SVC_TO_SERVICE[spkt.get_addrs_dst_host_addr()]
                 addr = self.get_srv_addr(service, spkt)
-            except SCIONServiceLookupError as e:
-                logging.error("Unable to deliver path mgmt packet: %s", e)
+            # except SCIONServiceLookupError as e:
+            else:
+                # logging.error("Unable to deliver path mgmt packet: %s", e)
                 raise SCMPUnknownHost
-        self.send(t, spkt, addr, SCION_UDP_EH_DATA_PORT)
+        return self.send(t, spkt, addr, SCION_UDP_EH_DATA_PORT)
 
     def verify_hof(self, path: SCIONPath, ingress: bool = True) -> None:
         Requires(Acc(path.State(), 1/9))
