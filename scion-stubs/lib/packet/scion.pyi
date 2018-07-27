@@ -323,9 +323,11 @@ class SCIONL4Packet(SCIONExtPacket):
 
 
     def update(self) -> None:
+        Requires(MustTerminate(1))
         ...
 
     def parse_payload(self) -> SCMPPayload:
+        Requires(MustTerminate(7))
         pass
 
     @Pure
