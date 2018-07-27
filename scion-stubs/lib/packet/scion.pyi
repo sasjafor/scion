@@ -293,10 +293,41 @@ class SCIONL4Packet(SCIONExtPacket):
         return (Acc(self.l4_hdr) and
                 Implies(self.l4_hdr is not None, self.l4_hdr.State()))
 
+    # @Predicate
+    # def PreState(self) -> bool:
+    #     """
+    #     PreState of packet, meaning the State a packet needs to have before the call to SCIONPath.inc_hof_idx
+    #     """
+    #     return (Acc(self.State()) and
+    #             Unfolding(Acc(self.State()),
+    #             Let(self.path, bool, lambda path:
+    #                 path.get_hof_idx() < path.get_ofs_len() - 1 and
+    #                 Let(cast(HopOpaqueField, Unfolding(Acc(path.State()), path._ofs.get_by_idx(path._hof_idx + 1))), bool, lambda hof:
+    #                     not path.get_hof_verify_only(hof)) and
+    #                 path.get_hof_idx() - path.get_iof_idx() < path.get_iof_hops(cast(InfoOpaqueField, path.ofs_get_by_idx(path.get_iof_idx()))) and
+    #                 Let(cast(InfoOpaqueField, path.ofs_get_by_idx(path.get_iof_idx())), bool, lambda iof:
+    #                 Implies((Let(cast(HopOpaqueField, path.ofs_get_by_idx(path.get_hof_idx() + 1)), bool, lambda hof:
+    #                     not path.get_hof_xover(hof) or
+    #                     path.get_iof_shortcut(iof)
+    #                  ) and
+    #                 (path.get_hof_idx() != path.get_iof_idx() + path.get_iof_hops(iof))),
+    #                     path.get_hof_idx() + 2 < path.get_ofs_len() and
+    #                     isinstance(path.ofs_get_by_idx(path.get_hof_idx() + 2), HopOpaqueField) and
+    #                     path.ofs_get_by_idx(path.get_hof_idx() + 2) is not path.ofs_get_by_idx(path.get_hof_idx() + 1)
+    #                 )
+    #                 ) and
+    #                 Implies(path.get_hof_idx() < path.get_ofs_len() - 2,
+    #                     isinstance(path.ofs_get_by_idx(path.get_hof_idx() + 2), HopOpaqueField))
+    #                 )
+    #             ))
+
+
     def update(self) -> None:
+        Requires(MustTerminate(1))
         ...
 
     def parse_payload(self) -> SCMPPayload:
+        Requires(MustTerminate(7))
         pass
 
     @Pure

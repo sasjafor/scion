@@ -13,6 +13,7 @@ class SCIONBaseException(Exception):
     def __init__(self, *args: object) -> None:
         Requires(MustTerminate(1))
         Ensures(Acc(self.args_))
+        Ensures(len(self.args_) == len(args))
         self.args_ = args # type: Tuple[object, ...]
 
 

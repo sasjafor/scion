@@ -72,6 +72,14 @@ class Topology(object):
         Requires(Acc(self.child_border_routers, 1/20))
         Requires(Acc(self.peer_border_routers, 1/20))
         Requires(Acc(self.routing_border_routers, 1/20))
+        Requires(Acc(list_pred(self.parent_border_routers), 1/20))
+        Requires(Acc(list_pred(self.child_border_routers), 1/20))
+        Requires(Acc(list_pred(self.peer_border_routers), 1/20))
+        Requires(Acc(list_pred(self.routing_border_routers), 1/20))
+        Ensures(len(Result()) ==    len(self.parent_border_routers) +
+                                    len(self.child_border_routers) +
+                                    len(self.peer_border_routers) +
+                                    len(self.routing_border_routers))
 
     @classmethod
     def from_file(cls, topology_file: str) -> 'Topology':
@@ -87,6 +95,7 @@ class Topology(object):
         Ensures(list_pred(Result()))
         Ensures(Forall(cast(List[RouterElement], Result()), lambda e: (e in self.get_border_routers(), [[e in Result()]])))
         Ensures(len(Result()) == len(self.get_border_routers()))
+        Ensures(self.get_border_routers() == Old(self.get_border_routers()))
         """
         Return all border routers associated to the AS.
 

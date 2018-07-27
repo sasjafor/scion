@@ -294,8 +294,9 @@ class SCIONElement(object):
     #     return None
 
     @ContractOnly
-    def _parse_packet(self, packet: bytes) -> Optional[SCIONL4Packet]:
+    def _parse_packet(self, packet: bytes, from_local_as: bool) -> Optional[SCIONL4Packet]:
         Requires(dict_pred(SVC_TO_SERVICE))
+        Requires(MustTerminate(7))
         # Ensures(Result() is not None)
         # Ensures(Acc(Result().State()))
         # Ensures(Result().get_ext_hdrs_len() == 0)
@@ -322,7 +323,12 @@ class SCIONElement(object):
                         Result().get_addrs_dst_host() is not None and
                         Result().get_path_iof_idx() is not None and
                         Result().get_path_hof_idx() is not None and
-                        SVC_TO_SERVICE.__contains__(cast(SCIONL4Packet, Result()).get_addrs_dst_host_addr()) and
+                        Implies(from_local_as, Let(cast(SCIONL4Packet, Result()).get_path(), bool, lambda path:
+                                                            Unfolding(Acc(cast(SCIONL4Packet, Result()).State(), 1 / 10),
+                                                                path.get_hof_idx() + 1 < path.get_ofs_len() and
+                                                                isinstance(path.ofs_get_by_idx(path.get_hof_idx() + 1), HopOpaqueField) and
+                                                                path.ofs_get_by_idx(path.get_hof_idx() + 1) is not path.ofs_get_by_idx(path.get_hof_idx())
+                                                        ))) and
                         (Unfolding(Acc(cast(SCIONL4Packet, Result()).State(), 1 / 10), Let(cast(SCIONL4Packet, Result()).path, bool, lambda path:
                             path.get_hof_idx() < path.get_ofs_len() - 1 and
                             Let(cast(HopOpaqueField, Unfolding(Acc(path.State(), 1 / 10), path._ofs.get_by_idx(path._hof_idx + 1))), bool, lambda hof:
@@ -351,6 +357,7 @@ class SCIONElement(object):
                         map_scion_packet_to_adt(Result()) == self.bytes_to_adt(packet)
                         )
                 )
+        Ensures(Implies(not is_wellformed_packet(packet), Result() is None))
         # Ensures(Implies(is_wellformed_packet(packet), Result() is not None and
         #                                               Result().State() and
         #                                               Result().matches(packet)))
@@ -391,6 +398,7 @@ class SCIONElement(object):
         pass
 
     def _scmp_validate_error(self, pkt: SCIONExtPacket, e: SCMPError) -> None:
+        Requires(MustTerminate(1))
         # if pkt.cmn_hdr.next_hdr == L4Proto.SCMP and pkt.ext_hdrs[0].error:
         #     # Never respond to an SCMP error with an SCMP error.
         #     logging.info(

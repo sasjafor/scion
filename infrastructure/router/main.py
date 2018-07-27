@@ -220,9 +220,6 @@ class Router(SCIONElement):
             Requires(token(t, 2) and udp_send(t, packed(packet), str(dst), dst_port, t2)),
             Ensures(Acc(self.State(), 1 / 10)),
             Ensures(Acc(packet.State(), 1 / 8)),
-            Exsures(SCIONBaseError, Acc(self.State(), 1 / 10)),
-            Exsures(SCIONBaseError, Acc(packet.State(), 1 / 8)),
-            Exsures(SCIONBaseError, Acc(RaisedException().args_)),
             Ensures(Result() is t2 and token(t2))
         ))
         """
@@ -259,9 +256,6 @@ class Router(SCIONElement):
         Ensures(Acc(spkt.State(), 1/9))
         Ensures(Acc(self.State(), 1/10))
         Ensures(len(Result()) == 0)
-        # Exsures(SCIONBaseError, Acc(spkt.State(), 1/9))
-        # Exsures(SCIONBaseError, Acc(self.State(), 1/10))
-        # Exsures(SCIONBaseError, Acc(RaisedException().args_))
         if pre_routing_phase:
             prefix = "pre"
             handlers = self.get_pre_ext_handlers() # type: Dict[int, bool]
@@ -279,9 +273,6 @@ class Router(SCIONElement):
         ext_hdrs_enum = enumerate(ext_hdrs)
         Fold(Acc(spkt.State(), 1/9))
         for i, ext_hdr in ext_hdrs_enum:
-            # Invariant(Acc(spkt.ext_hdrs, 1/9))
-            # Invariant(Acc(list_pred(spkt.ext_hdrs), 1/9))
-            # Invariant(len(spkt.ext_hdrs) == 0)
             Invariant(Acc(spkt.State(), 1/9))
             Invariant(spkt.get_ext_hdrs_len() == 0)
             Invariant(MustTerminate(1))
@@ -556,9 +547,22 @@ class Router(SCIONElement):
             Ensures(Acc(spkt.State(), 1/9)),
             Ensures(Acc(self.State(), 1/9)),
             Ensures(dict_pred(SVC_TO_SERVICE)),
-            Exsures(SCIONBaseError, Acc(spkt.State(), 1/9)),
-            Exsures(SCIONBaseError, Acc(self.State(), 1/9)),
-            Exsures(SCIONBaseError, dict_pred(SVC_TO_SERVICE)),
+            Exsures(SCMPDeliveryNonLocal, Acc(spkt.State(), 1/9)),
+            Exsures(SCMPDeliveryNonLocal, Acc(self.State(), 1/9)),
+            Exsures(SCMPDeliveryNonLocal, Acc(RaisedException().args_)),
+            Exsures(SCMPDeliveryNonLocal, dict_pred(SVC_TO_SERVICE)),
+            Exsures(SCMPDeliveryFwdOnly, Acc(spkt.State(), 1 / 9)),
+            Exsures(SCMPDeliveryFwdOnly, Acc(self.State(), 1 / 9)),
+            Exsures(SCMPDeliveryFwdOnly, Acc(RaisedException().args_)),
+            Exsures(SCMPDeliveryFwdOnly, dict_pred(SVC_TO_SERVICE)),
+            Exsures(SCMPNonRoutingHOF, Acc(spkt.State(), 1 / 9)),
+            Exsures(SCMPNonRoutingHOF, Acc(self.State(), 1 / 9)),
+            Exsures(SCMPNonRoutingHOF, Acc(RaisedException().args_)),
+            Exsures(SCMPNonRoutingHOF, dict_pred(SVC_TO_SERVICE)),
+            Exsures(SCMPUnknownHost, Acc(spkt.State(), 1 / 9)),
+            Exsures(SCMPUnknownHost, Acc(self.State(), 1 / 9)),
+            Exsures(SCMPUnknownHost, Acc(RaisedException().args_)),
+            Exsures(SCMPUnknownHost, dict_pred(SVC_TO_SERVICE)),
             # Exsures(SCIONBaseError, spkt.get_addrs() is not None and spkt.get_path() is not None and spkt.get_addrs_dst() is not None and spkt.get_addrs_dst_host() is not None and spkt.get_path_hof_idx() is not None),
             # Exsures(SCMPDeliveryNonLocal, (not force and not ((spkt.get_addrs_dst_isd_as() is None and self.get_addr_isd_as() is None) or (spkt.get_addrs_dst_isd_as() is not None and self.eq_isd_as(spkt))))),
             # Exsures(SCMPDeliveryFwdOnly, (spkt.get_path_len() != 0 and ((not force and spkt.get_path_hof_forward_only(spkt.get_path_hof()))))),
@@ -591,7 +595,6 @@ class Router(SCIONElement):
         addr = spkt.get_addrs_dst_host()
         if addr.TYPE is not None and addr.TYPE == AddrType.SVC:
             # Send request to any server.
-            # try:
             if SVC_TO_SERVICE.__contains__(spkt.get_addrs_dst_host_addr()):
                 service = SVC_TO_SERVICE[spkt.get_addrs_dst_host_addr()]
                 addr = self.get_srv_addr(service, spkt)
@@ -606,20 +609,23 @@ class Router(SCIONElement):
         Requires(Acc(self.State(), 1/9))
         Requires(path.get_iof_idx() is not None)
         Requires(path.get_hof_idx() is not None)
-        Requires(Unfolding(Acc(path.State(), (1/10)), Let(cast(InfoOpaqueField, path._ofs.get_by_idx(path._iof_idx)), bool, (lambda iof: Unfolding(Acc(path._ofs.State(), (1 / 10)), not iof.get_peer())))))
+        Requires(Implies(not ingress,
+                         path.get_hof_idx() + 1 < path.get_ofs_len() and
+                         isinstance(path.ofs_get_by_idx(path.get_hof_idx() + 1), HopOpaqueField) and
+                         path.ofs_get_by_idx(path.get_hof_idx() + 1) is not path.ofs_get_by_idx(path.get_hof_idx())
+                         )
+                 )
         Requires(MustTerminate(5))
         Ensures(Acc(path.State(), 1/9))
         Ensures(Acc(self.State(), 1/9))
         Ensures(path.get_iof_idx() is not None)
         Ensures(path.get_hof_idx() is not None)
         Ensures(valid_hof(path))
-        Exsures(SCIONOFExpiredError, Acc(path.State(), 1/9))
-        Exsures(SCIONOFExpiredError, Acc(self.State(), 1/9))
         Exsures(SCIONBaseError, Acc(path.State(), 1/9))
         Exsures(SCIONBaseError, Acc(self.State(), 1/9))
         Exsures(SCIONBaseError, Acc(RaisedException().args_))
-        Exsures(SCIONIFVerificationError, len(RaisedException().args_) >= 2)
-        Exsures(SCIONOFVerificationError, len(RaisedException().args_) >= 2)
+        Exsures(SCIONIFVerificationError, len(RaisedException().args_) == 2)
+        Exsures(SCIONOFVerificationError, len(RaisedException().args_) == 2)
         #Exsures(SCIONBaseError, not valid_hof(path))
         """Verify freshness and authentication of an opaque field."""
         iof = path.get_iof()
@@ -646,9 +652,6 @@ class Router(SCIONElement):
             Requires(token(t, 3) and udp_send(t, packed(spkt), str(self.get_interface_to_addr()), self.get_interface_to_udp_port(), t2)),
             Ensures(Acc(self.State(), 1/10)),
             Ensures(Acc(spkt.State(), 1/9)),
-            Exsures(SCIONBaseError, Acc(self.State(), 1/10)),
-            Exsures(SCIONBaseError, Acc(spkt.State(), 1/9)),
-            Exsures(SCIONBaseError, Acc(RaisedException().args_)),
             Ensures(Result() is t2 and token(t2))
         ))
         addr = self.get_interface_to_addr()
@@ -669,12 +672,16 @@ class Router(SCIONElement):
         Requires(spkt.get_path_hof_idx() is not None)
         Requires(spkt.get_addrs_dst_host() is not None)
         Requires(spkt.get_ext_hdrs_len() == 0)
-        Requires(Unfolding(Acc(spkt.State(), 1 / 10),
-                    Let(cast(InfoOpaqueField, Unfolding(Acc(spkt.path.State(), (1 / 10)), spkt.path._ofs.get_by_idx(spkt.path._iof_idx))), bool, lambda iof:
-                        not spkt.path.get_iof_peer(iof)))
-                 )
         Requires(dict_pred(SVC_TO_SERVICE))
-        Requires(SVC_TO_SERVICE.__contains__(spkt.get_addrs_dst_host_addr()))
+        Requires(Implies(from_local_as,
+                         Let(spkt.get_path(), bool, lambda path:
+                         Unfolding(Acc(spkt.State(), 1 / 10),
+                                   path.get_hof_idx() + 1 < path.get_ofs_len() and
+                                   isinstance(path.ofs_get_by_idx(path.get_hof_idx() + 1), HopOpaqueField) and
+                                   path.ofs_get_by_idx(path.get_hof_idx() + 1) is not path.ofs_get_by_idx(
+                                       path.get_hof_idx())
+                                   )))
+                 )
         Requires(Unfolding(Acc(spkt.State(), 1 / 10), Let(spkt.path, bool, lambda path:
                     path.get_hof_idx() < path.get_ofs_len() - 1 and
                     Let(cast(HopOpaqueField, Unfolding(Acc(path.State(), 1 / 10), path._ofs.get_by_idx(path._hof_idx + 1))), bool, lambda hof:
@@ -752,11 +759,15 @@ class Router(SCIONElement):
         Requires(spkt.get_path_hof_idx() is not None)
         Requires(spkt.get_addrs_dst_host() is not None)
         Requires(spkt.get_ext_hdrs_len() == 0)
-        Requires(Unfolding(Acc(spkt.State(), 1/10),
-                           Let(cast(InfoOpaqueField, Unfolding(Acc(spkt.path.State(), (1 / 10)), spkt.path._ofs.get_by_idx(spkt.path._iof_idx))), bool,
-                               (lambda iof: not spkt.path.get_iof_peer(iof)))))
+        Requires(Implies(not ingress,
+                         Let(spkt.get_path(), bool, lambda path:
+                            Unfolding(Acc(spkt.State(), 1/10),
+                                path.get_hof_idx() + 1 < path.get_ofs_len() and
+                                isinstance(path.ofs_get_by_idx(path.get_hof_idx() + 1), HopOpaqueField) and
+                                path.ofs_get_by_idx(path.get_hof_idx() + 1) is not path.ofs_get_by_idx(path.get_hof_idx())
+                         )))
+                 )
         Requires(dict_pred(SVC_TO_SERVICE))
-        Requires(SVC_TO_SERVICE.__contains__(spkt.get_addrs_dst_host_addr()))
         Requires(Unfolding(Acc(spkt.State(), 1 / 10), Let(spkt.path, bool, lambda path:
                     path.get_hof_idx() < path.get_ofs_len() - 1 and
                     Let(cast(HopOpaqueField, Unfolding(Acc(path.State(), 1 / 10), path._ofs.get_by_idx(path._hof_idx + 1))), bool, lambda hof:
@@ -776,30 +787,16 @@ class Router(SCIONElement):
                     Implies(path.get_hof_idx() < path.get_ofs_len() - 2,
                         isinstance(path.ofs_get_by_idx(path.get_hof_idx() + 2), HopOpaqueField))))
                  )
-        # Requires(Unfolding(Acc(self.State(), 1 / 10), self.ifid2br.__contains__(spkt.get_path_fwd_if())))
         Requires(MustTerminate(self.get_topology_border_routers_len() + 6))
         Ensures(Acc(spkt.State()))
         Ensures(Acc(self.State(), 1/2))
         Ensures(dict_pred(SVC_TO_SERVICE))
-        Exsures(SCMPNonRoutingHOF, Acc(spkt.State()))
-        Exsures(SCIONSegmentSwitchError, Acc(spkt.State()))
-        Exsures(SCMPBadIF, Acc(spkt.State()))
-        Exsures(SCIONIFVerificationError, Acc(spkt.State()))
-        Exsures(SCIONOFVerificationError, Acc(spkt.State()))
-        Exsures(SCIONOFExpiredError, Acc(spkt.State()))
-        Exsures(SCMPBadExtOrder, Acc(spkt.State()))
-        Exsures(SCMPBadHopByHop, Acc(spkt.State()))
-        Exsures(SCMPTooManyHopByHop, Acc(spkt.State()))
         Exsures(SCIONBaseException, Acc(spkt.State()))
         Exsures(SCIONBaseException, Acc(self.State(), 1/2))
         Exsures(SCIONBaseException, dict_pred(SVC_TO_SERVICE))
-        # Exsures(SCIONSegmentSwitchError, Acc(RaisedException().args_))
-        Exsures(SCIONIFVerificationError, Acc(RaisedException().args_))
-        Exsures(SCIONOFVerificationError, Acc(RaisedException().args_))
-        Exsures(SCIONSegmentSwitchError, Acc(RaisedException().args_))
         Exsures(SCIONBaseException, Acc(RaisedException().args_))
-        Exsures(SCIONIFVerificationError, len(RaisedException().args_) >= 2)
-        Exsures(SCIONOFVerificationError, len(RaisedException().args_) >= 2)
+        Exsures(SCIONIFVerificationError, len(RaisedException().args_) == 2)
+        Exsures(SCIONOFVerificationError, len(RaisedException().args_) == 2)
         Exsures(SCIONSegmentSwitchError, len(RaisedException().args_) >= 1)
         # Exsures(SCIONBaseException, True)
         # Exsures(SCIONBaseError, Unfolding(Rd(spkt.State()), spkt.path != None))
@@ -812,30 +809,24 @@ class Router(SCIONElement):
             # This also needs to look at the specific MTU for the relevant link
             # if on egress.
             #  raise SCMPOversizePkt("Packet larger than mtu", mtu)
-            # Assert(Acc(spkt.State()))
-            # Assert(Acc(self.State(), 1 / 2))
             pass
-        # assert spkt.get_ext_hdrs_len() == 0
         Unfold(Acc(spkt.State(), 1/4))
         # self.verify_hof(path, ingress=ingress)
-        self.verify_hof(spkt.path, ingress=ingress)
+        try:
+            self.verify_hof(spkt.path, ingress=ingress)
+        finally:
+            Fold(Acc(spkt.State(), 1/4))
+        Unfold(Acc(spkt.State(), 1 / 4))
         hof = spkt.path.get_hof()
         Fold(Acc(spkt.State(), 1/4))
-        # assert spkt.get_ext_hdrs_len() == 0
         if spkt.get_path_hof_verify_only(hof):
-            # Fold(Acc(spkt.State(), 1/4))
-            # Assert(Acc(spkt.State()))
-            # Assert(Acc(self.State(), 1/2))
             raise SCMPNonRoutingHOF
         # FIXME(aznair): Remove second condition once PathCombinator is less
         # stupid.
-        # assert spkt.get_ext_hdrs_len() == 0
         spkt_isd_as = spkt.get_addrs_dst_isd_as()
         self_isd_as = self.get_addr_isd_as()
         if ((spkt_isd_as is None and self_isd_as is None) or (spkt_isd_as is not None and self.eq_isd_as(spkt))) and spkt.path_call_is_on_last_segment():
-            # Fold(Acc(spkt.State(), 1/4))
             self.deliver(t, spkt)
-            # Assert(Acc(spkt.State()))
             return t
         if ingress:
             Unfold(Acc(spkt.State(), 1 / 10))
@@ -844,78 +835,53 @@ class Router(SCIONElement):
             prev_hof = path.get_hof()
             prev_iof_idx = path.get_of_idxs()[0]
             Fold(Acc(spkt.State(), 1 / 10))
-            # assert spkt.get_ext_hdrs_len() == 0
-            # Assert(Acc(spkt.State()))
             fwd_if, path_incd, skipped_vo = self._calc_fwding_ingress(spkt)
-            # assert spkt.get_ext_hdrs_len() == 0
-            # Assert(Acc(spkt.State()))
             Unfold(Acc(spkt.State(), 1 / 10))
             # path = spkt.path # seemingly necessary after call to _calc_fwding_ingress
             cur_iof_idx = path.get_of_idxs()[0]
             if prev_iof_idx != cur_iof_idx:
-                self._validate_segment_switch(
-                    path, fwd_if, prev_if, prev_iof, prev_hof)
-                Fold(Acc(spkt.State(), 1 / 10))
-                # Assert(Acc(spkt.State()))
+                try:
+                    self._validate_segment_switch(path, fwd_if, prev_if, prev_iof, prev_hof)
+                finally:
+                    Fold(Acc(spkt.State(), 1/10))
             elif skipped_vo:
                 Fold(Acc(spkt.State(), 1 / 10))
-                # Fold(Acc(spkt.State(), 1 / 4))
-                # Assert(Acc(spkt.State()))
-                # Assert(Acc(self.State(), 1 / 2))
                 raise SCIONSegmentSwitchError("Skipped verify only field, but "
                                               "did not switch segments.")
             else:
                 Fold(Acc(spkt.State(), 1 / 10))
-            # Assert(Acc(spkt.State()))
         else:
-            # assert spkt.get_ext_hdrs_len() == 0
             Unfold(Acc(spkt.State(), 1 / 10))
             fwd_if = path.get_fwd_if()
             Fold(Acc(spkt.State(), 1 / 10))
-            # assert spkt.get_ext_hdrs_len() == 0
             path_incd = False
-            # Assert(Acc(spkt.State()))
-        # assert spkt.get_ext_hdrs_len() == 0
-        # Assert(Acc(spkt.State()))
-        try:
+        if Unfolding(Acc(self.State(), 1/10), self.ifid2br.__contains__(fwd_if)):
             # br = self.ifid2br[fwd_if]
             br = self.get_ifid2br_elem(fwd_if)
             if_addr, port = self.get_br_addr(br), self.get_br_port(br)
             # if_addr, port = br.addr, br.port
-        except KeyError:
+        # except KeyError:
+        else:
             # So that the error message will show the current state of the
             # packet.
-            assert False
             spkt.update()
             logging.error("Cannot forward packet, fwd_if is invalid (%s):\n%s",
                           fwd_if, spkt)
             raise SCMPBadIF(fwd_if) from None
         # if not self.if_states[fwd_if].is_active:
-        # assert spkt.get_ext_hdrs_len() == 0
-        # Assert(Acc(spkt.State()))
         if not self.get_if_states_elem_is_active(fwd_if):
             if drop_on_error:
                 logging.debug("IF is down, but drop_on_error is set, dropping")
-                # Fold(Acc(spkt.State(), 1 / 4))
-                # Assert(Acc(spkt.State()))
                 return t
-            # Fold(Acc(spkt.State(), 1 / 4))
             self.send_revocation(t, spkt, fwd_if, ingress, path_incd)
-            # Assert(Acc(spkt.State()))
             return t
-        # assert spkt.get_ext_hdrs_len() == 0
-        # Assert(Acc(spkt.State()))
         if ingress:
             logging.debug("Sending to IF %s (%s:%s)", fwd_if, if_addr, port)
-            # Fold(Acc(spkt.State(), 1 / 4))
-            # Assert(Acc(spkt.State()))
             return self.send(t, spkt, if_addr, port)
         else:
-            # Fold(Acc(spkt.State(), 1 / 4))
             Unfold(Acc(spkt.State()))
             path.inc_hof_idx()
             Fold(Acc(spkt.State()))
-            # Assert(Acc(spkt.State()))
             return self._egress_forward(t, spkt)
 
     def _validate_segment_switch(self, path: SCIONPath, fwd_if: int, prev_if: int,
@@ -1006,8 +972,6 @@ class Router(SCIONElement):
         Ensures(spkt.get_ext_hdrs_len() == 0)
         Ensures(spkt.get_path_ofs_contents() is Old(spkt.get_path_ofs_contents()))
         Ensures(spkt.get_path() is Old(spkt.get_path()))
-        # Ensures(Unfolding(Acc(self.State(), 1 / 10), self.if_states.__contains__(Result()[0])))
-        # Ensures(Unfolding(Acc(self.State(), 1 / 10), self.ifid2br.__contains__(Result()[0])))
         Unfold(Acc(spkt.State(), 1/10))
         path = spkt.path
         hof = path.get_hof()
@@ -1141,7 +1105,7 @@ class Router(SCIONElement):
         Requires(self.get_topology_mtu() is not None)
         Requires(self.get_interface_to_addr() is not None)
         Requires(dict_pred(SVC_TO_SERVICE))
-        # Requires(MustTerminate(self.get_topology_border_routers_len() + 8))
+        Requires(MustTerminate(self.get_topology_border_routers_len() + 8))
         Ensures(Acc(self.State(), 1/2))
         Ensures(dict_pred(SVC_TO_SERVICE))
         Exsures(SCIONBaseException, Acc(self.State(), 1/2))
@@ -1155,32 +1119,28 @@ class Router(SCIONElement):
             True, if the packet was received on the local socket.
         """
         from_local_as = from_local_socket
-        pkt = self._parse_packet(packet)
+        pkt = self._parse_packet(packet, from_local_as)
         if not pkt:
             return t
         try:
             flags = self.handle_extensions(pkt, True, from_local_as)
         except SCMPError as e:
             self._scmp_validate_error(pkt, e)
-            # Assert(dict_pred(SVC_TO_SERVICE))
             return t
         stop, needs_local = self._process_flags(flags, pkt, from_local_as)
         if stop:
             logging.debug("Stopped processing")
-            # Assert(dict_pred(SVC_TO_SERVICE))
             return t
         try:
             needs_local = needs_local or self._needs_local_processing(pkt)
         except SCMPError as e:
             self._scmp_validate_error(pkt, e)
-            # Assert(dict_pred(SVC_TO_SERVICE))
             return t
         if needs_local:
             try:
                 pkt.parse_payload()
             except SCIONBaseError:
                 log_exception("Error parsing payload:\n%s" % hex_str(packet))
-                # Assert(dict_pred(SVC_TO_SERVICE))
                 return t
             handler = False  # self._get_handler(pkt)
         else:
@@ -1190,7 +1150,6 @@ class Router(SCIONElement):
                       "\n  %s\n  %s\n  handler: %s",
                       from_local_as, pkt.get_cmn_hdr(), pkt.get_addrs(), handler)
         if not handler:
-            # Assert(dict_pred(SVC_TO_SERVICE))
             return t
         try:
             return self.handle_data(t, pkt, from_local_as)
@@ -1198,7 +1157,6 @@ class Router(SCIONElement):
             self._scmp_validate_error(pkt, e)
         except SCIONBaseError:
             log_exception("Error handling packet: %s" % pkt)
-        # Assert(dict_pred(SVC_TO_SERVICE))
         return t
 
     """
@@ -1313,7 +1271,6 @@ class Router(SCIONElement):
     def get_topology_border_routers_len_1(self) -> int:
         Requires(Acc(self.topology, 1/10))
         Requires(Acc(self.topology.State(), 1/10))
-        # Ensures(Result() == Unfolding(Acc(self.topology.State(), 1/10), len(self.topology.border_routers())))
         Ensures(Result() >= 0)
         return Unfolding(Acc(self.topology.State(), 1/10), len(self.topology.border_routers()))
 
@@ -1346,41 +1303,28 @@ class Router(SCIONElement):
     @Pure
     def eq_isd_as(self, spkt: SCIONL4Packet) -> bool:
         Requires(Acc(self.State(), 1/10))
-        # Requires(Acc(self.addr, 1 / 10))
-        # Requires(Acc(self.addr.isd_as, 1 / 10))
-        # Requires(Acc(self.addr.isd_as.State(), 1 / 10))
         Requires(Acc(spkt.State(), 1 / 10))
         Requires(spkt.get_addrs() is not None)
         Requires(spkt.get_addrs_dst() is not None)
         Requires(spkt.get_addrs_dst_isd_as() is not None)
-        # Requires(Implies(isinstance(other, ISD_AS), Acc(cast(ISD_AS, other).State(), 1 / 10)))
         return Unfolding(Acc(spkt.State(), 1 / 10), self.eq_isd_as_1(spkt))
 
     @Pure
     def eq_isd_as_1(self, spkt: SCIONL4Packet) -> bool:
         Requires(Acc(self.State(), 1 / 10))
-        # Requires(Acc(self.addr, 1 / 10))
-        # Requires(Acc(self.addr.isd_as, 1 / 10))
-        # Requires(Acc(self.addr.isd_as.State(), 1 / 10))
         Requires(Acc(spkt.addrs, 1 / 10))
         Requires(Acc(spkt.addrs.State(), 1 / 10))
         Requires(spkt.get_addrs_dst_1() is not None)
         Requires(spkt.get_addrs_dst_isd_as_1() is not None)
-        # Requires(Implies(isinstance(other, ISD_AS), Acc(cast(ISD_AS, other).State(), 1 / 10)))
         return Unfolding(Acc(spkt.addrs.State(), 1 / 10), self.eq_isd_as_2(spkt))
 
     @Pure
     def eq_isd_as_2(self, spkt: SCIONL4Packet) -> bool:
         Requires(Acc(self.State(), 1 / 10))
-        # Requires(Acc(self.addr, 1 / 10))
-        # Requires(Acc(self.addr.isd_as, 1 / 10))
-        # Requires(Acc(self.addr.isd_as.State(), 1 / 10))
         Requires(Acc(spkt.addrs, 1 / 10))
         Requires(Acc(spkt.addrs.dst, 1 / 10))
         Requires(Acc(spkt.addrs.dst.State(), 1 / 10))
         Requires(spkt.get_addrs_dst_isd_as_2() is not None)
-        # Requires(Implies(isinstance(other, ISD_AS), Acc(cast(ISD_AS, other).State(), 1 / 10)))
-        # return Unfolding(Acc(spkt.addrs.dst.State(), 1 / 10), spkt.addrs.dst.isd_as == other)
         return Unfolding(Acc(spkt.addrs.dst.State(), 1 / 10), self.eq_isd_as_3(spkt))
 
     @Pure
@@ -1391,7 +1335,6 @@ class Router(SCIONElement):
         Requires(Acc(spkt.addrs.dst.isd_as, 1 / 10))
         Requires(Acc(spkt.addrs.dst.isd_as.State(), 1 / 10))
         Requires(spkt.addrs.dst.isd_as is not None)
-        # Requires(Implies(isinstance(other, ISD_AS), Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self.addr.State(), 1/10), Acc(cast(ISD_AS, other).State(), 1 / 10)))))
         return Unfolding(Acc(self.State(), 1 / 10), self.eq_isd_as_4(spkt))
 
     @Pure
@@ -1403,7 +1346,6 @@ class Router(SCIONElement):
         Requires(Acc(spkt.addrs.dst.isd_as, 1 / 10))
         Requires(Acc(spkt.addrs.dst.isd_as.State(), 1 / 10))
         Requires(spkt.addrs.dst.isd_as is not None)
-        # Requires(Implies(isinstance(other, ISD_AS), Unfolding(Acc(self.addr.State(), 1/10), Acc(cast(ISD_AS, other).State(), 1 / 10))))
         return Unfolding(Acc(self.addr.State(), 1 / 10), spkt.addrs.dst.isd_as == self.addr.isd_as)
 
     @Pure
@@ -1415,7 +1357,7 @@ class Router(SCIONElement):
     @ContractOnly
     def get_ifid2br_elem(self, fwd_if: int) -> RouterElement:
         Requires(Acc(self.State(), 1/10))
-        # Requires(Unfolding(Acc(self.State(), 1/10), self.ifid2br.__contains__(fwd_if)))
+        Requires(Unfolding(Acc(self.State(), 1/10), self.ifid2br.__contains__(fwd_if)))
         Ensures(Result() in self.get_topology_border_routers())
         return Unfolding(Acc(self.State(), 1/10), self.ifid2br[fwd_if])
 
@@ -1424,7 +1366,7 @@ class Router(SCIONElement):
     def get_if_states_elem_is_active(self, fwd_if: int) -> bool:
         Requires(Acc(self.State(), 1 / 10))
         # Requires(Unfolding(Acc(self.State(), 1/10), self.if_states.__contains__(fwd_if)))
-        return Unfolding(Acc(self.State(), 1 / 10), self.get_if_states_elem_is_active_1(self.if_states[fwd_if]))
+        return Unfolding(Acc(self.State(), 1 / 10), self.get_if_states_elem_is_active_1(cast(InterfaceState, self.if_states[fwd_if])))
 
     @Pure
     def get_if_states_elem_is_active_1(self, if_state: InterfaceState) -> bool:
@@ -1442,12 +1384,10 @@ class Router(SCIONElement):
     #     return self.ifid2br[fwd_if]
 
     @Pure
-    @ContractOnly
     def get_br_addr(self, br: RouterElement) -> Optional[HostAddrBase]:
         Requires(Acc(self.State(), 1/10))
         Requires(br in self.get_topology_border_routers())
         Ensures(br in self.get_topology_border_routers())
-        # Ensures(Implies(br in self.get_topology_border_routers(), Result() is not None))
         Ensures(Result() is not None)
         return Unfolding(Acc(self.State(), 1 / 10), self.get_br_addr_1(br))
 
@@ -1457,13 +1397,11 @@ class Router(SCIONElement):
         Requires(Acc(self.topology.State(), 1 / 10))
         Requires(br in self.topology.get_border_routers())
         Ensures(br in self.topology.get_border_routers())
-        # Ensures(Implies(br in self.topology.get_border_routers(), Result() is not None))
         Ensures(Result() is not None)
         return Unfolding(Acc(self.topology.State(), 1 / 10), self.get_br_addr_2(br))
 
     @Pure
     def get_br_addr_2(self, br: RouterElement) -> Optional[HostAddrBase]:
-        Requires(Acc(br.State(), 1 / 10))
         Requires(Acc(self.topology, 1/10))
         Requires(Acc(self.topology.parent_border_routers, 1 / 20))
         Requires(Acc(self.topology.child_border_routers, 1 / 20))
@@ -1473,26 +1411,36 @@ class Router(SCIONElement):
         Requires(Forall(self.topology.border_routers(), lambda e: (e.get_addr() is not None)))
         Requires(br in self.topology.border_routers())
         Ensures(br in self.topology.border_routers())
-        # Ensures(Implies(br in self.topology.border_routers(), Result() is not None))
         Ensures(Result() is not None)
         return Unfolding(Acc(br.State(), 1 / 10), br.addr)
 
     @Pure
-    @ContractOnly
     def get_br_port(self, br: RouterElement) -> Optional[int]:
         Requires(Acc(self.State(), 1 / 10))
         Requires(br in self.get_topology_border_routers())
+        Ensures(br in self.get_topology_border_routers())
         Ensures(Result() is not None)
         return Unfolding(Acc(self.State(), 1 / 10), self.get_br_port_1(br))
 
     @Pure
     def get_br_port_1(self, br: RouterElement) -> Optional[int]:
-        Requires(Acc(self.topology, 1/10))
+        Requires(Acc(self.topology, 1 / 10))
         Requires(Acc(self.topology.State(), 1 / 10))
         Requires(br in self.topology.get_border_routers())
+        Ensures(br in self.topology.get_border_routers())
+        Ensures(Result() is not None)
         return Unfolding(Acc(self.topology.State(), 1 / 10), self.get_br_port_2(br))
 
     @Pure
     def get_br_port_2(self, br: RouterElement) -> Optional[int]:
-        Requires(Acc(br.State(), 1 / 10))
+        Requires(Acc(self.topology, 1 / 10))
+        Requires(Acc(self.topology.parent_border_routers, 1 / 20))
+        Requires(Acc(self.topology.child_border_routers, 1 / 20))
+        Requires(Acc(self.topology.peer_border_routers, 1 / 20))
+        Requires(Acc(self.topology.routing_border_routers, 1 / 20))
+        Requires(Forall(self.topology.border_routers(), lambda e: (Acc(e.State(), 1 / 10))))
+        Requires(Forall(self.topology.border_routers(), lambda e: (e.get_port() is not None)))
+        Requires(br in self.topology.border_routers())
+        Ensures(br in self.topology.border_routers())
+        Ensures(Result() is not None)
         return Unfolding(Acc(br.State(), 1 / 10), br.port)
