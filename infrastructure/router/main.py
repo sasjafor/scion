@@ -20,6 +20,8 @@ import logging
 import threading
 import time
 import zlib
+
+from adt import map_scion_packet_to_adt
 from collections import defaultdict
 
 # External packages
@@ -523,7 +525,6 @@ class Router(SCIONElement):
             Requires(spkt.get_path() is not None),
             Requires(spkt.get_addrs_dst() is not None),
             Requires(spkt.get_addrs_dst_host() is not None),
-            # Requires(SVC_TO_SERVICE.__contains__(spkt.get_addrs_dst_host_addr())),
             Requires(spkt.get_path_hof_idx() is not None),
             Requires(spkt.get_ext_hdrs_len() == 0),
             Requires(MustTerminate(4)),
@@ -533,12 +534,14 @@ class Router(SCIONElement):
             # Requires(not (spkt.get_path_len() and spkt.get_path_hof_verify_only(spkt.get_path_hof()))),
             # Requires(not (spkt.get_addrs_dst_host().TYPE is not None and spkt.get_addrs_dst_host().TYPE == AddrType.SVC and
             #                       not SVC_TO_SERVICE.__contains__(spkt.get_addrs_dst_host_addr()))),
-            Requires(Implies(not (not force and not ((spkt.get_addrs_dst_isd_as() is None and self.get_addr_isd_as() is None) or (spkt.get_addrs_dst_isd_as() is not None and self.eq_isd_as(spkt)))) and
-                             not (spkt.get_path_len() and ((not force and spkt.get_path_hof_forward_only(spkt.get_path_hof())))) and
-                             not (spkt.get_path_len() and spkt.get_path_hof_verify_only(spkt.get_path_hof())) and
-                             not (spkt.get_addrs_dst_host().TYPE is not None and spkt.get_addrs_dst_host().TYPE == AddrType.SVC and
-                                  not SVC_TO_SERVICE.__contains__(spkt.get_addrs_dst_host_addr())),
-                                udp_send(t, packed(spkt), str(spkt.get_addrs_dst_host()), SCION_UDP_EH_DATA_PORT, t2))),
+            # Requires(Implies(not (not force and not ((spkt.get_addrs_dst_isd_as() is None and self.get_addr_isd_as() is None) or (spkt.get_addrs_dst_isd_as() is not None and self.eq_isd_as(spkt)))) and
+            #                  not (spkt.get_path_len() and ((not force and spkt.get_path_hof_forward_only(spkt.get_path_hof())))) and
+            #                  not (spkt.get_path_len() and spkt.get_path_hof_verify_only(spkt.get_path_hof())) and
+            #                  not (spkt.get_addrs_dst_host().TYPE is not None and spkt.get_addrs_dst_host().TYPE == AddrType.SVC and
+            #                       not SVC_TO_SERVICE.__contains__(spkt.get_addrs_dst_host_addr())),
+            #                     udp_send(t, packed(spkt), str(spkt.get_addrs_dst_host()), SCION_UDP_EH_DATA_PORT, t2))),
+            Requires(Let(map_scion_packet_to_adt(spkt), bool, lambda pkt_adt:
+                        (not force and not (pkt_adt.addrs.dst.isd_as is None and self.get_addr_isd_as() is None) or (pkt_adt.addrs.dst.isd_as is not None and pkt_adt.addrs.dst.isd_as == self.get_addr_isd_as())))),
             # Requires(udp_send(t, packed(spkt), str(spkt.get_addrs_dst_host()), SCION_UDP_EH_DATA_PORT, t2)),
             # Requires(Implies(not (not force and spkt.get_addrs_dst_isd_as() != self.get_addr_isd_as()) and
             #                  not (spkt.get_path_len() and ((not force and spkt.get_path_hof_forward_only(spkt.get_path_hof())) or
