@@ -20,11 +20,11 @@ class UDPSocket(Socket):
 
     @ContractOnly
     def send(self, t: Place, data: bytes, dst: Tuple[str, int]=None) -> Tuple[bool, Place]:
-        # IOExists1(Place)(lambda t2: (
-        Requires(MustTerminate(1))
-        #     Requires(dst is not None and token(t, 1) and udp_send(t, data, dst[0], dst[1], t2)),
-        #     Ensures(Result()[1] is t2 and token(t2))
-        # ))
+        IOExists1(Place)(lambda t2: (
+            Requires(MustTerminate(1)),
+            Requires(dst is not None and token(t, 1) and udp_send(t, data, dst[0], dst[1], t2)),
+            Ensures(Result()[1] is t2 and token(t2))
+        ))
         ...
 
 class ReliableSocket(Socket):

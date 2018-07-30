@@ -21,7 +21,7 @@ import threading
 import time
 import zlib
 
-from adt import map_scion_packet_to_adt
+from sascha.adt import map_scion_packet_to_adt
 from collections import defaultdict
 
 # External packages
@@ -541,7 +541,8 @@ class Router(SCIONElement):
             #                       not SVC_TO_SERVICE.__contains__(spkt.get_addrs_dst_host_addr())),
             #                     udp_send(t, packed(spkt), str(spkt.get_addrs_dst_host()), SCION_UDP_EH_DATA_PORT, t2))),
             Requires(Let(map_scion_packet_to_adt(spkt), bool, lambda pkt_adt:
-                        (not force and not (pkt_adt.addrs.dst.isd_as is None and self.get_addr_isd_as() is None) or (pkt_adt.addrs.dst.isd_as is not None and pkt_adt.addrs.dst.isd_as == self.get_addr_isd_as())))),
+                        (Implies(not force and not (pkt_adt.addrs.dst.isd_as is None and self.get_addr_isd_as() is None) or (pkt_adt.addrs.dst.isd_as is not None and pkt_adt.addrs.dst.isd_as == self.get_addr_isd_as()),
+                     udp_send(t, packed(spkt), str(spkt.get_addrs_dst_host()), SCION_UDP_EH_DATA_PORT, t2))))),
             # Requires(udp_send(t, packed(spkt), str(spkt.get_addrs_dst_host()), SCION_UDP_EH_DATA_PORT, t2)),
             # Requires(Implies(not (not force and spkt.get_addrs_dst_isd_as() != self.get_addr_isd_as()) and
             #                  not (spkt.get_path_len() and ((not force and spkt.get_path_hof_forward_only(spkt.get_path_hof())) or
