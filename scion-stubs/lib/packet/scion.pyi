@@ -897,7 +897,7 @@ class SCIONL4Packet(SCIONExtPacket):
 @Pure
 @ContractOnly
 def packed(spkt: SCIONBasePacket) -> bytes:
-    Requires(Acc(spkt.State(), 1/10))
+    Requires(Acc(spkt.State(), 1/20))
 
 @Pure
 def extensions_match(next_hdr: int, hdrs: List[ExtensionHeader], packet: bytes, offset: int) -> bool:
