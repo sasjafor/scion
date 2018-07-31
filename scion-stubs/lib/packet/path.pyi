@@ -28,7 +28,17 @@ class SCIONPath(Serializable, Sized):
 
     @Predicate
     def State(self) -> bool:
-        return (Acc(self._ofs) and self._ofs.State() and
+        """
+        State of SCIONPath
+        First comes the general part that holds for any instance of a path.
+        The second part only holds for the specific case where there is one
+        up segment in the path and there is no peering. It is needed for
+        guaranteeing that get_hof_ver returns an object of type HopOpaqueField.
+        The third part is also only for the specific case. It is needed, because
+        with only one segment, we can't switch to a next segment in inc_hof_idx.
+        """
+        return (# First part
+                Acc(self._ofs) and self._ofs.State() and
                 Acc(self._hof_idx) and
                 Acc(self._iof_idx) and
                 Acc(self.interfaces) and Acc(list_pred(self.interfaces)) and
@@ -39,6 +49,7 @@ class SCIONPath(Serializable, Sized):
                 Implies(self._iof_idx is not None,
                         self._iof_idx >= 0 and self._iof_idx < self.state_get_ofs_len() and
                         isinstance(self._ofs.get_by_idx(self._iof_idx), InfoOpaqueField)) and
+                # Start of the second part
                 Implies(self._hof_idx is not None and
                         self._iof_idx is not None,
                         Let(cast(InfoOpaqueField, self._ofs.get_by_idx(self._iof_idx)), bool, lambda iof:
@@ -54,6 +65,7 @@ class SCIONPath(Serializable, Sized):
                                     )
                             )
                         ) and
+                # Start of the third part
                 Implies(self._hof_idx is not None and
                         self._iof_idx is not None and
                         self._hof_idx < self.state_get_ofs_len() - 1,

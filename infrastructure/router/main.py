@@ -1370,11 +1370,10 @@ class Router(SCIONElement):
         return Unfolding(Acc(self.State(), 1/10), self.ifid2br)
 
     @Pure
-    @ContractOnly
+    # @ContractOnly
     def get_ifid2br_elem(self, fwd_if: int) -> RouterElement:
         Requires(Acc(self.State(), 1/10))
         Requires(Unfolding(Acc(self.State(), 1/10), self.ifid2br.__contains__(fwd_if)))
-        Ensures(Unfolding(Acc(self.State(), 1/10), self.ifid2br.__contains__(fwd_if)))
         Ensures(Result() in self.get_topology_border_routers())
         return Unfolding(Acc(self.State(), 1/10), self.ifid2br[fwd_if])
 
