@@ -535,12 +535,17 @@ class Router(SCIONElement):
             # Requires(not (spkt.get_path_len() and spkt.get_path_hof_verify_only(spkt.get_path_hof()))),
             # Requires(not (spkt.get_addrs_dst_host().TYPE is not None and spkt.get_addrs_dst_host().TYPE == AddrType.SVC and
             #                       not SVC_TO_SERVICE.__contains__(spkt.get_addrs_dst_host_addr()))),
-            # Requires(Implies(not (not force and not ((spkt.get_addrs_dst_isd_as() is None and self.get_addr_isd_as() is None) or (spkt.get_addrs_dst_isd_as() is not None and self.eq_isd_as(spkt)))),
-            #                  # not (spkt.get_path_len() and ((not force and spkt.get_path_hof_forward_only(spkt.get_path_hof())))) and
-            #                  # not (spkt.get_path_len() and spkt.get_path_hof_verify_only(spkt.get_path_hof())) and
-            #                  # not (spkt.get_addrs_dst_host().TYPE is not None and spkt.get_addrs_dst_host().TYPE == AddrType.SVC and
-            #                  #      SVC_TO_SERVICE.__contains__(spkt.get_addrs_dst_host_addr())),
-            #                     udp_send(t, packed(spkt), str(spkt.get_addrs_dst_host()), SCION_UDP_EH_DATA_PORT, t2))),
+            Requires(Implies(SVC_TO_SERVICE.__contains__(spkt.get_addrs_dst_host_addr()),
+                             SVC_TO_SERVICE[spkt.get_addrs_dst_host_addr()] is "hello")),
+            Requires(Implies(not (not force and not ((spkt.get_addrs_dst_isd_as() is None and self.get_addr_isd_as() is None) or (spkt.get_addrs_dst_isd_as() is not None and self.eq_isd_as(spkt)))) and
+                             not (spkt.get_path_len() and ((not force and spkt.get_path_hof_forward_only(spkt.get_path_hof())))) and
+                             not (spkt.get_path_len() and spkt.get_path_hof_verify_only(spkt.get_path_hof())),
+                             # not (spkt.get_addrs_dst_host().TYPE is not None and spkt.get_addrs_dst_host().TYPE == AddrType.SVC and
+                             #      SVC_TO_SERVICE.__contains__(spkt.get_addrs_dst_host_addr())),
+                             Implies((spkt.get_addrs_dst_host().TYPE is not None and spkt.get_addrs_dst_host().TYPE == AddrType.SVC) and SVC_TO_SERVICE.__contains__(spkt.get_addrs_dst_host_addr()),
+                                    udp_send(t, packed(spkt), str(self.get_srv_addr_pure(SVC_TO_SERVICE[spkt.get_addrs_dst_host_addr()], spkt)), SCION_UDP_EH_DATA_PORT, t2)) and
+                             Implies(not (spkt.get_addrs_dst_host().TYPE is not None and spkt.get_addrs_dst_host().TYPE == AddrType.SVC),
+                                     udp_send(t, packed(spkt), str(spkt.get_addrs_dst_host()), SCION_UDP_EH_DATA_PORT, t2)))),
             # Requires(Let(map_scion_packet_to_adt(spkt), bool, lambda pkt_adt:
             #             (Implies(not (not force and not (pkt_adt.addrs.dst.isd_as is None and self.get_addr_isd_as() is None) or (pkt_adt.addrs.dst.isd_as is not None and pkt_adt.addrs.dst.isd_as == self.get_addr_isd_as())),
             #          udp_send(t, packed(spkt), str(spkt.get_addrs_dst_host()), SCION_UDP_EH_DATA_PORT, t2))))),
@@ -551,8 +556,6 @@ class Router(SCIONElement):
             #             udp_send(t, packed(spkt), str(spkt.get_addrs_dst_host()), SCION_UDP_EH_DATA_PORT, t2))),
             # Requires(Implies((spkt.get_addrs_dst_host().TYPE is not None and spkt.get_addrs_dst_host().TYPE == AddrType.SVC) and SVC_TO_SERVICE.__contains__(spkt.get_addrs_dst_host_addr()),
             #                  udp_send(t, packed(spkt), str(self.get_srv_addr_pure(SVC_TO_SERVICE[spkt.get_addrs_dst_host_addr()], spkt)), SCION_UDP_EH_DATA_PORT, t2))),
-            Requires(Implies(SVC_TO_SERVICE.__contains__(spkt.get_addrs_dst_host_addr()),
-                             SVC_TO_SERVICE[spkt.get_addrs_dst_host_addr()] is "hello")),
             Requires(Implies(SVC_TO_SERVICE.__contains__(spkt.get_addrs_dst_host_addr()),
                              udp_send(t, packed(spkt), str(self.get_srv_addr_pure(SVC_TO_SERVICE[spkt.get_addrs_dst_host_addr()], spkt)), SCION_UDP_EH_DATA_PORT, t2))),
             Requires(Implies(not (spkt.get_addrs_dst_host().TYPE is not None and spkt.get_addrs_dst_host().TYPE == AddrType.SVC),
@@ -1371,6 +1374,7 @@ class Router(SCIONElement):
     def get_ifid2br_elem(self, fwd_if: int) -> RouterElement:
         Requires(Acc(self.State(), 1/10))
         Requires(Unfolding(Acc(self.State(), 1/10), self.ifid2br.__contains__(fwd_if)))
+        Ensures(Unfolding(Acc(self.State(), 1/10), self.ifid2br.__contains__(fwd_if)))
         Ensures(Result() in self.get_topology_border_routers())
         return Unfolding(Acc(self.State(), 1/10), self.ifid2br[fwd_if])
 
