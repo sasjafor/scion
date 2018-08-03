@@ -347,28 +347,24 @@ class SCIONPath(Serializable, Sized):
     @Pure
     def get_iof_idx(self) -> Optional[int]:
         Requires(Acc(self.State(), 1/10))
-        # Ensures(Result() is Unfolding(Acc(self.State(), 1/10), self._iof_idx))
         Ensures(Implies(Result() is not None, Result() >= 0 and Result() < self.get_ofs_len()))
         return Unfolding(Acc(self.State(), 1/10), self._iof_idx)
 
     @Pure
     def get_hof_idx(self) -> Optional[int]:
         Requires(Acc(self.State(), 1/10))
-        # Ensures(Result() is Unfolding(Acc(self.State(), 1/10), self._hof_idx))
         Ensures(Implies(Result() is not None, Result() >= 0 and Result() < self.get_ofs_len()))
         return Unfolding(Acc(self.State(), 1/10), self._hof_idx)
 
     @Pure
     def get_ofs_contents(self) -> Sequence[OpaqueField]:
         Requires(Acc(self.State(), 1/10))
-        # Ensures(Result() is Unfolding(Acc(self.State(), 1/10), Unfolding(Acc(self._ofs.State(), 1/10), self._ofs.contents())))
         return Unfolding(Acc(self.State(), 1/10), self.get_ofs_contents_1())
 
     @Pure
     def get_ofs_contents_1(self) -> Sequence[OpaqueField]:
         Requires(Acc(self._ofs, 1/10))
         Requires(Acc(self._ofs.State(), 1/10))
-        # Ensures(Result() is Unfolding(Acc(self._ofs.State(), 1/10), self._ofs.contents()))
         return Unfolding(Acc(self._ofs.State(), 1/10), self._ofs.contents())
 
     @Pure
@@ -380,14 +376,12 @@ class SCIONPath(Serializable, Sized):
     @Pure
     def get_ofs_len(self) -> int:
         Requires(Acc(self.State(), 1/10))
-        # Ensures(Result() == Unfolding(Acc(self.State(), 1/10), self.state_get_ofs_len()))
         return cast(int, Unfolding(Acc(self.State(), 1/10), self.get_ofs_len_1()))
 
     @Pure
     def get_ofs_len_1(self) -> int:
         Requires(Acc(self._ofs, 1/10))
         Requires(Acc(self._ofs.State(), 1/10))
-        # Ensures(Result() is self._ofs.get_len())
         return Unfolding(Acc(self._ofs.State(), 1/10), len(self._ofs))
 
     @Pure
@@ -543,7 +537,6 @@ class SCIONPath(Serializable, Sized):
         Requires(Acc(self.State(), 1/10))
         Requires(idx >= 0 and idx < self.get_ofs_len())
         Ensures(Result() in self.get_ofs_contents())
-        # Ensures(isinstance(Result(), type(Unfolding(Acc(self.State(), 1/10), self._ofs.get_by_idx(idx)))))
         return Unfolding(Acc(self.State(), 1/10), self._ofs.get_by_idx(idx))
 
     """

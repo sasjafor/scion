@@ -774,9 +774,18 @@ class Router(SCIONElement):
                  ),
             Requires(MustTerminate(self.get_topology_border_routers_len() + 6)),
             Requires(token(t, 4)),
-            Requires(Implies(((spkt.get_addrs_dst_isd_as() is None and self.get_addr_isd_as() is None) or (spkt.get_addrs_dst_isd_as() is not None and self.eq_isd_as(spkt))) and spkt.path_call_is_on_last_segment() and
-                            not (spkt.get_path_len() and spkt.get_path_hof_verify_only(spkt.get_path_hof())),
+            Requires(Implies(   valid_hof(spkt.get_path(), ingress, self.get_interface_if_id(), self.get_of_gen_key()) and
+                                not spkt.get_path_hof_verify_only(spkt.get_path_hof()) and
+                                ((spkt.get_addrs_dst_isd_as() is None and self.get_addr_isd_as() is None) or (spkt.get_addrs_dst_isd_as() is not None and self.eq_isd_as(spkt))) and spkt.path_call_is_on_last_segment() and
+                                not (spkt.get_path_len() and spkt.get_path_hof_verify_only(spkt.get_path_hof())),
                          udp_send(t, packed(spkt), str(self.get_srv_addr_pure(SVC_TO_SERVICE[spkt.get_addrs_dst_host_addr()], spkt) if ((spkt.get_addrs_dst_host().TYPE is not None and spkt.get_addrs_dst_host().TYPE == AddrType.SVC) and spkt.get_addrs_dst_host_addr() in SVC_TO_SERVICE) else spkt.get_addrs_dst_host()), SCION_UDP_EH_DATA_PORT, t2))),
+            Requires(Implies(valid_hof(spkt.get_path(), ingress, self.get_interface_if_id(), self.get_of_gen_key()) and
+                             not spkt.get_path_hof_verify_only(spkt.get_path_hof()) and
+                             not (((spkt.get_addrs_dst_isd_as() is None and self.get_addr_isd_as() is None) or (spkt.get_addrs_dst_isd_as() is not None and self.eq_isd_as(spkt))) and spkt.path_call_is_on_last_segment()) and
+                             not ingress and
+                             self.in_ifid2br(spkt.get_path_fwd_if()) and
+                             self.get_if_states_elem_is_active(spkt.get_path_fwd_if()),
+                             udp_send(t, packed(spkt), str(self.get_interface_to_addr()), self.get_interface_to_udp_port(), t2))),
             Ensures(Acc(spkt.State())),
             Ensures(Acc(self.State(), 1/2)),
             Ensures(dict_pred(SVC_TO_SERVICE)),
@@ -788,7 +797,6 @@ class Router(SCIONElement):
             Exsures(SCIONIFVerificationError, len(RaisedException().args_) == 2),
             Exsures(SCIONOFVerificationError, len(RaisedException().args_) == 2),
             Exsures(SCIONSegmentSwitchError, len(RaisedException().args_) >= 1)
-        # Exsures(SCIONBaseException, True)
         # Exsures(SCIONBaseError, Unfolding(Rd(spkt.State()), spkt.path != None))
         # Exsures(SCIONBaseError, Unfolding(Rd(spkt.State()), Unfolding(Rd(spkt.path.State()), not valid_hof(spkt.path))))
         ))
@@ -827,7 +835,6 @@ class Router(SCIONElement):
             Fold(Acc(spkt.State(), 1 / 10))
             fwd_if, path_incd, skipped_vo = self._calc_fwding_ingress(spkt)
             Unfold(Acc(spkt.State(), 1 / 10))
-            # path = spkt.path # seemingly necessary after call to _calc_fwding_ingress
             cur_iof_idx = path.get_of_idxs()[0]
             if prev_iof_idx != cur_iof_idx:
                 try:
@@ -845,12 +852,9 @@ class Router(SCIONElement):
             fwd_if = path.get_fwd_if()
             Fold(Acc(spkt.State(), 1 / 10))
             path_incd = False
-        if Unfolding(Acc(self.State(), 1/10), self.ifid2br.__contains__(fwd_if)):
-            # br = self.ifid2br[fwd_if]
+        if self.in_ifid2br(fwd_if):
             br = self.get_ifid2br_elem(fwd_if)
             if_addr, port = self.get_br_addr(br), self.get_br_port(br)
-            # if_addr, port = br.addr, br.port
-        # except KeyError:
         else:
             # So that the error message will show the current state of the
             # packet.
@@ -858,7 +862,6 @@ class Router(SCIONElement):
             logging.error("Cannot forward packet, fwd_if is invalid (%s):\n%s",
                           fwd_if, spkt)
             raise SCMPBadIF(fwd_if) from None
-        # if not self.if_states[fwd_if].is_active:
         if not self.get_if_states_elem_is_active(fwd_if):
             if drop_on_error:
                 logging.debug("IF is down, but drop_on_error is set, dropping")
@@ -1446,6 +1449,11 @@ class Router(SCIONElement):
         Ensures(br in self.topology.border_routers())
         Ensures(Result() is not None)
         return Unfolding(Acc(br.State(), 1 / 10), br.port)
+
+    @Pure
+    def in_ifid2br(self, fwd_if: int) -> bool:
+        Requires(Acc(self.State(), 1/10))
+        return Unfolding(Acc(self.State(), 1 / 10), fwd_if in self.ifid2br)
 
     """
     Additional helper functions for non-pure functions
