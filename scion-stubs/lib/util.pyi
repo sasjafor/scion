@@ -7,8 +7,9 @@ class SCIONTime(object):
     #_custom_time = None  # type: None
 
     @classmethod
+    @Pure
     def get_time(cls) -> int:
-        Requires(MustTerminate(1))
+        # Requires(MustTerminate(1))
         ...
 
     @classmethod

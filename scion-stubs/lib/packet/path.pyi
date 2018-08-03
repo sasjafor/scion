@@ -1,9 +1,10 @@
 from nagini_contracts.obligations import MustTerminate
 
+from lib.defines import EXP_TIME_UNIT
 from lib.packet.packet_base import Serializable
 from lib.packet.opaque_field import OpaqueField, InfoOpaqueField, HopOpaqueField, OpaqueFieldList
 from lib.packet.pcb import ASMarking
-from lib.util import Raw
+from lib.util import Raw, SCIONTime
 from typing import cast, Optional, Sized, List, Tuple
 from nagini_contracts.contracts import *
 
@@ -117,6 +118,7 @@ class SCIONPath(Serializable, Sized):
         Ensures(self.get_hof_idx() is not None)
         Ensures(Implies(Result() is not None, Result() in self.get_ofs_contents()))
         Ensures(Implies(Result() is not None, Result() is not self.get_hof()))
+        Ensures(Result() is self.get_hof_ver_pure())
         """Return the :any:`HopOpaqueField` needed to verify the current HOF."""
         iof = self.get_iof()
         hof = self.get_hof()
@@ -544,8 +546,33 @@ class SCIONPath(Serializable, Sized):
         # Ensures(isinstance(Result(), type(Unfolding(Acc(self.State(), 1/10), self._ofs.get_by_idx(idx)))))
         return Unfolding(Acc(self.State(), 1/10), self._ofs.get_by_idx(idx))
 
+    """
+    Helper functions for non-pure functions
+    """
+    @Pure
+    @ContractOnly
+    def get_hof_ver_pure(self) -> Optional[HopOpaqueField]:
+        Requires(Acc(self.State(), 1/10))
+        Requires(self.get_iof_idx() is not None)
+        Requires(self.get_hof_idx() is not None)
+        Ensures(self.get_iof_idx() is not None)
+        Ensures(self.get_hof_idx() is not None)
+        Ensures(Implies(Result() is not None, Result() in self.get_ofs_contents()))
+        Ensures(Implies(Result() is not None, Result() is not self.get_hof()))
+        ...
+
 
 @Pure
-def valid_hof(path: SCIONPath) -> bool:
+def valid_hof(path: SCIONPath, ingress: bool, interface_if_id: int, of_gen_key: bytes) -> bool:
     Requires(Acc(path.State(), 1/10))
-    return True
+    Requires(path.get_iof_idx() is not None)
+    Requires(path.get_hof_idx() is not None)
+    return (not (path.get_curr_if(ingress=ingress) != interface_if_id) and
+            Let(path.get_hof(), bool, lambda hof:
+            Let(path.get_iof(), bool, lambda iof:
+            Let(path.get_iof_timestamp(iof), bool, lambda ts:
+            Let(path.get_hof_ver_pure(), bool, lambda prev_hof:
+            int(SCIONTime.get_time()) <= ts + path.get_hof_exp_time(hof) * EXP_TIME_UNIT and
+            Unfolding(Acc(path.State(), 1/10), Unfolding(Acc(path._ofs.State(), 1/10), hof.verify_mac(of_gen_key, ts, prev_hof))))))))
+
+
