@@ -324,6 +324,8 @@ class SCIONL4Packet(SCIONExtPacket):
 
     def update(self) -> None:
         Requires(MustTerminate(1))
+        Requires(Acc(self.State(), 1/20))
+        Ensures(Acc(self.State(), 1/20))
         ...
 
     def parse_payload(self) -> SCMPPayload:
