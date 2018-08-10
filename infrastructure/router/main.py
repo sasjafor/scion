@@ -539,19 +539,19 @@ class Router(SCIONElement):
             Ensures(Acc(spkt.State(), 1/8)),
             Ensures(Acc(self.State(), 1/9)),
             Ensures(dict_pred(SVC_TO_SERVICE)),
-            Exsures(SCMPDeliveryNonLocal, Acc(spkt.State(), 1/9)),
+            Exsures(SCMPDeliveryNonLocal, Acc(spkt.State(), 1/8)),
             Exsures(SCMPDeliveryNonLocal, Acc(self.State(), 1/9)),
             Exsures(SCMPDeliveryNonLocal, Acc(RaisedException().args_)),
             Exsures(SCMPDeliveryNonLocal, dict_pred(SVC_TO_SERVICE)),
-            Exsures(SCMPDeliveryFwdOnly, Acc(spkt.State(), 1 / 9)),
+            Exsures(SCMPDeliveryFwdOnly, Acc(spkt.State(), 1 / 8)),
             Exsures(SCMPDeliveryFwdOnly, Acc(self.State(), 1 / 9)),
             Exsures(SCMPDeliveryFwdOnly, Acc(RaisedException().args_)),
             Exsures(SCMPDeliveryFwdOnly, dict_pred(SVC_TO_SERVICE)),
-            Exsures(SCMPNonRoutingHOF, Acc(spkt.State(), 1 / 9)),
+            Exsures(SCMPNonRoutingHOF, Acc(spkt.State(), 1 / 8)),
             Exsures(SCMPNonRoutingHOF, Acc(self.State(), 1 / 9)),
             Exsures(SCMPNonRoutingHOF, Acc(RaisedException().args_)),
             Exsures(SCMPNonRoutingHOF, dict_pred(SVC_TO_SERVICE)),
-            Exsures(SCMPUnknownHost, Acc(spkt.State(), 1 / 9)),
+            Exsures(SCMPUnknownHost, Acc(spkt.State(), 1 / 8)),
             Exsures(SCMPUnknownHost, Acc(self.State(), 1 / 9)),
             Exsures(SCMPUnknownHost, Acc(RaisedException().args_)),
             Exsures(SCMPUnknownHost, dict_pred(SVC_TO_SERVICE)),
@@ -734,7 +734,7 @@ class Router(SCIONElement):
         return t
 
     def _process_data(self, t: Place, spkt: SCIONL4Packet, ingress: bool, drop_on_error: bool) -> Place:
-        IOExists2(Place, Place)(lambda t2, t3: (
+        IOExists1(Place)(lambda t2: (
             Requires(Acc(spkt.State())),
             Requires(Acc(self.State(), 1/2)),
             Requires(self.get_topology_mtu() is not None),
@@ -787,7 +787,7 @@ class Router(SCIONElement):
                              not ingress and
                              self.in_ifid2br(spkt.get_path_fwd_if()) and
                              self.get_if_states_elem_is_active(spkt.get_path_fwd_if()),
-                             udp_send(t, packed(spkt), str(self.get_interface_to_addr()), self.get_interface_to_udp_port(), t3))),
+                             udp_send(t, packed(spkt), str(self.get_interface_to_addr()), self.get_interface_to_udp_port(), t2))),
             # Requires(Implies(Unfolding(Acc(spkt.State(), 1/10), valid_hof(spkt.path, ingress, self.get_interface_if_id(), self.get_of_gen_key())) and
             #                  not spkt.get_path_hof_verify_only(spkt.get_path_hof()),
             #                  udp_send(t, packed(spkt),          str(self.get_srv_addr_pure(SVC_TO_SERVICE[spkt.get_addrs_dst_host_addr()], spkt)
@@ -805,19 +805,21 @@ class Router(SCIONElement):
             Ensures(Acc(spkt.State())),
             Ensures(Acc(self.State(), 1/2)),
             Ensures(dict_pred(SVC_TO_SERVICE)),
-            # Ensures(Result() is t2 and token(t2)),
-            Ensures(Implies(Unfolding(Acc(spkt.State(), 1/10), valid_hof(spkt.path, ingress, self.get_interface_if_id(), self.get_of_gen_key())) and
-                                not spkt.get_path_hof_verify_only(spkt.get_path_hof()) and
-                                ((spkt.get_addrs_dst_isd_as() is None and self.get_addr_isd_as() is None) or (spkt.get_addrs_dst_isd_as() is not None and self.eq_isd_as(spkt))) and spkt.path_call_is_on_last_segment() and
-                                not (spkt.get_path_len() and spkt.get_path_hof_verify_only(spkt.get_path_hof())),
-                         Result() is t2 and token(t2))),
-            Requires(Implies(Unfolding(Acc(spkt.State(), 1/10), valid_hof(spkt.path, ingress, self.get_interface_if_id(), self.get_of_gen_key())) and
-                             not spkt.get_path_hof_verify_only(spkt.get_path_hof()) and
-                             not (((spkt.get_addrs_dst_isd_as() is None and self.get_addr_isd_as() is None) or (spkt.get_addrs_dst_isd_as() is not None and self.eq_isd_as(spkt))) and spkt.path_call_is_on_last_segment()) and
-                             not ingress and
-                             self.in_ifid2br(spkt.get_path_fwd_if()) and
-                             self.get_if_states_elem_is_active(spkt.get_path_fwd_if()),
-                             Result() is t3 and token(t3))),
+            Ensures(Result() is t2 and token(t2)),
+            # Ensures(spkt.get_path_iof_idx() is not None),
+            # Ensures(spkt.get_path_hof_idx() is not None),
+            # Ensures(Implies(Unfolding(Acc(spkt.State(), 1/10), valid_hof(spkt.path, ingress, self.get_interface_if_id(), self.get_of_gen_key())) and
+            #                     not spkt.get_path_hof_verify_only(spkt.get_path_hof()) and
+            #                     ((spkt.get_addrs_dst_isd_as() is None and self.get_addr_isd_as() is None) or (spkt.get_addrs_dst_isd_as() is not None and self.eq_isd_as(spkt))) and spkt.path_call_is_on_last_segment() and
+            #                     not (spkt.get_path_len() and spkt.get_path_hof_verify_only(spkt.get_path_hof())),
+            #              Result() is t2 and token(t2))),
+            # Ensures(Implies(Unfolding(Acc(spkt.State(), 1/10), valid_hof(spkt.path, ingress, self.get_interface_if_id(), self.get_of_gen_key())) and
+            #                  not spkt.get_path_hof_verify_only(spkt.get_path_hof()) and
+            #                  not (((spkt.get_addrs_dst_isd_as() is None and self.get_addr_isd_as() is None) or (spkt.get_addrs_dst_isd_as() is not None and self.eq_isd_as(spkt))) and spkt.path_call_is_on_last_segment()) and
+            #                  not ingress and
+            #                  self.in_ifid2br(spkt.get_path_fwd_if()) and
+            #                  self.get_if_states_elem_is_active(spkt.get_path_fwd_if()),
+            #                  Result() is t3 and token(t3))),
             Exsures(SCIONBaseException, Acc(spkt.State())),
             Exsures(SCIONBaseException, Acc(self.State(), 1/2)),
             Exsures(SCIONBaseException, dict_pred(SVC_TO_SERVICE)),
