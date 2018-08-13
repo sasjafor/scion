@@ -38,8 +38,8 @@ class OpaqueFieldList(Sized):
     @Pure
     @ContractOnly
     def contents(self) -> Sequence[OpaqueField]:
-        Requires(Acc(self._order, 1/10) and Acc(self._labels, 1/10))
-        Requires(Acc(dict_pred(self._labels), 1/10))
+        Requires(Acc(self._order, 1/20) and Acc(self._labels, 1/20))
+        Requires(Acc(dict_pred(self._labels), 1/20))
         Ensures(len(Result()) == self.__len__())
 
     @Pure
@@ -51,8 +51,8 @@ class OpaqueFieldList(Sized):
     @Pure
     @ContractOnly
     def __len__(self) -> int:
-        Requires(Acc(self._labels, 1/10))
-        Requires(Acc(dict_pred(self._labels), 1/10))
+        Requires(Acc(self._labels, 1/20))
+        Requires(Acc(dict_pred(self._labels), 1/20))
         Ensures(Result() >= 0)
 
     @Pure
@@ -68,19 +68,19 @@ class OpaqueFieldList(Sized):
     @Pure
     @ContractOnly
     def get_hof_by_idx(self, idx: int) -> HopOpaqueField:
-        Requires(Acc(self.State(), 1/10))
+        Requires(Acc(self.State(), 1/20))
         Requires(idx >= 0 and idx < self.get_len())
-        # Requires(idx >= 0 and idx < Unfolding(Acc(self.State(), 1/10), len(self)))
-        Ensures(Result() is Unfolding(Acc(self.State(), 1/10), self.contents()[idx]))
-        Ensures(Result() in Unfolding(Acc(self.State(), 1/10), self.contents()))
+        # Requires(idx >= 0 and idx < Unfolding(Acc(self.State(), 1/20), len(self)))
+        Ensures(Result() is Unfolding(Acc(self.State(), 1/20), self.contents()[idx]))
+        Ensures(Result() in Unfolding(Acc(self.State(), 1/20), self.contents()))
 
     @Pure
     @ContractOnly
     def get_by_idx(self, idx: int) -> OpaqueField:
-        Requires(Acc(self.State(), 1/10))
+        Requires(Acc(self.State(), 1/20))
         Requires(idx >= 0 and idx < self.get_len())
-        Ensures(Result() is Unfolding(Acc(self.State(), 1/10), self.contents()[idx]))
-        Ensures(Result() in Unfolding(Acc(self.State(), 1/10), self.contents()))
+        Ensures(Result() is Unfolding(Acc(self.State(), 1/20), self.contents()[idx]))
+        Ensures(Result() in Unfolding(Acc(self.State(), 1/20), self.contents()))
         # """
         # Get an OF by index. The index follows the order supplied when the
         # :class:`OpaqueFieldList` object was created.
@@ -108,8 +108,8 @@ class OpaqueFieldList(Sized):
 
     @Pure
     def get_len(self) -> int:
-        Requires(Acc(self.State(), 1/10))
-        return Unfolding(Acc(self.State(), 1/10), len(self))
+        Requires(Acc(self.State(), 1/20))
+        return Unfolding(Acc(self.State(), 1/20), len(self))
 
     @Pure
     def get_contents(self) -> Sequence[OpaqueField]:
@@ -213,38 +213,38 @@ class HopOpaqueField(OpaqueField):
 
     @Pure
     def get_xover(self) -> bool:
-        Requires(Acc(self.State(), 1/10))
-        return Unfolding(Acc(self.State(), 1/10), self.xover)
+        Requires(Acc(self.State(), 1/20))
+        return Unfolding(Acc(self.State(), 1/20), self.xover)
 
     @Pure
     def get_verify_only(self) -> bool:
-        Requires(Acc(self.State(), 1/10))
-        return Unfolding(Acc(self.State(), 1/10), self.verify_only)
+        Requires(Acc(self.State(), 1/20))
+        return Unfolding(Acc(self.State(), 1/20), self.verify_only)
 
     @Pure
     def get_forward_only(self) -> bool:
-        Requires(Acc(self.State(), 1/10))
-        return Unfolding(Acc(self.State(), 1/10), self.forward_only)
+        Requires(Acc(self.State(), 1/20))
+        return Unfolding(Acc(self.State(), 1/20), self.forward_only)
 
     @Pure
     def get_exp_time(self) -> int:
-        Requires(Acc(self.State(), 1/10))
-        return Unfolding(Acc(self.State(), 1/10), self.exp_time)
+        Requires(Acc(self.State(), 1/20))
+        return Unfolding(Acc(self.State(), 1/20), self.exp_time)
 
     @Pure
     def get_egress_if(self) -> int:
-        Requires(Acc(self.State(), 1/10))
-        return Unfolding(Acc(self.State(), 1/10), self.egress_if)
+        Requires(Acc(self.State(), 1/20))
+        return Unfolding(Acc(self.State(), 1/20), self.egress_if)
 
     @Pure
     def get_ingress_if(self) -> int:
-        Requires(Acc(self.State(), 1/10))
-        return Unfolding(Acc(self.State(), 1/10), self.ingress_if)
+        Requires(Acc(self.State(), 1/20))
+        return Unfolding(Acc(self.State(), 1/20), self.ingress_if)
 
     @Pure
     def get_mac(self) -> bytes:
-        Requires(Acc(self.State(), 1/10))
-        return Unfolding(Acc(self.State(), 1/10), self.mac)
+        Requires(Acc(self.State(), 1/20))
+        return Unfolding(Acc(self.State(), 1/20), self.mac)
 
 class InfoOpaqueField(OpaqueField):
     def __init__(self) -> None:  # pragma: no cover
@@ -266,25 +266,25 @@ class InfoOpaqueField(OpaqueField):
 
     @Pure
     def get_up_flag(self) -> bool:
-        Requires(Acc(self.State(), 1/10))
-        return Unfolding(Acc(self.State(), 1/10), self.up_flag)
+        Requires(Acc(self.State(), 1/20))
+        return Unfolding(Acc(self.State(), 1/20), self.up_flag)
 
     @Pure
     def get_shortcut(self) -> bool:
-        Requires(Acc(self.State(), 1/10))
-        return Unfolding(Acc(self.State(), 1/10), self.shortcut)
+        Requires(Acc(self.State(), 1/20))
+        return Unfolding(Acc(self.State(), 1/20), self.shortcut)
 
     @Pure
     def get_peer(self) -> bool:
-        Requires(Acc(self.State(), 1/10))
-        return Unfolding(Acc(self.State(), 1/10), self.peer)
+        Requires(Acc(self.State(), 1/20))
+        return Unfolding(Acc(self.State(), 1/20), self.peer)
 
     @Pure
     def get_hops(self) -> int:
-        Requires(Acc(self.State(), 1/10))
-        return Unfolding(Acc(self.State(), 1/10), self.hops)
+        Requires(Acc(self.State(), 1/20))
+        return Unfolding(Acc(self.State(), 1/20), self.hops)
 
     @Pure
     def get_timestamp(self) -> int:
-        Requires(Acc(self.State(), 1/10))
-        return Unfolding(Acc(self.State(), 1/10), self.timestamp)
+        Requires(Acc(self.State(), 1/20))
+        return Unfolding(Acc(self.State(), 1/20), self.timestamp)

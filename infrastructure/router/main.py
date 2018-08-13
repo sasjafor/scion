@@ -24,7 +24,7 @@ import zlib
 from nagini_contracts.io_contracts import IOExists2
 from nagini_contracts.obligations import MeasureAbove
 
-from sascha.adt import map_scion_packet_to_adt
+from sascha.adt import map_scion_packet_to_adt, ADT_Packet, ADT_Path
 from collections import defaultdict
 
 # External packages
@@ -63,7 +63,7 @@ from lib.packet.ext.traceroute import TracerouteExt
 from lib.packet.ext_hdr import ExtensionHeader
 from lib.packet.ifid import IFIDPayload
 from lib.packet.opaque_field import HopOpaqueField, InfoOpaqueField
-from lib.packet.path import SCIONPath, valid_hof, incremented
+from lib.packet.path import SCIONPath, valid_hof
 from lib.packet.path_mgmt.ifstate import IFStateInfo, IFStateRequest
 from lib.packet.path_mgmt.rev_info import RevocationInfo
 from lib.packet.scion_addr import SCIONAddr, ISD_AS
@@ -1544,3 +1544,7 @@ def pre_condition_for_inc_hof_idx(spkt: SCIONL4Packet) -> bool:
                     ) and
                     Implies(path.get_hof_idx() < path.get_ofs_len() - 2,
                         isinstance(path.ofs_get_by_idx(path.get_hof_idx() + 2), HopOpaqueField))))
+
+@Pure
+def incremented(adt_packet: ADT_Packet) -> ADT_Packet:
+    return ADT_Packet(adt_packet.addrs, ADT_Path(adt_packet.path.A_HOFS, adt_packet.path.B_HOFS, adt_packet.path.C_HOFS, adt_packet.path.iof, adt_packet.path.hofs, adt_packet.path.iof_idx, adt_packet.path.hof_idx + 1))

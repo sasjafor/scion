@@ -361,14 +361,14 @@ class SCIONPath(Serializable, Sized):
 
     @Pure
     def get_ofs_contents(self) -> Sequence[OpaqueField]:
-        Requires(Acc(self.State(), 1/10))
-        return Unfolding(Acc(self.State(), 1/10), self.get_ofs_contents_1())
+        Requires(Acc(self.State(), 1/20))
+        return Unfolding(Acc(self.State(), 1/20), self.get_ofs_contents_1())
 
     @Pure
     def get_ofs_contents_1(self) -> Sequence[OpaqueField]:
-        Requires(Acc(self._ofs, 1/10))
-        Requires(Acc(self._ofs.State(), 1/10))
-        return Unfolding(Acc(self._ofs.State(), 1/10), self._ofs.contents())
+        Requires(Acc(self._ofs, 1/20))
+        Requires(Acc(self._ofs.State(), 1/20))
+        return Unfolding(Acc(self._ofs.State(), 1/20), self._ofs.contents())
 
     @Pure
     def state_get_ofs_len(self) -> int:
@@ -378,14 +378,14 @@ class SCIONPath(Serializable, Sized):
 
     @Pure
     def get_ofs_len(self) -> int:
-        Requires(Acc(self.State(), 1/10))
-        return cast(int, Unfolding(Acc(self.State(), 1/10), self.get_ofs_len_1()))
+        Requires(Acc(self.State(), 1/20))
+        return cast(int, Unfolding(Acc(self.State(), 1/20), self.get_ofs_len_1()))
 
     @Pure
     def get_ofs_len_1(self) -> int:
-        Requires(Acc(self._ofs, 1/10))
-        Requires(Acc(self._ofs.State(), 1/10))
-        return Unfolding(Acc(self._ofs.State(), 1/10), len(self._ofs))
+        Requires(Acc(self._ofs, 1/20))
+        Requires(Acc(self._ofs.State(), 1/20))
+        return Unfolding(Acc(self._ofs.State(), 1/20), len(self._ofs))
 
     @Pure
     def get_ofs(self) -> OpaqueFieldList:
