@@ -16,6 +16,7 @@ from lib.types import AddrType, L4Proto
 from typing import List, Optional, Sized, Tuple, Union, cast
 from nagini_contracts.contracts import *
 from nagini_contracts.io_builtins import MustTerminate
+from sascha.adt import ADT_Packet, map_scion_packet_to_adt
 
 
 @Pure
@@ -523,8 +524,8 @@ class SCIONL4Packet(SCIONExtPacket):
 
     @Pure
     def get_addrs(self) -> Optional[SCIONAddrHdr]:
-        Requires(Acc(self.State(), 1/10))
-        return Unfolding(Acc(self.State(), 1/10), self.addrs)
+        Requires(Acc(self.State(), 1/20))
+        return Unfolding(Acc(self.State(), 1/20), self.addrs)
 
     @Pure
     def get_cmn_hdr(self) -> Optional[SCIONCommonHdr]:
@@ -533,8 +534,8 @@ class SCIONL4Packet(SCIONExtPacket):
 
     @Pure
     def get_path(self) -> Optional[SCIONPath]:
-        Requires(Acc(self.State(), 1/10))
-        return Unfolding(Acc(self.State(), 1/10), self.path)
+        Requires(Acc(self.State(), 1/20))
+        return Unfolding(Acc(self.State(), 1/20), self.path)
 
     @Pure
     def get_addrs_total_len(self) -> Optional[int]:
@@ -931,8 +932,39 @@ def incremented(spkt: SCIONBasePacket) -> bool:
 
 @Pure
 @ContractOnly
-def packed(spkt: SCIONBasePacket) -> bytes:
+def packed(spkt: SCIONL4Packet) -> bytes:
     Requires(Acc(spkt.State(), 1/20))
+    Requires(spkt.get_path() is not None)
+    Requires(spkt.get_addrs() is not None)
+    Requires(spkt.get_addrs_src() is not None)
+    Requires(spkt.get_addrs_dst() is not None)
+    Requires(spkt.get_addrs_src_isd_as() is not None)
+    Requires(spkt.get_addrs_dst_isd_as() is not None)
+    Requires(spkt.get_addrs_src_host() is not None)
+    Requires(spkt.get_addrs_dst_host() is not None)
+    Requires(spkt.get_path_iof_idx() is not None)
+    Requires(spkt.get_path_hof_idx() is not None)
+    Requires(Let(cast(InfoOpaqueField, Unfolding(Acc(spkt.State(), 1/20), Unfolding(Acc(spkt.path.State(), 1/20), spkt.path._ofs.get_by_idx(spkt.path._iof_idx)))), bool, lambda iof:
+                 spkt.get_path_iof_hops(iof) >= 0 and spkt.get_path_iof_idx() + spkt.get_path_iof_hops(iof) < spkt.get_path_ofs_len()))
+    # Ensures(spkt.get_path() is not None)
+    # Ensures(spkt.get_addrs() is not None)
+    # Ensures(spkt.get_addrs_src() is not None)
+    # Ensures(spkt.get_addrs_dst() is not None)
+    # Ensures(spkt.get_addrs_src_isd_as() is not None)
+    # Ensures(spkt.get_addrs_dst_isd_as() is not None)
+    # Ensures(spkt.get_addrs_src_host() is not None)
+    # Ensures(spkt.get_addrs_dst_host() is not None)
+    # Ensures(spkt.get_path_iof_idx() is not None)
+    # Ensures(spkt.get_path_hof_idx() is not None)
+    # Ensures(Let(cast(InfoOpaqueField, Unfolding(Acc(spkt.State(), 1/20), Unfolding(Acc(spkt.path.State(), 1/20), spkt.path._ofs.get_by_idx(spkt.path._iof_idx)))), bool, lambda iof:
+    #              spkt.get_path_iof_hops(iof) >= 0 and spkt.get_path_iof_idx() + spkt.get_path_iof_hops(iof) < spkt.get_path_ofs_len()))
+    # Ensures(Result() is adt_packed(map_scion_packet_to_adt(spkt)))
+    ...
+    
+# @Pure
+# @ContractOnly
+# def adt_packed(adt_pkt: ADT_Packet) -> bytes:
+#     ...
 
 @Pure
 def extensions_match(next_hdr: int, hdrs: List[ExtensionHeader], packet: bytes, offset: int) -> bool:

@@ -780,14 +780,14 @@ class Router(SCIONElement):
             Requires(pre_condition_for_inc_hof_idx(spkt)),
             Requires(MustTerminate(self.get_topology_border_routers_len() + 6)),
             Requires(token(t, 4)),
-            Requires(Unfolding(Acc(spkt.State(), 1/10),
-                    Implies(valid_hof(spkt.path, ingress, self.get_interface_if_id(), self.get_of_gen_key()) and
+            Requires(
+                    Implies(self.get_valid_hof(spkt, ingress) and
                             not spkt.get_path_hof_verify_only(spkt.get_path_hof()) and
                             ((spkt.get_addrs_dst_isd_as() is None and self.get_addr_isd_as() is None) or (spkt.get_addrs_dst_isd_as() is not None and self.eq_isd_as(spkt))) and spkt.path_call_is_on_last_segment() and
                             not (spkt.get_path_len() and spkt.get_path_hof_verify_only(spkt.get_path_hof())),
                          udp_send(t, packed(spkt), str(self.get_srv_addr_pure(SVC_TO_SERVICE[spkt.get_addrs_dst_host_addr()], spkt) if ((spkt.get_addrs_dst_host().TYPE is not None and spkt.get_addrs_dst_host().TYPE == AddrType.SVC) and spkt.get_addrs_dst_host_addr() in SVC_TO_SERVICE) else spkt.get_addrs_dst_host()), SCION_UDP_EH_DATA_PORT, t2))
                     and
-                    Implies(valid_hof(spkt.path, ingress, self.get_interface_if_id(), self.get_of_gen_key()) and
+                    Implies(self.get_valid_hof(spkt, ingress) and
                              not spkt.get_path_hof_verify_only(spkt.get_path_hof()) and
                              not (((spkt.get_addrs_dst_isd_as() is None and self.get_addr_isd_as() is None) or (spkt.get_addrs_dst_isd_as() is not None and self.eq_isd_as(spkt))) and spkt.path_call_is_on_last_segment()) and
                              not ingress and
@@ -795,13 +795,14 @@ class Router(SCIONElement):
                              self.get_if_states_elem_is_active(spkt.get_path_fwd_if()),
                              udp_send(t, packed(spkt), str(self.get_interface_to_addr()), self.get_interface_to_udp_port(), t2))
                     and
-                    Implies(valid_hof(spkt.path, ingress, self.get_interface_if_id(), self.get_of_gen_key()) and
+                    Implies(self.get_valid_hof(spkt, ingress) and
                              not spkt.get_path_hof_verify_only(spkt.get_path_hof()) and
                              not (((spkt.get_addrs_dst_isd_as() is None and self.get_addr_isd_as() is None) or (spkt.get_addrs_dst_isd_as() is not None and self.eq_isd_as(spkt))) and spkt.path_call_is_on_last_segment()) and
                              ingress and
                              self.in_ifid2br(spkt.get_path_fwd_if()) and
                              self.get_if_states_elem_is_active(spkt.get_path_fwd_if()),
-                             udp_send(t, packed(spkt), str(self.get_br_addr(self.get_ifid2br_elem(spkt.get_path_fwd_if()))), self.get_br_port(self.get_ifid2br_elem(spkt.get_path_fwd_if())), t2)))),
+                             udp_send(t, packed(spkt), str(self.get_br_addr(self.get_ifid2br_elem(spkt.get_path_fwd_if()))), self.get_br_port(self.get_ifid2br_elem(spkt.get_path_fwd_if())), t2))),
+                               # )),
             Ensures(Acc(spkt.State())),
             Ensures(Acc(self.State(), 1/2)),
             Ensures(dict_pred(SVC_TO_SERVICE)),
@@ -1477,6 +1478,15 @@ class Router(SCIONElement):
     def in_ifid2br(self, fwd_if: int) -> bool:
         Requires(Acc(self.State(), 1/10))
         return Unfolding(Acc(self.State(), 1 / 10), fwd_if in self.ifid2br)
+
+    @Pure
+    def get_valid_hof(self, spkt: SCIONL4Packet, ingress: bool) -> bool:
+        Requires(Acc(self.State(), 1/10))
+        Requires(Acc(spkt.State(), 1/10))
+        Requires(spkt.get_path() is not None)
+        Requires(spkt.get_path_iof_idx() is not None)
+        Requires(spkt.get_path_hof_idx() is not None)
+        return Unfolding(Acc(spkt.State(), 1/10), valid_hof(spkt.path, ingress, self.get_interface_if_id(), self.get_of_gen_key()))
 
     """
     Additional helper functions for non-pure functions
