@@ -788,6 +788,28 @@ class SCIONL4Packet(SCIONExtPacket):
         return Unfolding(Acc(self.path._ofs.State(), 1/10), hof.get_verify_only())
 
     @Pure
+    def get_path_hof_xover(self, hof: HopOpaqueField) -> bool:
+        Requires(Acc(self.State(), 1/10))
+        Requires(self.get_path() is not None)
+        Requires(hof in self.get_path_ofs_contents())
+        return Unfolding(Acc(self.State(), 1/10), self.get_path_hof_xover_1(hof))
+
+    @Pure
+    def get_path_hof_xover_1(self, hof: HopOpaqueField) -> bool:
+        Requires(Acc(self.path, 1/10))
+        Requires(Acc(self.path.State(), 1/10))
+        Requires(hof in self.get_path_ofs_contents_1())
+        return Unfolding(Acc(self.path.State(), 1/10), self.get_path_hof_xover_2(hof))
+
+    @Pure
+    def get_path_hof_xover_2(self, hof: HopOpaqueField) -> bool:
+        Requires(Acc(self.path, 1/10))
+        Requires(Acc(self.path._ofs, 1/10))
+        Requires(Acc(self.path._ofs.State(), 1/10))
+        Requires(hof in self.get_path_ofs_contents_2())
+        return Unfolding(Acc(self.path._ofs.State(), 1/10), hof.get_xover())
+
+    @Pure
     def get_path_iof_peer(self, iof: InfoOpaqueField) -> bool:
         Requires(Acc(self.State(), 1/10))
         Requires(self.get_path() is not None)
@@ -895,6 +917,17 @@ class SCIONL4Packet(SCIONExtPacket):
         Ensures(self.get_path_hof_idx() is not None)
         return Unfolding(Acc(self.State(), 1/10), self.path.get_fwd_if())
 
+    # @Pure
+    # @ContractOnly
+    # def incremented(self) -> None:
+    #     Requires(Acc(self.State()))
+    #     ...
+
+
+@Pure
+def incremented(spkt: SCIONBasePacket) -> bool:
+    Requires(Acc(spkt.State(), 1/10))
+    return True
 
 @Pure
 @ContractOnly

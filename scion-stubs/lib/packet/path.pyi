@@ -239,6 +239,9 @@ class SCIONPath(Serializable, Sized):
         Ensures(self.get_iof_idx() is not None)
         Ensures(self.get_hof_idx() is not None)
         Ensures(self.get_ofs_contents() is Old(self.get_ofs_contents()))
+        Ensures(self.get_iof_idx() == Old(self.get_iof_idx()))
+        Ensures(Result() is False)
+        Ensures(incremented(self))
         """
         Increment the HOF idx to next routing HOF.
 
@@ -278,6 +281,7 @@ class SCIONPath(Serializable, Sized):
                 )
             Invariant(Implies(self.get_hof_idx() < self.get_ofs_len() - 2, isinstance(self.ofs_get_by_idx(self.get_hof_idx() + 2), HopOpaqueField)))
             Invariant(self.get_ofs_contents() is Old(self.get_ofs_contents()))
+            Invariant(skipped_verify_only is False)
             Invariant(MustTerminate(1))
             Unfold(self.State())
             self._hof_idx += 1
@@ -568,4 +572,9 @@ def valid_hof(path: SCIONPath, ingress: bool, interface_if_id: int, of_gen_key: 
             int(SCIONTime.get_time()) <= ts + path.get_hof_exp_time(hof) * EXP_TIME_UNIT and
             Unfolding(Acc(path.State(), 1/10), Unfolding(Acc(path._ofs.State(), 1/10), hof.verify_mac(of_gen_key, ts, prev_hof))))))))
 
-
+@Pure
+# @ContractOnly
+def incremented(path: SCIONPath) -> bool:
+    Requires(Acc(path.State(), 1/10))
+    # Ensures(Result().get_hof_idx() == path.get_hof_idx() + 1)
+    return True # for now try this

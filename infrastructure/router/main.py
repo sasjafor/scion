@@ -22,6 +22,7 @@ import time
 import zlib
 
 from nagini_contracts.io_contracts import IOExists2
+from nagini_contracts.obligations import MeasureAbove
 
 from sascha.adt import map_scion_packet_to_adt
 from collections import defaultdict
@@ -62,7 +63,7 @@ from lib.packet.ext.traceroute import TracerouteExt
 from lib.packet.ext_hdr import ExtensionHeader
 from lib.packet.ifid import IFIDPayload
 from lib.packet.opaque_field import HopOpaqueField, InfoOpaqueField
-from lib.packet.path import SCIONPath, valid_hof
+from lib.packet.path import SCIONPath, valid_hof, incremented
 from lib.packet.path_mgmt.ifstate import IFStateInfo, IFStateRequest
 from lib.packet.path_mgmt.rev_info import RevocationInfo
 from lib.packet.scion_addr import SCIONAddr, ISD_AS
@@ -108,7 +109,6 @@ from lib.packet.scion import SCIONL4Packet, packed
 from lib.packet.host_addr import HostAddrBase
 from lib.util import Raw
 from lib.topology import InterfaceElement, RouterElement
-
 
 class Router(SCIONElement):
     """
@@ -491,7 +491,6 @@ class Router(SCIONElement):
     def send_revocation(self, t: Place, spkt: SCIONL4Packet, if_id: int, ingress: bool, path_incd: bool) -> None:
         Requires(Acc(self.State(), 1/10))
         Requires(MustTerminate(5))
-        # Requires(Unfolding(Acc(self.State(), 1/10), self.if_states.__contains__(if_id)))
         Ensures(Acc(self.State(), 1/10))
         """
         Sends an interface revocation for 'if_id' along the path in 'spkt'.
@@ -580,7 +579,7 @@ class Router(SCIONElement):
         addr = spkt.get_addrs_dst_host()
         if addr.TYPE is not None and addr.TYPE == AddrType.SVC:
             # Send request to any server.
-            if SVC_TO_SERVICE.__contains__(spkt.get_addrs_dst_host_addr()):
+            if spkt.get_addrs_dst_host_addr() in SVC_TO_SERVICE:
                 service = SVC_TO_SERVICE[spkt.get_addrs_dst_host_addr()]
                 addr = self.get_srv_addr(service, spkt)
             else:
@@ -611,7 +610,9 @@ class Router(SCIONElement):
         Exsures(SCIONBaseError, path.get_iof_idx() is not None)
         Exsures(SCIONBaseError, path.get_hof_idx() is not None)
         Exsures(SCIONIFVerificationError, len(RaisedException().args_) == 2)
+        Exsures(SCIONIFVerificationError, Acc(path.State(), 1/9))
         Exsures(SCIONOFVerificationError, len(RaisedException().args_) == 2)
+        Exsures(SCIONOFVerificationError, Acc(path.State(), 1/9))
         Exsures(SCIONBaseError, not valid_hof(path, ingress, self.get_interface_if_id(), self.get_of_gen_key()))
         """Verify freshness and authentication of an opaque field."""
         iof = path.get_iof()
@@ -778,7 +779,7 @@ class Router(SCIONElement):
             Requires(token(t, 4)),
             Requires(Implies(Unfolding(Acc(spkt.State(), 1/10), valid_hof(spkt.path, ingress, self.get_interface_if_id(), self.get_of_gen_key())) and
                                 not spkt.get_path_hof_verify_only(spkt.get_path_hof()) and
-                                ((spkt.get_addrs_dst_isd_as() is None and self.get_addr_isd_as() is None) or (spkt.get_addrs_dst_isd_as() is not None and self.eq_isd_as(spkt))) and spkt.path_call_is_on_last_segment() and
+                                # ((spkt.get_addrs_dst_isd_as() is None and self.get_addr_isd_as() is None) or (spkt.get_addrs_dst_isd_as() is not None and self.eq_isd_as(spkt))) and spkt.path_call_is_on_last_segment() and
                                 not (spkt.get_path_len() and spkt.get_path_hof_verify_only(spkt.get_path_hof())),
                          udp_send(t, packed(spkt), str(self.get_srv_addr_pure(SVC_TO_SERVICE[spkt.get_addrs_dst_host_addr()], spkt) if ((spkt.get_addrs_dst_host().TYPE is not None and spkt.get_addrs_dst_host().TYPE == AddrType.SVC) and spkt.get_addrs_dst_host_addr() in SVC_TO_SERVICE) else spkt.get_addrs_dst_host()), SCION_UDP_EH_DATA_PORT, t2))),
             Requires(Implies(Unfolding(Acc(spkt.State(), 1/10), valid_hof(spkt.path, ingress, self.get_interface_if_id(), self.get_of_gen_key())) and
@@ -788,38 +789,17 @@ class Router(SCIONElement):
                              self.in_ifid2br(spkt.get_path_fwd_if()) and
                              self.get_if_states_elem_is_active(spkt.get_path_fwd_if()),
                              udp_send(t, packed(spkt), str(self.get_interface_to_addr()), self.get_interface_to_udp_port(), t2))),
-            # Requires(Implies(Unfolding(Acc(spkt.State(), 1/10), valid_hof(spkt.path, ingress, self.get_interface_if_id(), self.get_of_gen_key())) and
-            #                  not spkt.get_path_hof_verify_only(spkt.get_path_hof()),
-            #                  udp_send(t, packed(spkt),          str(self.get_srv_addr_pure(SVC_TO_SERVICE[spkt.get_addrs_dst_host_addr()], spkt)
-            #                                                 if ((spkt.get_addrs_dst_host().TYPE is not None and spkt.get_addrs_dst_host().TYPE == AddrType.SVC) and spkt.get_addrs_dst_host_addr() in SVC_TO_SERVICE)
-            #                                                 else
-            #                                                     spkt.get_addrs_dst_host()), SCION_UDP_EH_DATA_PORT
-            #                                             if ((spkt.get_addrs_dst_isd_as() is None and self.get_addr_isd_as() is None) or (spkt.get_addrs_dst_isd_as() is not None and self.eq_isd_as(spkt))) and spkt.path_call_is_on_last_segment() and not (spkt.get_path_len() and spkt.get_path_hof_verify_only(spkt.get_path_hof())),
-            #                           t2))),
-            #
-            #                  not (((spkt.get_addrs_dst_isd_as() is None and self.get_addr_isd_as() is None) or (spkt.get_addrs_dst_isd_as() is not None and self.eq_isd_as(spkt))) and spkt.path_call_is_on_last_segment()) and
-            #                  not ingress and
-            #                  self.in_ifid2br(spkt.get_path_fwd_if()) and
-            #                  self.get_if_states_elem_is_active(spkt.get_path_fwd_if()),
-            #                  udp_send(t, packed(spkt), str(self.get_interface_to_addr()), self.get_interface_to_udp_port(), t2))),
+            Requires(Implies(Unfolding(Acc(spkt.State(), 1/10), valid_hof(spkt.path, ingress, self.get_interface_if_id(), self.get_of_gen_key())) and
+                             not spkt.get_path_hof_verify_only(spkt.get_path_hof()) and
+                             not (((spkt.get_addrs_dst_isd_as() is None and self.get_addr_isd_as() is None) or (spkt.get_addrs_dst_isd_as() is not None and self.eq_isd_as(spkt))) and spkt.path_call_is_on_last_segment()) and
+                             ingress and
+                             self.in_ifid2br(spkt.get_path_fwd_if()) and
+                             self.get_if_states_elem_is_active(spkt.get_path_fwd_if()),
+                             udp_send(t, packed(spkt), str(self.get_br_addr(self.get_ifid2br_elem(spkt.get_path_fwd_if()))), self.get_br_port(self.get_ifid2br_elem(spkt.get_path_fwd_if())), t2))),
             Ensures(Acc(spkt.State())),
             Ensures(Acc(self.State(), 1/2)),
             Ensures(dict_pred(SVC_TO_SERVICE)),
             Ensures(Result() is t2 and token(t2)),
-            # Ensures(spkt.get_path_iof_idx() is not None),
-            # Ensures(spkt.get_path_hof_idx() is not None),
-            # Ensures(Implies(Unfolding(Acc(spkt.State(), 1/10), valid_hof(spkt.path, ingress, self.get_interface_if_id(), self.get_of_gen_key())) and
-            #                     not spkt.get_path_hof_verify_only(spkt.get_path_hof()) and
-            #                     ((spkt.get_addrs_dst_isd_as() is None and self.get_addr_isd_as() is None) or (spkt.get_addrs_dst_isd_as() is not None and self.eq_isd_as(spkt))) and spkt.path_call_is_on_last_segment() and
-            #                     not (spkt.get_path_len() and spkt.get_path_hof_verify_only(spkt.get_path_hof())),
-            #              Result() is t2 and token(t2))),
-            # Ensures(Implies(Unfolding(Acc(spkt.State(), 1/10), valid_hof(spkt.path, ingress, self.get_interface_if_id(), self.get_of_gen_key())) and
-            #                  not spkt.get_path_hof_verify_only(spkt.get_path_hof()) and
-            #                  not (((spkt.get_addrs_dst_isd_as() is None and self.get_addr_isd_as() is None) or (spkt.get_addrs_dst_isd_as() is not None and self.eq_isd_as(spkt))) and spkt.path_call_is_on_last_segment()) and
-            #                  not ingress and
-            #                  self.in_ifid2br(spkt.get_path_fwd_if()) and
-            #                  self.get_if_states_elem_is_active(spkt.get_path_fwd_if()),
-            #                  Result() is t3 and token(t3))),
             Exsures(SCIONBaseException, Acc(spkt.State())),
             Exsures(SCIONBaseException, Acc(self.State(), 1/2)),
             Exsures(SCIONBaseException, dict_pred(SVC_TO_SERVICE)),
@@ -842,8 +822,10 @@ class Router(SCIONElement):
         Unfold(Acc(spkt.State(), 1/4))
         # self.verify_hof(path, ingress=ingress)
         try:
+            # Assert(Acc(spkt.path.State(), 1/4))
             self.verify_hof(spkt.path, ingress=ingress)
         finally:
+            # Assert(Acc(spkt.path.State(), 1/4))
             Fold(Acc(spkt.State(), 1/4))
         Unfold(Acc(spkt.State(), 1 / 4))
         hof = spkt.path.get_hof()
@@ -852,9 +834,10 @@ class Router(SCIONElement):
             raise SCMPNonRoutingHOF
         # FIXME(aznair): Remove second condition once PathCombinator is less
         # stupid.
-        spkt_isd_as = spkt.get_addrs_dst_isd_as()
-        self_isd_as = self.get_addr_isd_as()
-        if ((spkt_isd_as is None and self_isd_as is None) or (spkt_isd_as is not None and self.eq_isd_as(spkt))) and spkt.path_call_is_on_last_segment():
+        # spkt_isd_as = spkt.get_addrs_dst_isd_as()
+        # self_isd_as = self.get_addr_isd_as()
+        if ((spkt.get_addrs_dst_isd_as() is None and self.get_addr_isd_as() is None) or (spkt.get_addrs_dst_isd_as() is not None and self.eq_isd_as(spkt))) and spkt.path_call_is_on_last_segment():
+            Assert(MeasureAbove(t, 3))
             return self.deliver(t, spkt)
         if ingress:
             Unfold(Acc(spkt.State(), 1 / 10))
@@ -995,6 +978,9 @@ class Router(SCIONElement):
         Ensures(spkt.get_ext_hdrs_len() == 0)
         Ensures(spkt.get_path_ofs_contents() is Old(spkt.get_path_ofs_contents()))
         Ensures(spkt.get_path() is Old(spkt.get_path()))
+        Ensures(spkt.get_path_iof_idx() == Old(spkt.get_path_iof_idx()))
+        Ensures(Result()[2] is False)
+        # Ensures(Implies(spkt.get_path_hof_xover(spkt.get_path_hof()), spkt.get_path() == incremented(Old(spkt.get_path()))))
         Unfold(Acc(spkt.State(), 1/10))
         path = spkt.path
         hof = path.get_hof()
@@ -1493,3 +1479,8 @@ class Router(SCIONElement):
     @ContractOnly
     def get_srv_addr_pure(self, service: str, pkt: SCIONL4Packet) -> HostAddrBase:
         ...
+
+@Pure
+@ContractOnly
+def foo() -> bool:
+    ...
