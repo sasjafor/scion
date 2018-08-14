@@ -1,5 +1,4 @@
-from nagini_contracts.adt import ADT
-
+from sascha.adt import ADT_IOF, ADT_HOF, ADT_Packet, ADT_ISD_AS, ADT_HostAddrBase, ADT_Address, ADT_Path, ADT_AddrHdr
 from lib.errors import SCIONBaseError, SCIONChecksumFailed
 from lib.packet.ext_hdr import ExtensionHeader
 from lib.packet.opaque_field import OpaqueFieldList, HopOpaqueField, OpaqueField, InfoOpaqueField
@@ -18,7 +17,6 @@ from lib.types import AddrType, L4Proto
 from typing import List, Optional, Sized, Tuple, Union, cast, NamedTuple
 from nagini_contracts.contracts import *
 from nagini_contracts.io_builtins import MustTerminate
-
 
 @Pure
 @ContractOnly
@@ -137,7 +135,6 @@ class SCIONCommonHdr(Serializable):
                 Acc(self.next_hdr) and
                 Acc(self.hdr_len))
 
-
 class SCIONAddrHdr(Serializable):
 
     BLK_SIZE = 8
@@ -208,7 +205,11 @@ class SCIONAddrHdr(Serializable):
                 Acc(self.dst) and
                 Implies(self.dst is not None, self.dst.State()) and
                 Acc(self._pad_len) and
-                Acc(self._total_len))
+                Acc(self._total_len) and
+                # needed for a valid packet
+                self.src is not None and
+                self.dst is not None
+                )
 
 @Predicate
 def AddressType(addr: SCIONAddr) -> bool:
@@ -255,8 +256,11 @@ class SCIONBasePacket(PacketBase, Sized):
                 Acc(self.addrs) and
                 Implies(self.addrs is not None, self.addrs.State()) and
                 Acc(self.path) and
-                Implies(self.path is not None, self.path.State()))
-
+                Implies(self.path is not None, self.path.State()) and
+                # needed for a valid packet
+                self.path is not None and
+                self.addrs is not None
+                )
 
 class SCIONExtPacket(SCIONBasePacket):
     def __init__(self, raw: bytes=None) -> None:  # pragma: no cover
@@ -294,35 +298,6 @@ class SCIONL4Packet(SCIONExtPacket):
     def State(self) -> bool:
         return (Acc(self.l4_hdr) and
                 Implies(self.l4_hdr is not None, self.l4_hdr.State()))
-
-    # @Predicate
-    # def PreState(self) -> bool:
-    #     """
-    #     PreState of packet, meaning the State a packet needs to have before the call to SCIONPath.inc_hof_idx
-    #     """
-    #     return (Acc(self.State()) and
-    #             Unfolding(Acc(self.State()),
-    #             Let(self.path, bool, lambda path:
-    #                 path.get_hof_idx() < path.get_ofs_len() - 1 and
-    #                 Let(cast(HopOpaqueField, Unfolding(Acc(path.State()), path._ofs.get_by_idx(path._hof_idx + 1))), bool, lambda hof:
-    #                     not path.get_hof_verify_only(hof)) and
-    #                 path.get_hof_idx() - path.get_iof_idx() < path.get_iof_hops(cast(InfoOpaqueField, path.ofs_get_by_idx(path.get_iof_idx()))) and
-    #                 Let(cast(InfoOpaqueField, path.ofs_get_by_idx(path.get_iof_idx())), bool, lambda iof:
-    #                 Implies((Let(cast(HopOpaqueField, path.ofs_get_by_idx(path.get_hof_idx() + 1)), bool, lambda hof:
-    #                     not path.get_hof_xover(hof) or
-    #                     path.get_iof_shortcut(iof)
-    #                  ) and
-    #                 (path.get_hof_idx() != path.get_iof_idx() + path.get_iof_hops(iof))),
-    #                     path.get_hof_idx() + 2 < path.get_ofs_len() and
-    #                     isinstance(path.ofs_get_by_idx(path.get_hof_idx() + 2), HopOpaqueField) and
-    #                     path.ofs_get_by_idx(path.get_hof_idx() + 2) is not path.ofs_get_by_idx(path.get_hof_idx() + 1)
-    #                 )
-    #                 ) and
-    #                 Implies(path.get_hof_idx() < path.get_ofs_len() - 2,
-    #                     isinstance(path.ofs_get_by_idx(path.get_hof_idx() + 2), HopOpaqueField))
-    #                 )
-    #             ))
-
 
     def update(self) -> None:
         Requires(MustTerminate(1))
@@ -540,15 +515,15 @@ class SCIONL4Packet(SCIONExtPacket):
 
     @Pure
     def get_addrs_total_len(self) -> Optional[int]:
-        Requires(Acc(self.State(), 1/10))
+        Requires(Acc(self.State(), 1/20))
         Requires(self.get_addrs() is not None)
-        return Unfolding(Acc(self.State(), 1/10), self.get_addrs_total_len_1())
+        return Unfolding(Acc(self.State(), 1/20), self.get_addrs_total_len_1())
 
     @Pure
     def get_addrs_total_len_1(self) -> Optional[int]:
-        Requires(Acc(self.addrs, 1/10))
-        Requires(Acc(self.addrs.State(), 1/10))
-        return Unfolding(Acc(self.addrs.State(), 1/10), self.addrs._total_len)
+        Requires(Acc(self.addrs, 1/20))
+        Requires(Acc(self.addrs.State(), 1/20))
+        return Unfolding(Acc(self.addrs.State(), 1/20), self.addrs._total_len)
 
     @Pure
     def get_addrs_dst(self) -> Optional[SCIONAddr]:
@@ -695,7 +670,7 @@ class SCIONL4Packet(SCIONExtPacket):
     @Pure
     def get_path_iof_idx(self) -> Optional[int]:
         Requires(Acc(self.State(), 1/20))
-        Requires(self.get_path() is not None)
+        # Requires(self.get_path() is not None)
         return Unfolding(Acc(self.State(), 1/20), self.get_path_iof_idx_1())
 
     @Pure
@@ -904,9 +879,9 @@ class SCIONL4Packet(SCIONExtPacket):
 
     @Pure
     def get_path_iof(self) -> Optional[InfoOpaqueField]:
-        Requires(Acc(self.State(), 1/10))
+        Requires(Acc(self.State(), 1/20))
         Requires(self.get_path() is not None)
-        return Unfolding(Acc(self.State(), 1/10), self.path.get_iof())
+        return Unfolding(Acc(self.State(), 1/20), self.path.get_iof())
 
     @Pure
     def get_path_fwd_if(self) -> int:
@@ -935,28 +910,8 @@ def incremented(spkt: SCIONBasePacket) -> bool:
 @ContractOnly
 def packed(spkt: SCIONL4Packet) -> bytes:
     Requires(Acc(spkt.State(), 1/20))
-    Requires(spkt.get_path() is not None)
-    Requires(spkt.get_addrs() is not None)
-    Requires(spkt.get_addrs_src() is not None)
-    Requires(spkt.get_addrs_dst() is not None)
-    Requires(spkt.get_addrs_src_isd_as() is not None)
-    Requires(spkt.get_addrs_dst_isd_as() is not None)
-    Requires(spkt.get_addrs_src_host() is not None)
-    Requires(spkt.get_addrs_dst_host() is not None)
-    Requires(spkt.get_path_iof_idx() is not None)
-    Requires(spkt.get_path_hof_idx() is not None)
-    Requires(Let(cast(InfoOpaqueField, Unfolding(Acc(spkt.State(), 1/20), Unfolding(Acc(spkt.path.State(), 1/20), spkt.path._ofs.get_by_idx(spkt.path._iof_idx)))), bool, lambda iof:
-                 spkt.get_path_iof_hops(iof) >= 0 and spkt.get_path_iof_idx() + spkt.get_path_iof_hops(iof) < spkt.get_path_ofs_len()))
-    # Ensures(spkt.get_path() is not None)
-    # Ensures(spkt.get_addrs() is not None)
-    # Ensures(spkt.get_addrs_src() is not None)
-    # Ensures(spkt.get_addrs_dst() is not None)
-    # Ensures(spkt.get_addrs_src_isd_as() is not None)
-    # Ensures(spkt.get_addrs_dst_isd_as() is not None)
-    # Ensures(spkt.get_addrs_src_host() is not None)
-    # Ensures(spkt.get_addrs_dst_host() is not None)
-    # Ensures(spkt.get_path_iof_idx() is not None)
-    # Ensures(spkt.get_path_hof_idx() is not None)
+    # Requires(Let(cast(InfoOpaqueField, Unfolding(Acc(spkt.State(), 1/20), Unfolding(Acc(spkt.path.State(), 1/20), spkt.path._ofs.get_by_idx(spkt.path._iof_idx)))), bool, lambda iof:
+    #              spkt.get_path_iof_hops(iof) >= 0 and spkt.get_path_iof_idx() + spkt.get_path_iof_hops(iof) < spkt.get_path_ofs_len()))
     # Ensures(Let(cast(InfoOpaqueField, Unfolding(Acc(spkt.State(), 1/20), Unfolding(Acc(spkt.path.State(), 1/20), spkt.path._ofs.get_by_idx(spkt.path._iof_idx)))), bool, lambda iof:
     #              spkt.get_path_iof_hops(iof) >= 0 and spkt.get_path_iof_idx() + spkt.get_path_iof_hops(iof) < spkt.get_path_ofs_len()))
     Ensures(Result() is adt_packed(map_scion_packet_to_adt(spkt)))
@@ -995,70 +950,8 @@ def build_base_hdrs(src: SCIONAddr, dst: SCIONAddr, l4: int =L4Proto.UDP) -> Tup
     ...
 
 """
-This is a set of classes based on the ADT basetype from Nagini to model a SCION packet in an abstract way.
+ADT functions
 """
-
-class ADT_base(ADT):
-    """
-    This is the base class for this ADT structure
-    """
-    pass
-
-class ADT_HostAddrBase(ADT_base, NamedTuple('ADT_HostAddrBase', [('TYPE', Optional[int]), ('addr', Optional[bytes])])):
-    """
-    Constructor for ADT_HostAddrBase
-    """
-    pass
-
-
-class ADT_ISD_AS(ADT_base, NamedTuple('ADT_ISD_AS', [('isd', int), ('as', int)])):
-    """
-    Constructor for ADT_ISD_AS
-    """
-    pass
-
-class ADT_HOF(ADT_base, NamedTuple('ADT_HOF', [('xover', bool), ('verify_only', bool), ('forward_only', bool), ('exp_time', int), ('ingress_if', int), ('egress_if', int)])):
-    """
-    Constructor for ADT_HOF
-    """
-    pass
-
-
-class ADT_IOF(ADT_base, NamedTuple('ADT_IOF', [('up_flag', bool), ('shortcut', bool), ('peer', bool), ('timestamp', int), ('hops', int)])):
-    """
-    Constructor for ADT_IOF
-    """
-    pass
-
-
-class ADT_Address(ADT_base, NamedTuple('ADT_Address', [('isd_as', ADT_ISD_AS), ('host', ADT_HostAddrBase)])):
-    """
-    Constructor for ADT_Address
-    """
-    pass
-
-
-class ADT_AddrHdr(ADT_base, NamedTuple('ADT_AddrHdr', [('src', ADT_Address), ('dst', ADT_Address), ('total_len', Optional[int])])):
-    """
-    Constructor for ADT_AddrHdr
-    """
-    pass
-
-
-class ADT_Path(ADT_base, NamedTuple('ADT_Path',
-                               [('A_HOFS', str), ('B_HOFS', str), ('C_HOFS', str), ('iof', ADT_IOF), ('hofs', Sequence[ADT_HOF]),
-                                ('iof_idx', int), ('hof_idx', int)])):
-    """
-    Constructor for ADT_Path
-    """
-    pass
-
-
-class ADT_Packet(ADT_base, NamedTuple('ADT_Packet', [('addrs', ADT_AddrHdr), ('path', ADT_Path)])):
-    """
-    Constructor for ADT_packet
-    """
-    pass
 
 @Pure
 def iof_to_adt(iof: InfoOpaqueField) -> ADT_IOF:
@@ -1122,19 +1015,19 @@ def map_ofs_list(ofs: OpaqueFieldList, iof_idx: int, iof: ADT_IOF) -> Sequence[A
 
 @Pure
 def map_scion_packet_to_adt(pkt: SCIONL4Packet) -> ADT_Packet:
-    Requires(Acc(pkt.State(), 1 / 20))
-    Requires(pkt.get_path() is not None)
-    Requires(pkt.get_addrs() is not None)
-    Requires(pkt.get_addrs_src() is not None)
-    Requires(pkt.get_addrs_dst() is not None)
-    Requires(pkt.get_addrs_src_isd_as() is not None)
-    Requires(pkt.get_addrs_dst_isd_as() is not None)
-    Requires(pkt.get_addrs_src_host() is not None)
-    Requires(pkt.get_addrs_dst_host() is not None)
-    Requires(pkt.get_path_iof_idx() is not None)
-    Requires(pkt.get_path_hof_idx() is not None)
-    Requires(Let(cast(InfoOpaqueField, Unfolding(Acc(pkt.State(), 1/20), Unfolding(Acc(pkt.path.State(), 1/20), pkt.path._ofs.get_by_idx(pkt.path._iof_idx)))), bool, lambda iof:
-                 pkt.get_path_iof_hops(iof) >= 0 and pkt.get_path_iof_idx() + pkt.get_path_iof_hops(iof) < pkt.get_path_ofs_len()))
+    Requires(Acc(pkt.State(), 1/20))
+    # Requires(pkt.get_path() is not None)
+    # Requires(pkt.get_addrs() is not None)
+    # Requires(pkt.get_addrs_src() is not None)
+    # Requires(pkt.get_addrs_dst() is not None)
+    # Requires(pkt.get_addrs_src_isd_as() is not None)
+    # Requires(pkt.get_addrs_dst_isd_as() is not None)
+    # Requires(pkt.get_addrs_src_host() is not None)
+    # Requires(pkt.get_addrs_dst_host() is not None)
+    # Requires(pkt.get_path_iof_idx() is not None)
+    # Requires(pkt.get_path_hof_idx() is not None)
+    # Requires(Let(cast(InfoOpaqueField, Unfolding(Acc(pkt.State(), 1/20), Unfolding(Acc(pkt.path.State(), 1/20), pkt.path._ofs.get_by_idx(pkt.path._iof_idx)))), bool, lambda iof:
+    #              pkt.get_path_iof_hops(iof) >= 0 and pkt.get_path_iof_idx() + pkt.get_path_iof_hops(iof) < pkt.get_path_ofs_len()))
     """
     Method to map a SCIONPacket to the ADT defined in this file
     :param packet: the packet to be mapped

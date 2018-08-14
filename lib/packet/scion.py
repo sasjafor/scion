@@ -287,10 +287,6 @@ class SCIONAddrHdr(Serializable):
         return "%s(%sB): Src:<%s> Dst:<%s>" % (
             self.NAME, len(self), self.src, self.dst)
 
-    @Predicate
-    def State(self) -> bool:
-        return Acc(self.dst)
-
 
 class SCIONBasePacket(PacketBase):
     """

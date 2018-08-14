@@ -105,7 +105,7 @@ from nagini_contracts.io_builtins import Place, token, IOOperation, IOExists1, T
 
 # for type annotations
 from typing import List, Tuple, Union, Callable, cast, Optional, Dict, Any, Iterable
-from lib.packet.scion import SCIONL4Packet, packed
+from lib.packet.scion import SCIONL4Packet, packed, adt_packed
 from lib.packet.host_addr import HostAddrBase
 from lib.util import Raw
 from lib.topology import InterfaceElement, RouterElement
@@ -793,7 +793,7 @@ class Router(SCIONElement):
                              not ingress and
                              self.in_ifid2br(spkt.get_path_fwd_if()) and
                              self.get_if_states_elem_is_active(spkt.get_path_fwd_if()),
-                             udp_send(t, packed(spkt), str(self.get_interface_to_addr()), self.get_interface_to_udp_port(), t2))
+                             udp_send(t, adt_packed(map_scion_packet_to_adt(spkt)), str(self.get_interface_to_addr()), self.get_interface_to_udp_port(), t2))
                     and
                     Implies(self.get_valid_hof(spkt, ingress) and
                              not spkt.get_path_hof_verify_only(spkt.get_path_hof()) and
