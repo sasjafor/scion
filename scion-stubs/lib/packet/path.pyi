@@ -78,10 +78,10 @@ class SCIONPath(Serializable, Sized):
                         ) and
                 # needed for a valid packet
                 self._hof_idx is not None and
-                self._iof_idx is not None and
-                Let(cast(InfoOpaqueField, self._ofs.get_by_idx(self._iof_idx)), bool, lambda iof:
-                    self.get_iof_hops_1(iof) >= 0 and self._iof_idx + self.get_iof_hops_1(iof) < self.state_get_ofs_len()
-                    )
+                self._iof_idx is not None
+                # Let(cast(InfoOpaqueField, self._ofs.get_by_idx(self._iof_idx)), bool, lambda iof:
+                #     self.get_iof_hops_1(iof) >= 0 and self._iof_idx + self.get_iof_hops_1(iof) < self.state_get_ofs_len()
+                #     )
                 )
 
     @Pure

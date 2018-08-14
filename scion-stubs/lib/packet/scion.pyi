@@ -260,6 +260,8 @@ class SCIONBasePacket(PacketBase, Sized):
                 # needed for a valid packet
                 self.path is not None and
                 self.addrs is not None
+                # Let(cast(InfoOpaqueField, Unfolding(Acc(self.path.State(), 1/20), self.path._ofs.get_by_idx(self.path._iof_idx))), bool, lambda iof:
+                #     self.path.get_iof_hops(iof) >= 0 and self.path.get_iof_idx() + self.path.get_iof_hops(iof) < self.path.get_ofs_len())
                 )
 
 class SCIONExtPacket(SCIONBasePacket):
@@ -373,17 +375,17 @@ class SCIONL4Packet(SCIONExtPacket):
     @Pure
     def get_addrs_dst_isd_as_isd(self) -> int:
         Requires(Acc(self.State(), 1/20))
-        Requires(self.get_addrs() is not None)
-        Requires(self.get_addrs_dst() is not None)
-        Requires(self.get_addrs_dst_isd_as() is not None)
+        # Requires(self.get_addrs() is not None)
+        # Requires(self.get_addrs_dst() is not None)
+        # Requires(self.get_addrs_dst_isd_as() is not None)
         return Unfolding(Acc(self.State(), 1/20), self.get_addrs_dst_isd_as_isd_1())
 
     @Pure
     def get_addrs_dst_isd_as_isd_1(self) -> int:
         Requires(Acc(self.addrs, 1/20))
         Requires(Acc(self.addrs.State(), 1/20))
-        Requires(self.get_addrs_dst_1() is not None)
-        Requires(self.get_addrs_dst_isd_as_1() is not None)
+        # Requires(self.get_addrs_dst_1() is not None)
+        # Requires(self.get_addrs_dst_isd_as_1() is not None)
         return Unfolding(Acc(self.addrs.State(), 1/20), self.get_addrs_dst_isd_as_isd_2())
 
     @Pure
@@ -391,7 +393,7 @@ class SCIONL4Packet(SCIONExtPacket):
         Requires(Acc(self.addrs, 1/20))
         Requires(Acc(self.addrs.dst, 1/20))
         Requires(Acc(self.addrs.dst.State(), 1/20))
-        Requires(self.get_addrs_dst_isd_as_2() is not None)
+        # Requires(self.get_addrs_dst_isd_as_2() is not None)
         return Unfolding(Acc(self.addrs.dst.State(), 1/20), self.get_addrs_dst_isd_as_isd_3())
 
     @Pure
@@ -405,17 +407,17 @@ class SCIONL4Packet(SCIONExtPacket):
     @Pure
     def get_addrs_dst_isd_as_as(self) -> int:
         Requires(Acc(self.State(), 1/20))
-        Requires(self.get_addrs() is not None)
-        Requires(self.get_addrs_dst() is not None)
-        Requires(self.get_addrs_dst_isd_as() is not None)
+        # Requires(self.get_addrs() is not None)
+        # Requires(self.get_addrs_dst() is not None)
+        # Requires(self.get_addrs_dst_isd_as() is not None)
         return Unfolding(Acc(self.State(), 1/20), self.get_addrs_dst_isd_as_as_1())
 
     @Pure
     def get_addrs_dst_isd_as_as_1(self) -> int:
         Requires(Acc(self.addrs, 1/20))
         Requires(Acc(self.addrs.State(), 1/20))
-        Requires(self.get_addrs_dst_1() is not None)
-        Requires(self.get_addrs_dst_isd_as_1() is not None)
+        # Requires(self.get_addrs_dst_1() is not None)
+        # Requires(self.get_addrs_dst_isd_as_1() is not None)
         return Unfolding(Acc(self.addrs.State(), 1/20), self.get_addrs_dst_isd_as_as_2())
 
     @Pure
@@ -423,7 +425,7 @@ class SCIONL4Packet(SCIONExtPacket):
         Requires(Acc(self.addrs, 1/20))
         Requires(Acc(self.addrs.dst, 1/20))
         Requires(Acc(self.addrs.dst.State(), 1/20))
-        Requires(self.get_addrs_dst_isd_as_2() is not None)
+        # Requires(self.get_addrs_dst_isd_as_2() is not None)
         return Unfolding(Acc(self.addrs.dst.State(), 1/20), self.get_addrs_dst_isd_as_as_3())
 
     @Pure
@@ -437,17 +439,17 @@ class SCIONL4Packet(SCIONExtPacket):
     @Pure
     def get_addrs_src_isd_as_isd(self) -> int:
         Requires(Acc(self.State(), 1/20))
-        Requires(self.get_addrs() is not None)
-        Requires(self.get_addrs_src() is not None)
-        Requires(self.get_addrs_src_isd_as() is not None)
+        # Requires(self.get_addrs() is not None)
+        # Requires(self.get_addrs_src() is not None)
+        # Requires(self.get_addrs_src_isd_as() is not None)
         return Unfolding(Acc(self.State(), 1/20), self.get_addrs_src_isd_as_isd_1())
 
     @Pure
     def get_addrs_src_isd_as_isd_1(self) -> int:
         Requires(Acc(self.addrs, 1/20))
         Requires(Acc(self.addrs.State(), 1/20))
-        Requires(self.get_addrs_src_1() is not None)
-        Requires(self.get_addrs_src_isd_as_1() is not None)
+        # Requires(self.get_addrs_src_1() is not None)
+        # Requires(self.get_addrs_src_isd_as_1() is not None)
         return Unfolding(Acc(self.addrs.State(), 1/20), self.get_addrs_src_isd_as_isd_2())
 
     @Pure
@@ -455,7 +457,7 @@ class SCIONL4Packet(SCIONExtPacket):
         Requires(Acc(self.addrs, 1/20))
         Requires(Acc(self.addrs.src, 1/20))
         Requires(Acc(self.addrs.src.State(), 1/20))
-        Requires(self.get_addrs_src_isd_as_2() is not None)
+        # Requires(self.get_addrs_src_isd_as_2() is not None)
         return Unfolding(Acc(self.addrs.src.State(), 1/20), self.get_addrs_src_isd_as_isd_3())
 
     @Pure
@@ -469,17 +471,17 @@ class SCIONL4Packet(SCIONExtPacket):
     @Pure
     def get_addrs_src_isd_as_as(self) -> int:
         Requires(Acc(self.State(), 1/20))
-        Requires(self.get_addrs() is not None)
-        Requires(self.get_addrs_src() is not None)
-        Requires(self.get_addrs_src_isd_as() is not None)
+        # Requires(self.get_addrs() is not None)
+        # Requires(self.get_addrs_src() is not None)
+        # Requires(self.get_addrs_src_isd_as() is not None)
         return Unfolding(Acc(self.State(), 1/20), self.get_addrs_src_isd_as_as_1())
 
     @Pure
     def get_addrs_src_isd_as_as_1(self) -> int:
         Requires(Acc(self.addrs, 1/20))
         Requires(Acc(self.addrs.State(), 1/20))
-        Requires(self.get_addrs_src_1() is not None)
-        Requires(self.get_addrs_src_isd_as_1() is not None)
+        # Requires(self.get_addrs_src_1() is not None)
+        # Requires(self.get_addrs_src_isd_as_1() is not None)
         return Unfolding(Acc(self.addrs.State(), 1/20), self.get_addrs_src_isd_as_as_2())
 
     @Pure
@@ -487,7 +489,7 @@ class SCIONL4Packet(SCIONExtPacket):
         Requires(Acc(self.addrs, 1/20))
         Requires(Acc(self.addrs.src, 1/20))
         Requires(Acc(self.addrs.src.State(), 1/20))
-        Requires(self.get_addrs_src_isd_as_2() is not None)
+        # Requires(self.get_addrs_src_isd_as_2() is not None)
         return Unfolding(Acc(self.addrs.src.State(), 1/20), self.get_addrs_src_isd_as_as_3())
 
     @Pure
@@ -516,7 +518,7 @@ class SCIONL4Packet(SCIONExtPacket):
     @Pure
     def get_addrs_total_len(self) -> Optional[int]:
         Requires(Acc(self.State(), 1/20))
-        Requires(self.get_addrs() is not None)
+        # Requires(self.get_addrs() is not None)
         return Unfolding(Acc(self.State(), 1/20), self.get_addrs_total_len_1())
 
     @Pure
@@ -540,15 +542,15 @@ class SCIONL4Packet(SCIONExtPacket):
     @Pure
     def get_addrs_dst_host(self) -> Optional[HostAddrBase]:
         Requires(Acc(self.State(), 1/20))
-        Requires(self.get_addrs() is not None)
-        Requires(self.get_addrs_dst() is not None)
+        # Requires(self.get_addrs() is not None)
+        # Requires(self.get_addrs_dst() is not None)
         return Unfolding(Acc(self.State(), 1/20), self.get_addrs_dst_host_1())
 
     @Pure
     def get_addrs_dst_host_1(self) -> Optional[HostAddrBase]:
         Requires(Acc(self.addrs, 1/20))
         Requires(Acc(self.addrs.State(), 1/20))
-        Requires(self.get_addrs_dst_1() is not None)
+        # Requires(self.get_addrs_dst_1() is not None)
         return Unfolding(Acc(self.addrs.State(), 1/20), self.get_addrs_dst_host_2())
 
     @Pure
@@ -561,17 +563,17 @@ class SCIONL4Packet(SCIONExtPacket):
     @Pure
     def get_addrs_dst_host_addr(self) -> Optional[bytes]:
         Requires(Acc(self.State(), 1/20))
-        Requires(self.get_addrs() is not None)
-        Requires(self.get_addrs_dst() is not None)
-        Requires(self.get_addrs_dst_host() is not None)
+        # Requires(self.get_addrs() is not None)
+        # Requires(self.get_addrs_dst() is not None)
+        # Requires(self.get_addrs_dst_host() is not None)
         return Unfolding(Acc(self.State(), 1 / 20), self.get_addrs_dst_host_addr_1())
 
     @Pure
     def get_addrs_dst_host_addr_1(self) -> Optional[bytes]:
         Requires(Acc(self.addrs, 1/20))
         Requires(Acc(self.addrs.State(), 1/20))
-        Requires(self.get_addrs_dst_1() is not None)
-        Requires(self.get_addrs_dst_host_1() is not None)
+        # Requires(self.get_addrs_dst_1() is not None)
+        # Requires(self.get_addrs_dst_host_1() is not None)
         return Unfolding(Acc(self.addrs.State(), 1/20), self.get_addrs_dst_host_addr_2())
 
     @Pure
@@ -579,7 +581,7 @@ class SCIONL4Packet(SCIONExtPacket):
         Requires(Acc(self.addrs, 1/20))
         Requires(Acc(self.addrs.dst, 1/20))
         Requires(Acc(self.addrs.dst.State(), 1/20))
-        Requires(self.get_addrs_dst_host_2() is not None)
+        # Requires(self.get_addrs_dst_host_2() is not None)
         return Unfolding(Acc(self.addrs.dst.State(), 1/20), self.get_addrs_dst_host_addr_3())
 
     @Pure
@@ -605,15 +607,15 @@ class SCIONL4Packet(SCIONExtPacket):
     @Pure
     def get_addrs_src_host(self) -> Optional[HostAddrBase]:
         Requires(Acc(self.State(), 1/20))
-        Requires(self.get_addrs() is not None)
-        Requires(self.get_addrs_src() is not None)
+        # Requires(self.get_addrs() is not None)
+        # Requires(self.get_addrs_src() is not None)
         return Unfolding(Acc(self.State(), 1/20), self.get_addrs_src_host_1())
 
     @Pure
     def get_addrs_src_host_1(self) -> Optional[HostAddrBase]:
         Requires(Acc(self.addrs, 1/20))
         Requires(Acc(self.addrs.State(), 1/20))
-        Requires(self.get_addrs_src_1() is not None)
+        # Requires(self.get_addrs_src_1() is not None)
         return Unfolding(Acc(self.addrs.State(), 1/20), self.get_addrs_src_host_2())
 
     @Pure
@@ -626,17 +628,17 @@ class SCIONL4Packet(SCIONExtPacket):
     @Pure
     def get_addrs_src_host_addr(self) -> Optional[bytes]:
         Requires(Acc(self.State(), 1/20))
-        Requires(self.get_addrs() is not None)
-        Requires(self.get_addrs_src() is not None)
-        Requires(self.get_addrs_src_host() is not None)
+        # Requires(self.get_addrs() is not None)
+        # Requires(self.get_addrs_src() is not None)
+        # Requires(self.get_addrs_src_host() is not None)
         return Unfolding(Acc(self.State(), 1 / 20), self.get_addrs_src_host_addr_1())
 
     @Pure
     def get_addrs_src_host_addr_1(self) -> Optional[bytes]:
         Requires(Acc(self.addrs, 1/20))
         Requires(Acc(self.addrs.State(), 1/20))
-        Requires(self.get_addrs_src_1() is not None)
-        Requires(self.get_addrs_src_host_1() is not None)
+        # Requires(self.get_addrs_src_1() is not None)
+        # Requires(self.get_addrs_src_host_1() is not None)
         return Unfolding(Acc(self.addrs.State(), 1/20), self.get_addrs_src_host_addr_2())
 
     @Pure
@@ -644,7 +646,7 @@ class SCIONL4Packet(SCIONExtPacket):
         Requires(Acc(self.addrs, 1/20))
         Requires(Acc(self.addrs.src, 1/20))
         Requires(Acc(self.addrs.src.State(), 1/20))
-        Requires(self.get_addrs_src_host_2() is not None)
+        # Requires(self.get_addrs_src_host_2() is not None)
         return Unfolding(Acc(self.addrs.src.State(), 1/20), self.get_addrs_src_host_addr_3())
 
     @Pure
@@ -658,7 +660,7 @@ class SCIONL4Packet(SCIONExtPacket):
     @Pure
     def get_path_hof_idx(self) -> Optional[int]:
         Requires(Acc(self.State(), 1/20))
-        Requires(self.get_path() is not None)
+        # Requires(self.get_path() is not None)
         return Unfolding(Acc(self.State(), 1/20), self.get_path_hof_idx_1())
 
     @Pure
@@ -682,7 +684,7 @@ class SCIONL4Packet(SCIONExtPacket):
     @Pure
     def get_path_ofs(self) -> OpaqueFieldList:
         Requires(Acc(self.State(), 1/10))
-        Requires(self.get_path() is not None)
+        # Requires(self.get_path() is not None)
         return Unfolding(Acc(self.State(), 1/10), self.get_path_ofs_1())
 
     @Pure
@@ -833,16 +835,16 @@ class SCIONL4Packet(SCIONExtPacket):
     @Pure
     def get_path_ofs_contents(self) -> Sequence[OpaqueField]:
         Requires(Acc(self.State(), 1/20))
-        Requires(self.get_path() is not None)
-        Ensures(Result() is Unfolding(Acc(self.State(), 1/20), self.path.get_ofs_contents()))
+        # Requires(self.get_path() is not None)
+        # Ensures(Result() is Unfolding(Acc(self.State(), 1/20), self.path.get_ofs_contents()))
         return Unfolding(Acc(self.State(), 1/20), self.get_path_ofs_contents_1())
 
     @Pure
     def get_path_ofs_contents_1(self) -> Sequence[OpaqueField]:
         Requires(Acc(self.path, 1/20))
         Requires(Acc(self.path.State(), 1/20))
-        Ensures(self.path is not None)
-        Ensures(Result() is self.path.get_ofs_contents())
+        # Ensures(self.path is not None)
+        # Ensures(Result() is self.path.get_ofs_contents())
         return Unfolding(Acc(self.path.State(), 1/20), self.get_path_ofs_contents_2())
 
     @Pure
@@ -864,9 +866,9 @@ class SCIONL4Packet(SCIONExtPacket):
     @Pure
     def get_path_ofs_len(self) -> int:
         Requires(Acc(self.State(), 1/20))
-        Requires(self.get_path() is not None)
-        Ensures(Result() == Unfolding(Acc(self.State(), 1/20), self.path.get_ofs_len()))
-        Ensures(self.get_path() is not None)
+        # Requires(self.get_path() is not None)
+        # Ensures(Result() == Unfolding(Acc(self.State(), 1/20), self.path.get_ofs_len()))
+        # Ensures(self.get_path() is not None)
         return Unfolding(Acc(self.State(), 1/20), self.path.get_ofs_len())
 
     @Pure
@@ -874,13 +876,12 @@ class SCIONL4Packet(SCIONExtPacket):
         Requires(Acc(self.State(), 1/10))
         Requires(self.get_path() is not None)
         Requires(self.get_path_hof_idx() is not None)
-        # Ensures(Acc(self.State(), 1/10))
         return Unfolding(Acc(self.State(), 1/10), self.path.is_on_last_segment())
 
     @Pure
     def get_path_iof(self) -> Optional[InfoOpaqueField]:
         Requires(Acc(self.State(), 1/20))
-        Requires(self.get_path() is not None)
+        # Requires(self.get_path() is not None)
         return Unfolding(Acc(self.State(), 1/20), self.path.get_iof())
 
     @Pure
@@ -910,8 +911,8 @@ def incremented(spkt: SCIONBasePacket) -> bool:
 @ContractOnly
 def packed(spkt: SCIONL4Packet) -> bytes:
     Requires(Acc(spkt.State(), 1/20))
-    # Requires(Let(cast(InfoOpaqueField, Unfolding(Acc(spkt.State(), 1/20), Unfolding(Acc(spkt.path.State(), 1/20), spkt.path._ofs.get_by_idx(spkt.path._iof_idx)))), bool, lambda iof:
-    #              spkt.get_path_iof_hops(iof) >= 0 and spkt.get_path_iof_idx() + spkt.get_path_iof_hops(iof) < spkt.get_path_ofs_len()))
+    Requires(Let(cast(InfoOpaqueField, Unfolding(Acc(spkt.State(), 1/20), Unfolding(Acc(spkt.path.State(), 1/20), spkt.path._ofs.get_by_idx(spkt.path._iof_idx)))), bool, lambda iof:
+                 spkt.get_path_iof_hops(iof) >= 0 and spkt.get_path_iof_idx() + spkt.get_path_iof_hops(iof) < spkt.get_path_ofs_len()))
     # Ensures(Let(cast(InfoOpaqueField, Unfolding(Acc(spkt.State(), 1/20), Unfolding(Acc(spkt.path.State(), 1/20), spkt.path._ofs.get_by_idx(spkt.path._iof_idx)))), bool, lambda iof:
     #              spkt.get_path_iof_hops(iof) >= 0 and spkt.get_path_iof_idx() + spkt.get_path_iof_hops(iof) < spkt.get_path_ofs_len()))
     Ensures(Result() is adt_packed(map_scion_packet_to_adt(spkt)))
@@ -1026,8 +1027,8 @@ def map_scion_packet_to_adt(pkt: SCIONL4Packet) -> ADT_Packet:
     # Requires(pkt.get_addrs_dst_host() is not None)
     # Requires(pkt.get_path_iof_idx() is not None)
     # Requires(pkt.get_path_hof_idx() is not None)
-    # Requires(Let(cast(InfoOpaqueField, Unfolding(Acc(pkt.State(), 1/20), Unfolding(Acc(pkt.path.State(), 1/20), pkt.path._ofs.get_by_idx(pkt.path._iof_idx)))), bool, lambda iof:
-    #              pkt.get_path_iof_hops(iof) >= 0 and pkt.get_path_iof_idx() + pkt.get_path_iof_hops(iof) < pkt.get_path_ofs_len()))
+    Requires(Let(cast(InfoOpaqueField, Unfolding(Acc(pkt.State(), 1/20), Unfolding(Acc(pkt.path.State(), 1/20), pkt.path._ofs.get_by_idx(pkt.path._iof_idx)))), bool, lambda iof:
+                 pkt.get_path_iof_hops(iof) >= 0 and pkt.get_path_iof_idx() + pkt.get_path_iof_hops(iof) < pkt.get_path_ofs_len()))
     """
     Method to map a SCIONPacket to the ADT defined in this file
     :param packet: the packet to be mapped
@@ -1064,7 +1065,7 @@ start of performance helper functions
 @Pure
 def call_iof_to_adt(pkt: SCIONL4Packet, iof: InfoOpaqueField) -> ADT_IOF:
     Requires(Acc(pkt.State(), 1/20))
-    Requires(pkt.get_path() is not None)
+    # Requires(pkt.get_path() is not None)
     Requires(iof in pkt.get_path_ofs_contents())
     return Unfolding(Acc(pkt.State(), 1/20), call_iof_to_adt_1(pkt, iof))
 
@@ -1089,7 +1090,7 @@ def call_iof_to_adt_2(pkt: SCIONL4Packet, iof: InfoOpaqueField) -> ADT_IOF:
 @Pure
 def call_map_ofs_list(pkt: SCIONL4Packet, iof_idx: int, iof_adt: ADT_IOF) -> Sequence[ADT_HOF]:
     Requires(Acc(pkt.State(), 1/20))
-    Requires(pkt.get_path() is not None)
+    # Requires(pkt.get_path() is not None)
     Requires(iof_adt.hops >= 0)
     Requires(iof_idx >= 0)
     Requires(iof_idx + iof_adt.hops < pkt.get_path_ofs_len())

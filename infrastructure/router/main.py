@@ -24,7 +24,8 @@ import zlib
 from nagini_contracts.io_contracts import IOExists2
 from nagini_contracts.obligations import MeasureAbove
 
-from sascha.adt import map_scion_packet_to_adt, ADT_Packet, ADT_Path
+from sascha.adt import ADT_Packet, ADT_Path, ADT_IOF, ADT_HOF, ADT_Address, ADT_HostAddrBase, \
+    ADT_AddrHdr, ADT_ISD_AS
 from collections import defaultdict
 
 # External packages
@@ -62,7 +63,7 @@ from lib.packet.ext.one_hop_path import OneHopPathExt
 from lib.packet.ext.traceroute import TracerouteExt
 from lib.packet.ext_hdr import ExtensionHeader
 from lib.packet.ifid import IFIDPayload
-from lib.packet.opaque_field import HopOpaqueField, InfoOpaqueField
+from lib.packet.opaque_field import HopOpaqueField, InfoOpaqueField, OpaqueFieldList
 from lib.packet.path import SCIONPath, valid_hof
 from lib.packet.path_mgmt.ifstate import IFStateInfo, IFStateRequest
 from lib.packet.path_mgmt.rev_info import RevocationInfo
@@ -793,7 +794,7 @@ class Router(SCIONElement):
                              not ingress and
                              self.in_ifid2br(spkt.get_path_fwd_if()) and
                              self.get_if_states_elem_is_active(spkt.get_path_fwd_if()),
-                             udp_send(t, adt_packed(map_scion_packet_to_adt(spkt)), str(self.get_interface_to_addr()), self.get_interface_to_udp_port(), t2))
+                             udp_send(t, adt_packed(incremented(map_scion_packet_to_adt(spkt))), str(self.get_interface_to_addr()), self.get_interface_to_udp_port(), t2))
                     and
                     Implies(self.get_valid_hof(spkt, ingress) and
                              not spkt.get_path_hof_verify_only(spkt.get_path_hof()) and
@@ -892,9 +893,10 @@ class Router(SCIONElement):
             logging.debug("Sending to IF %s (%s:%s)", fwd_if, if_addr, port)
             return self.send(t, spkt, if_addr, port)
         else:
-            Unfold(Acc(spkt.State()))
-            path.inc_hof_idx()
-            Fold(Acc(spkt.State()))
+            # Unfold(Acc(spkt.State()))
+            # path.inc_hof_idx()
+            # Fold(Acc(spkt.State()))
+            call_inc_hof_idx(spkt)
             return self._egress_forward(t, spkt)
 
     def _validate_segment_switch(self, path: SCIONPath, fwd_if: int, prev_if: int,
@@ -1523,9 +1525,9 @@ def pre_condition_for_get_hof_ver_path(ingress: bool, path: SCIONPath) -> bool:
 @Pure
 def pre_condition_for_inc_hof_idx(spkt: SCIONL4Packet) -> bool:
     Requires(Acc(spkt.State(), 1/10))
-    Requires(spkt.get_path() is not None)
-    Requires(spkt.get_path_hof_idx() is not None)
-    Requires(spkt.get_path_iof_idx() is not None)
+    # Requires(spkt.get_path() is not None)
+    # Requires(spkt.get_path_hof_idx() is not None)
+    # Requires(spkt.get_path_iof_idx() is not None)
     return Unfolding(Acc(spkt.State(), 1 / 10), Let(spkt.path, bool, lambda path:
                     path.get_hof_idx() < path.get_ofs_len() - 1 and
                     Let(cast(HopOpaqueField, Unfolding(Acc(path.State(), 1 / 10), path._ofs.get_by_idx(path._hof_idx + 1))), bool, lambda hof:
@@ -1548,3 +1550,165 @@ def pre_condition_for_inc_hof_idx(spkt: SCIONL4Packet) -> bool:
 @Pure
 def incremented(adt_packet: ADT_Packet) -> ADT_Packet:
     return ADT_Packet(adt_packet.addrs, ADT_Path(adt_packet.path.A_HOFS, adt_packet.path.B_HOFS, adt_packet.path.C_HOFS, adt_packet.path.iof, adt_packet.path.hofs, adt_packet.path.iof_idx, adt_packet.path.hof_idx + 1))
+
+def call_inc_hof_idx(spkt: SCIONL4Packet) -> bool:
+    Requires(Acc(spkt.State()))
+    Requires(pre_condition_for_inc_hof_idx(spkt))
+    return Unfolding(Acc(spkt.State()), spkt.path.inc_hof_idx())
+
+"""
+ADT functions
+"""
+
+@Pure
+def iof_to_adt(iof: InfoOpaqueField) -> ADT_IOF:
+    Requires(Acc(iof.State(), 1/20))
+    Ensures(Result().hops == iof.get_hops())
+    # Ensures(Implies(iof.get_hops() >= 0, Result().hops >= 0))
+    """
+    Method to map a InfoOpaqueField to an ADT
+    :param iof: the original IOF
+    :return: ADT containing the same information
+    """
+    return ADT_IOF(iof.get_up_flag(), iof.get_shortcut(), iof.get_peer(), iof.get_timestamp(), iof.get_hops())
+
+@Pure
+def hof_to_adt(hof: HopOpaqueField) -> ADT_HOF:
+    Requires(Acc(hof.State(), 1/20))
+    """
+    Method to map a HopOpaqueField to an ADT
+    :param hof: the original HOF
+    :return: ADT containing the same information
+    """
+    return ADT_HOF(hof.get_xover(), hof.get_verify_only(), hof.get_forward_only(), hof.get_exp_time(), hof.get_ingress_if(), hof.get_egress_if())
+
+@Pure
+def map_ofs_list_rec(seq: Sequence[ADT_HOF], ofs: OpaqueFieldList, curr_idx: int, last_idx: int) -> Sequence[ADT_HOF]:
+    Requires(Acc(ofs.State(), 1/20))
+    Requires(last_idx < ofs.get_len())
+    Requires(curr_idx >= 0)
+    Requires(curr_idx <= last_idx)
+    Requires(curr_idx < ofs.get_len())
+    """
+    Method to map the InfoOpaqueField and the HopOpaqueFields from the packet to a Nagini Sequence
+    :param ofs: OpaqueFields from the packet
+    :param iof_idx: index of the InfoOpaqueField that precedes the HopOpaqueFields
+    :return: sequence of OpaqueField ADTs
+    """
+    hof = ofs.get_hof_by_idx(curr_idx)
+    hof_adt = Unfolding(Acc(ofs.State(), 1/20), hof_to_adt(hof))
+    hof_seq = Sequence(hof_adt) # type: Sequence[ADT_HOF]
+    res = seq.__add__(hof_seq)
+    if curr_idx == last_idx:
+        return res
+    return map_ofs_list_rec(res, ofs, curr_idx + 1, last_idx)
+
+@Pure
+def map_ofs_list(ofs: OpaqueFieldList, iof_idx: int, iof: ADT_IOF) -> Sequence[ADT_HOF]:
+    Requires(Acc(ofs.State(), 1 / 20))
+    Requires(iof.hops >= 0)
+    Requires(iof_idx >= 0)
+    Requires(iof_idx + iof.hops < ofs.get_len())
+    """
+    Method to map the InfoOpaqueField and the HopOpaqueFields from the packet to a Nagini Sequence
+    :param ofs: OpaqueFields from the packet
+    :param iof_idx: index of the InfoOpaqueField that precedes the HopOpaqueFields
+    :return: sequence of OpaqueField ADTs
+    """
+    res = Sequence() # type: Sequence[ADT_HOF]
+    if iof.hops == 0:
+        return res
+    return map_ofs_list_rec(res, ofs, iof_idx + 1, iof_idx + iof.hops)
+
+@Pure
+def map_scion_packet_to_adt(pkt: SCIONL4Packet) -> ADT_Packet:
+    Requires(Acc(pkt.State(), 1/20))
+    # Requires(pkt.get_path() is not None)
+    # Requires(pkt.get_addrs() is not None)
+    # Requires(pkt.get_addrs_src() is not None)
+    # Requires(pkt.get_addrs_dst() is not None)
+    # Requires(pkt.get_addrs_src_isd_as() is not None)
+    # Requires(pkt.get_addrs_dst_isd_as() is not None)
+    # Requires(pkt.get_addrs_src_host() is not None)
+    # Requires(pkt.get_addrs_dst_host() is not None)
+    # Requires(pkt.get_path_iof_idx() is not None)
+    # Requires(pkt.get_path_hof_idx() is not None)
+    Requires(Let(cast(InfoOpaqueField, Unfolding(Acc(pkt.State(), 1/20), Unfolding(Acc(pkt.path.State(), 1/20), pkt.path._ofs.get_by_idx(pkt.path._iof_idx)))), bool, lambda iof:
+                 pkt.get_path_iof_hops(iof) >= 0 and pkt.get_path_iof_idx() + pkt.get_path_iof_hops(iof) < pkt.get_path_ofs_len()))
+    """
+    Method to map a SCIONPacket to the ADT defined in this file
+    :param packet: the packet to be mapped
+    :return: ADT containing the same information as the packet
+    """
+
+    iof_idx = pkt.get_path_iof_idx()
+
+    iof = pkt.get_path_iof()
+
+    src_isd_as = ADT_ISD_AS(pkt.get_addrs_src_isd_as_isd(), pkt.get_addrs_src_isd_as_as())
+    dst_isd_as = ADT_ISD_AS(pkt.get_addrs_dst_isd_as_isd(), pkt.get_addrs_dst_isd_as_as())
+
+    src_host = ADT_HostAddrBase(pkt.get_addrs_src_host().TYPE, pkt.get_addrs_src_host_addr())
+    dst_host = ADT_HostAddrBase(pkt.get_addrs_dst_host().TYPE, pkt.get_addrs_dst_host_addr())
+
+    src = ADT_Address(src_isd_as, src_host)
+    dst = ADT_Address(dst_isd_as, dst_host)
+
+    iof_adt = call_iof_to_adt(pkt, iof)
+    ofs_seq = call_map_ofs_list(pkt, iof_idx, iof_adt)
+
+    addrs = ADT_AddrHdr(src, dst, pkt.get_addrs_total_len())
+    path = ADT_Path(pkt.get_path().A_HOFS, pkt.get_path().B_HOFS, pkt.get_path().C_HOFS, iof_adt, ofs_seq, pkt.get_path_iof_idx(), pkt.get_path_hof_idx())
+
+    return ADT_Packet(addrs, path)
+
+
+"""
+start of performance helper functions
+"""
+
+
+@Pure
+def call_iof_to_adt(pkt: SCIONL4Packet, iof: InfoOpaqueField) -> ADT_IOF:
+    Requires(Acc(pkt.State(), 1/20))
+    # Requires(pkt.get_path() is not None)
+    Requires(iof in pkt.get_path_ofs_contents())
+    return Unfolding(Acc(pkt.State(), 1/20), call_iof_to_adt_1(pkt, iof))
+
+
+@Pure
+def call_iof_to_adt_1(pkt: SCIONL4Packet, iof: InfoOpaqueField) -> ADT_IOF:
+    Requires(Acc(pkt.path, 1 / 20))
+    Requires(Acc(pkt.path.State(), 1/20))
+    Requires(iof in pkt.get_path_ofs_contents_1())
+    return Unfolding(Acc(pkt.path.State(), 1 / 20), call_iof_to_adt_2(pkt, iof))
+
+
+@Pure
+def call_iof_to_adt_2(pkt: SCIONL4Packet, iof: InfoOpaqueField) -> ADT_IOF:
+    Requires(Acc(pkt.path, 1 / 20))
+    Requires(Acc(pkt.path._ofs, 1/20))
+    Requires(Acc(pkt.path._ofs.State(), 1 / 20))
+    Requires(iof in pkt.get_path_ofs_contents_2())
+    return Unfolding(Acc(pkt.path._ofs.State(), 1 / 20), iof_to_adt(iof))
+
+
+@Pure
+def call_map_ofs_list(pkt: SCIONL4Packet, iof_idx: int, iof_adt: ADT_IOF) -> Sequence[ADT_HOF]:
+    Requires(Acc(pkt.State(), 1/20))
+    # Requires(pkt.get_path() is not None)
+    Requires(iof_adt.hops >= 0)
+    Requires(iof_idx >= 0)
+    Requires(iof_idx + iof_adt.hops < pkt.get_path_ofs_len())
+    return Unfolding(Acc(pkt.State(), 1 / 20), call_map_ofs_list_1(pkt, iof_idx, iof_adt))
+
+
+@Pure
+def call_map_ofs_list_1(pkt: SCIONL4Packet, iof_idx: int, iof_adt: ADT_IOF) -> Sequence[ADT_HOF]:
+    Requires(Acc(pkt.path, 1/20))
+    Requires(pkt.path is not None)
+    Requires(Acc(pkt.path.State(), 1 / 20))
+    Requires(iof_adt.hops >= 0)
+    Requires(iof_idx >= 0)
+    Requires(iof_idx + iof_adt.hops < pkt.path.get_ofs_len())
+    return Unfolding(Acc(pkt.path.State(), 1 / 20), map_ofs_list(pkt.path._ofs, iof_idx, iof_adt))
