@@ -84,13 +84,13 @@ class SCIONPath(Serializable, Sized):
 
     @Pure
     def get_iof(self) -> Optional[InfoOpaqueField]:  # pragma: no cover
-        Requires(Acc(self.State(), 1/10))
+        Requires(Acc(self.State(), 1/20))
         Ensures(Implies(self.get_iof_idx() is not None, Result() is not None))
         Ensures(Implies(Result() is not None, Result() in self.get_ofs_contents()))
         idx = self.get_iof_idx()
         if idx is None:
             return None
-        return cast(InfoOpaqueField, Unfolding(Acc(self.State(), 1/10), self._ofs.get_by_idx(idx)))
+        return cast(InfoOpaqueField, Unfolding(Acc(self.State(), 1/20), self._ofs.get_by_idx(idx)))
 
     @Pure
     def get_hof(self) -> Optional[HopOpaqueField]:  # pragma: no cover
@@ -349,15 +349,15 @@ class SCIONPath(Serializable, Sized):
 
     @Pure
     def get_iof_idx(self) -> Optional[int]:
-        Requires(Acc(self.State(), 1/10))
+        Requires(Acc(self.State(), 1/20))
         Ensures(Implies(Result() is not None, Result() >= 0 and Result() < self.get_ofs_len()))
-        return Unfolding(Acc(self.State(), 1/10), self._iof_idx)
+        return Unfolding(Acc(self.State(), 1/20), self._iof_idx)
 
     @Pure
     def get_hof_idx(self) -> Optional[int]:
-        Requires(Acc(self.State(), 1/10))
+        Requires(Acc(self.State(), 1/20))
         Ensures(Implies(Result() is not None, Result() >= 0 and Result() < self.get_ofs_len()))
-        return Unfolding(Acc(self.State(), 1/10), self._hof_idx)
+        return Unfolding(Acc(self.State(), 1/20), self._hof_idx)
 
     @Pure
     def get_ofs_contents(self) -> Sequence[OpaqueField]:
@@ -444,16 +444,16 @@ class SCIONPath(Serializable, Sized):
 
     @Pure
     def get_iof_hops(self, iof: InfoOpaqueField) -> int:
-        Requires(Acc(self.State(), 1/10))
+        Requires(Acc(self.State(), 1/20))
         Requires(iof in self.get_ofs_contents())
-        return Unfolding(Acc(self.State(), 1/10), self.get_iof_hops_1(iof))
+        return Unfolding(Acc(self.State(), 1/20), self.get_iof_hops_1(iof))
 
     @Pure
     def get_iof_hops_1(self, iof: InfoOpaqueField) -> int:
-        Requires(Acc(self._ofs, 1/10))
-        Requires(Acc(self._ofs.State(), 1/10))
+        Requires(Acc(self._ofs, 1/20))
+        Requires(Acc(self._ofs.State(), 1/20))
         Requires(iof in self._ofs.get_contents())
-        return Unfolding(Acc(self._ofs.State(), 1/10), iof.get_hops())
+        return Unfolding(Acc(self._ofs.State(), 1/20), iof.get_hops())
 
     @Pure
     def get_hof_ingress_if(self, hof: HopOpaqueField) -> int:

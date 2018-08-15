@@ -113,8 +113,8 @@ class OpaqueFieldList(Sized):
 
     @Pure
     def get_contents(self) -> Sequence[OpaqueField]:
-        Requires(Acc(self.State(), 1/10))
-        return Unfolding(Acc(self.State(), 1/10), self.contents())
+        Requires(Acc(self.State(), 1/20))
+        return Unfolding(Acc(self.State(), 1/20), self.contents())
 
     @Pure
     def get_iof_peer(self, iof: InfoOpaqueField) -> bool:
