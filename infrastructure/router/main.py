@@ -221,6 +221,18 @@ class Router(SCIONElement):
             Requires(Acc(packet.State(), 1 / 8)),
             Requires(packet.get_ext_hdrs_len() == 0),
             Requires(MustTerminate(3)),
+            Requires(packet.get_path() is not None),
+            Requires(packet.get_addrs() is not None),
+            Requires(packet.get_addrs_src() is not None),
+            Requires(packet.get_addrs_dst() is not None),
+            Requires(packet.get_addrs_src_isd_as() is not None),
+            Requires(packet.get_addrs_dst_isd_as() is not None),
+            Requires(packet.get_addrs_src_host() is not None),
+            Requires(packet.get_addrs_dst_host() is not None),
+            Requires(packet.get_path_iof_idx() is not None),
+            Requires(packet.get_path_hof_idx() is not None),
+            Requires(Let(cast(InfoOpaqueField, Unfolding(Acc(packet.State(), 1/20), Unfolding(Acc(packet.path.State(), 1/20), packet.path._ofs.get_by_idx(packet.path._iof_idx)))), bool, lambda iof:
+                 packet.get_path_iof_hops(iof) >= 0 and packet.get_path_iof_idx() + packet.get_path_iof_hops(iof) < packet.get_path_ofs_len())),
             Requires(token(t, 2) and udp_send(t, packed(packet), str(dst), dst_port, t2)),
             Ensures(Acc(self.State(), 1 / 10)),
             Ensures(Acc(packet.State(), 1 / 8)),
@@ -523,11 +535,18 @@ class Router(SCIONElement):
             Requires(Acc(spkt.State(), 1/8)),
             Requires(Acc(self.State(), 1/9)),
             Requires(dict_pred(SVC_TO_SERVICE)),
-            Requires(spkt.get_addrs() is not None),
             Requires(spkt.get_path() is not None),
+            Requires(spkt.get_addrs() is not None),
+            Requires(spkt.get_addrs_src() is not None),
             Requires(spkt.get_addrs_dst() is not None),
+            Requires(spkt.get_addrs_src_isd_as() is not None),
+            Requires(spkt.get_addrs_dst_isd_as() is not None),
+            Requires(spkt.get_addrs_src_host() is not None),
             Requires(spkt.get_addrs_dst_host() is not None),
+            Requires(spkt.get_path_iof_idx() is not None),
             Requires(spkt.get_path_hof_idx() is not None),
+            Requires(Let(cast(InfoOpaqueField, Unfolding(Acc(spkt.State(), 1/20), Unfolding(Acc(spkt.path.State(), 1/20), spkt.path._ofs.get_by_idx(spkt.path._iof_idx)))), bool, lambda iof:
+                 spkt.get_path_iof_hops(iof) >= 0 and spkt.get_path_iof_idx() + spkt.get_path_iof_hops(iof) < spkt.get_path_ofs_len())),
             Requires(spkt.get_ext_hdrs_len() == 0),
             Requires(MustTerminate(4)),
             Requires(token(t, 3)),
@@ -637,6 +656,18 @@ class Router(SCIONElement):
             Requires(self.get_interface_to_addr() is not None),
             Requires(spkt.get_ext_hdrs_len() == 0),
             Requires(MustTerminate(4)),
+            Requires(spkt.get_path() is not None),
+            Requires(spkt.get_addrs() is not None),
+            Requires(spkt.get_addrs_src() is not None),
+            Requires(spkt.get_addrs_dst() is not None),
+            Requires(spkt.get_addrs_src_isd_as() is not None),
+            Requires(spkt.get_addrs_dst_isd_as() is not None),
+            Requires(spkt.get_addrs_src_host() is not None),
+            Requires(spkt.get_addrs_dst_host() is not None),
+            Requires(spkt.get_path_iof_idx() is not None),
+            Requires(spkt.get_path_hof_idx() is not None),
+            Requires(Let(cast(InfoOpaqueField, Unfolding(Acc(spkt.State(), 1/20), Unfolding(Acc(spkt.path.State(), 1/20), spkt.path._ofs.get_by_idx(spkt.path._iof_idx)))), bool, lambda iof:
+                 spkt.get_path_iof_hops(iof) >= 0 and spkt.get_path_iof_idx() + spkt.get_path_iof_hops(iof) < spkt.get_path_ofs_len())),
             Requires(token(t, 3) and udp_send(t, packed(spkt), str(self.get_interface_to_addr()), self.get_interface_to_udp_port(), t2)),
             Ensures(Acc(self.State(), 1/10)),
             Ensures(Acc(spkt.State(), 1/9)),
@@ -743,10 +774,16 @@ class Router(SCIONElement):
             Requires(self.get_interface_to_addr() is not None),
             Requires(spkt.get_path() is not None),
             Requires(spkt.get_addrs() is not None),
+            Requires(spkt.get_addrs_src() is not None),
             Requires(spkt.get_addrs_dst() is not None),
+            Requires(spkt.get_addrs_src_isd_as() is not None),
+            Requires(spkt.get_addrs_dst_isd_as() is not None),
+            Requires(spkt.get_addrs_src_host() is not None),
+            Requires(spkt.get_addrs_dst_host() is not None),
             Requires(spkt.get_path_iof_idx() is not None),
             Requires(spkt.get_path_hof_idx() is not None),
-            Requires(spkt.get_addrs_dst_host() is not None),
+            Requires(Let(cast(InfoOpaqueField, Unfolding(Acc(spkt.State(), 1/20), Unfolding(Acc(spkt.path.State(), 1/20), spkt.path._ofs.get_by_idx(spkt.path._iof_idx)))), bool, lambda iof:
+                 spkt.get_path_iof_hops(iof) >= 0 and spkt.get_path_iof_idx() + spkt.get_path_iof_hops(iof) < spkt.get_path_ofs_len())),
             Requires(spkt.get_ext_hdrs_len() == 0),
             # Requires(Implies(not ingress,
             #              Let(spkt.get_path(), bool, lambda path:
@@ -793,7 +830,7 @@ class Router(SCIONElement):
                              not ingress and
                              self.in_ifid2br(spkt.get_path_fwd_if()) and
                              self.get_if_states_elem_is_active(spkt.get_path_fwd_if()),
-                             udp_send(t, packed(spkt), str(self.get_interface_to_addr()), self.get_interface_to_udp_port(), t2))
+                             udp_send(t, adt_packed(incremented(map_scion_packet_to_adt(spkt))), str(self.get_interface_to_addr()), self.get_interface_to_udp_port(), t2))
                     and
                     Implies(self.get_valid_hof(spkt, ingress) and
                              not spkt.get_path_hof_verify_only(spkt.get_path_hof()) and
@@ -1572,20 +1609,47 @@ def pre_condition_for_inc_hof_idx_path(path: SCIONPath) -> bool:
 def incremented(adt_packet: ADT_Packet) -> ADT_Packet:
     return ADT_Packet(adt_packet.addrs, ADT_Path(adt_packet.path.A_HOFS, adt_packet.path.B_HOFS, adt_packet.path.C_HOFS, adt_packet.path.iof, adt_packet.path.hofs, adt_packet.path.iof_idx, adt_packet.path.hof_idx + 1))
 
+# @ContractOnly
 def call_inc_hof_idx(spkt: SCIONL4Packet) -> bool:
     Requires(Acc(spkt.State()))
     Requires(spkt.get_path() is not None)
+    Requires(spkt.get_addrs() is not None)
+    Requires(spkt.get_addrs_src() is not None)
+    Requires(spkt.get_addrs_dst() is not None)
+    Requires(spkt.get_addrs_src_isd_as() is not None)
+    Requires(spkt.get_addrs_dst_isd_as() is not None)
+    Requires(spkt.get_addrs_src_host() is not None)
+    Requires(spkt.get_addrs_dst_host() is not None)
     Requires(spkt.get_path_iof_idx() is not None)
     Requires(spkt.get_path_hof_idx() is not None)
+    Requires(Let(cast(InfoOpaqueField, Unfolding(Acc(spkt.State(), 1/20), Unfolding(Acc(spkt.path.State(), 1/20), spkt.path._ofs.get_by_idx(spkt.path._iof_idx)))), bool, lambda iof:
+                 spkt.get_path_iof_hops(iof) >= 0 and spkt.get_path_iof_idx() + spkt.get_path_iof_hops(iof) < spkt.get_path_ofs_len()))
     Requires(pre_condition_for_inc_hof_idx(spkt))
-    return Unfolding(Acc(spkt.State()), call_inc_hof_idx_1(spkt.path))
+    Ensures(Acc(spkt.State()))
+    Ensures(spkt.get_path() is not None)
+    Ensures(spkt.get_addrs() is not None)
+    Ensures(spkt.get_addrs_src() is not None)
+    Ensures(spkt.get_addrs_dst() is not None)
+    Ensures(spkt.get_addrs_src_isd_as() is not None)
+    Ensures(spkt.get_addrs_dst_isd_as() is not None)
+    Ensures(spkt.get_addrs_src_host() is not None)
+    Ensures(spkt.get_addrs_dst_host() is not None)
+    Ensures(spkt.get_path_iof_idx() is not None)
+    Ensures(spkt.get_path_hof_idx() is not None)
+    Ensures(Let(cast(InfoOpaqueField, Unfolding(Acc(spkt.State(), 1/20), Unfolding(Acc(spkt.path.State(), 1/20), spkt.path._ofs.get_by_idx(spkt.path._iof_idx)))), bool, lambda iof:
+                 spkt.get_path_iof_hops(iof) >= 0 and spkt.get_path_iof_idx() + spkt.get_path_iof_hops(iof) < spkt.get_path_ofs_len()))
+    Ensures(map_scion_packet_to_adt(spkt) is incremented(Old(map_scion_packet_to_adt(spkt))))
+    Unfold(Acc(spkt.State()))
+    res = spkt.path.inc_hof_idx()
+    Fold(Acc(spkt.State()))
+    return res
 
-def call_inc_hof_idx_1(path: SCIONPath) -> bool:
-    Requires(Acc(path.State()))
-    Requires(path.get_iof_idx() is not None)
-    Requires(path.get_hof_idx() is not None)
-    Requires(pre_condition_for_inc_hof_idx_path(path))
-    return path.inc_hof_idx()
+# def call_inc_hof_idx_1(path: SCIONPath) -> bool:
+#     Requires(Acc(path.State()))
+#     Requires(path.get_iof_idx() is not None)
+#     Requires(path.get_hof_idx() is not None)
+#     Requires(pre_condition_for_inc_hof_idx_path(path))
+#     return path.inc_hof_idx()
 
 """
 ADT functions

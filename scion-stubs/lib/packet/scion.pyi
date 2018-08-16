@@ -894,10 +894,11 @@ class SCIONL4Packet(SCIONExtPacket):
     #     ...
 
 
-@Pure
-def incremented(spkt: SCIONBasePacket) -> bool:
-    Requires(Acc(spkt.State(), 1/10))
-    return True
+# @Pure
+# def incremented(spkt: SCIONBasePacket) -> bool:
+#     Requires(Acc(spkt.State(), 1/10))
+#     return True
+
 
 @Pure
 @ContractOnly

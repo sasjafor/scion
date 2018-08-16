@@ -240,6 +240,10 @@ class SCIONPath(Serializable, Sized):
         Ensures(self.get_hof_idx() is not None)
         Ensures(self.get_ofs_contents() is Old(self.get_ofs_contents()))
         Ensures(self.get_iof_idx() == Old(self.get_iof_idx()))
+        Ensures(self.get_ofs_len() == Old(self.get_ofs_len()))
+        Ensures(Let(cast(InfoOpaqueField, Unfolding(Acc(self.State(), 1/10), self._ofs.get_by_idx(self._iof_idx))), bool, lambda iof:
+                    self.get_iof_hops(iof) == Old(self.get_iof_hops(iof))))
+        Ensures(self.get_hof_idx() == Old(self.get_hof_idx()) + 1)
         Ensures(Result() is False)
         """
         Increment the HOF idx to next routing HOF.
