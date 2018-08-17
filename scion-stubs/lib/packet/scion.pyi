@@ -1101,6 +1101,20 @@ def call_iof_to_adt_2(pkt: SCIONL4Packet, iof: InfoOpaqueField) -> ADT_IOF:
 
 
 @Pure
+def call_iof_to_adt_path(path: SCIONPath, iof: InfoOpaqueField) -> ADT_IOF:
+    Requires(Acc(path.State(), 1/20))
+    Requires(iof in path.get_ofs_contents())
+    return Unfolding(Acc(path.State(), 1 / 20), call_iof_to_adt_path_1(path, iof))
+
+
+@Pure
+def call_iof_to_adt_path_1(path: SCIONPath, iof: InfoOpaqueField) -> ADT_IOF:
+    Requires(Acc(path._ofs, 1/20))
+    Requires(Acc(path._ofs.State(), 1 / 20))
+    Requires(iof in path.get_ofs_contents_1())
+    return Unfolding(Acc(path._ofs.State(), 1 / 20), iof_to_adt(iof))
+
+@Pure
 def call_map_ofs_list(pkt: SCIONL4Packet, iof_idx: int, iof_adt: ADT_IOF) -> Sequence[ADT_HOF]:
     Requires(Acc(pkt.State(), 1/20))
     Requires(pkt.get_path() is not None)
@@ -1119,3 +1133,11 @@ def call_map_ofs_list_1(pkt: SCIONL4Packet, iof_idx: int, iof_adt: ADT_IOF) -> S
     Requires(iof_idx >= 0)
     Requires(iof_idx + iof_adt.hops < pkt.path.get_ofs_len())
     return Unfolding(Acc(pkt.path.State(), 1 / 20), map_ofs_list(pkt.path._ofs, iof_idx, iof_adt))
+
+@Pure
+def call_map_ofs_list_path(path: SCIONPath, iof_idx: int, iof_adt: ADT_IOF) -> Sequence[ADT_HOF]:
+    Requires(Acc(path.State(), 1 / 20))
+    Requires(iof_adt.hops >= 0)
+    Requires(iof_idx >= 0)
+    Requires(iof_idx + iof_adt.hops < path.get_ofs_len())
+    return Unfolding(Acc(path.State(), 1 / 20), map_ofs_list(path._ofs, iof_idx, iof_adt))
