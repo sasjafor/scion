@@ -264,6 +264,7 @@ class SCIONPath(Serializable, Sized):
         hof_idx = self.get_hof_idx()
         iof = self.get_iof()
         skipped_verify_only = False
+        assert skipped_verify_only == True
         while True:
             Invariant(Acc(self.State()))
             Invariant(self.get_iof_idx() is not None)
