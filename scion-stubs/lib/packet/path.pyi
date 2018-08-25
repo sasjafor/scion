@@ -4,6 +4,7 @@ from lib.defines import EXP_TIME_UNIT
 from lib.packet.packet_base import Serializable
 from lib.packet.opaque_field import OpaqueField, InfoOpaqueField, HopOpaqueField, OpaqueFieldList
 from lib.packet.pcb import ASMarking
+from lib.packet.scion import iof_to_adt, call_iof_to_adt_path, call_map_ofs_list_path
 from lib.util import Raw, SCIONTime
 from typing import cast, Optional, Sized, List, Tuple
 from nagini_contracts.contracts import *
@@ -42,6 +43,9 @@ class SCIONPath(Serializable, Sized):
                 Acc(self._ofs) and self._ofs.State() and
                 Acc(self._hof_idx) and
                 Acc(self._iof_idx) and
+                # needed for a valid packet
+                self._hof_idx is not None and
+                self._iof_idx is not None and
                 Acc(self.interfaces) and Acc(list_pred(self.interfaces)) and
                 Acc(self.mtu) and
                 Implies(self._hof_idx is not None,
@@ -75,10 +79,7 @@ class SCIONPath(Serializable, Sized):
                         Let(cast(InfoOpaqueField, self._ofs.get_by_idx(self._iof_idx)), bool, lambda iof:
                             self._hof_idx - self._iof_idx <= self._ofs.get_iof_hops(iof)
                             )
-                        ) and
-                # needed for a valid packet
-                self._hof_idx is not None and
-                self._iof_idx is not None
+                        )
                 # Let(cast(InfoOpaqueField, self._ofs.get_by_idx(self._iof_idx)), bool, lambda iof:
                 #     self.get_iof_hops_1(iof) >= 0 and self._iof_idx + self.get_iof_hops_1(iof) < self.state_get_ofs_len()
                 #     )
@@ -240,12 +241,23 @@ class SCIONPath(Serializable, Sized):
                     )
                 )
         Requires(Implies(self.get_hof_idx() < self.get_ofs_len() - 2, isinstance(self.ofs_get_by_idx(self.get_hof_idx() + 2), HopOpaqueField)))
+        Requires(self.get_iof_idx() + call_iof_to_adt_path(cast(SCIONPath, self), self.get_iof()).hops < self.get_ofs_len())
+        Requires(call_iof_to_adt_path(cast(SCIONPath, self), self.get_iof()).hops >= 0)
         Requires(MustTerminate(2))
         Ensures(Acc(self.State()))
         Ensures(self.get_iof_idx() is not None)
         Ensures(self.get_hof_idx() is not None)
         Ensures(self.get_ofs_contents() is Old(self.get_ofs_contents()))
         Ensures(self.get_iof_idx() == Old(self.get_iof_idx()))
+        Ensures(call_iof_to_adt_path(cast(SCIONPath, self), self.get_iof()) is Old(call_iof_to_adt_path(cast(SCIONPath, self), self.get_iof())))
+        Ensures(self.get_iof_idx() + call_iof_to_adt_path(cast(SCIONPath, self), self.get_iof()).hops < self.get_ofs_len())
+        Ensures(call_iof_to_adt_path(cast(SCIONPath, self), self.get_iof()).hops >= 0)
+        Ensures(call_map_ofs_list_path(cast(SCIONPath, self), self.get_iof_idx(), call_iof_to_adt_path(cast(SCIONPath, self), self.get_iof())) is Old(call_map_ofs_list_path(cast(SCIONPath, self), self.get_iof_idx(), call_iof_to_adt_path(cast(SCIONPath, self), self.get_iof()))))
+        Ensures(self.get_ofs_len() == Old(self.get_ofs_len()))
+        Ensures(Let(cast(InfoOpaqueField, Unfolding(Acc(self.State(), 1/10), self._ofs.get_by_idx(self._iof_idx))), bool, lambda iof:
+                    self.get_iof_hops(iof) == Old(self.get_iof_hops(iof)))
+                )
+        Ensures(self.get_hof_idx() == Old(self.get_hof_idx()) + 1)
         Ensures(Result() is False)
         """
         Increment the HOF idx to next routing HOF.

@@ -1,12 +1,7 @@
 from typing import NamedTuple, cast, Optional
 
 from nagini_contracts.adt import ADT
-from nagini_contracts.contracts import Sequence, Requires, Acc, Pure, Ensures, Invariant, Unfolding, Unfold, Fold, \
-    Implies, Result, Let
-from nagini_contracts.obligations import MustTerminate
-
-from lib.packet.opaque_field import OpaqueFieldList, InfoOpaqueField, HopOpaqueField
-# from lib.packet.scion import SCIONL4Packet
+from nagini_contracts.contracts import Sequence
 
 """
 This is a set of classes based on the ADT basetype from Nagini to model a SCION packet in an abstract way.

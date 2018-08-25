@@ -50,12 +50,11 @@ class SCIONAddr(object):
     @Predicate
     def State(self) -> bool:
         return (Acc(self.isd_as) and
+                self.isd_as is not None and
                 Implies(self.isd_as is not None, self.isd_as.State()) and
                 Acc(self.host) and
-                Implies(self.host is not None, self.host.State()) and
-                # needed for a valid packet
-                self.isd_as is not None and
-                self.host is not None
+                self.host is not None and
+                Implies(self.host is not None, self.host.State())
                 )
 
     @Pure

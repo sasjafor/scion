@@ -201,14 +201,13 @@ class SCIONAddrHdr(Serializable):
     @Predicate
     def State(self) -> bool:
         return (Acc(self.src) and
+                self.src is not None and
                 Implies(self.src is not None, self.src.State()) and
                 Acc(self.dst) and
+                self.dst is not None and
                 Implies(self.dst is not None, self.dst.State()) and
                 Acc(self._pad_len) and
-                Acc(self._total_len) and
-                # needed for a valid packet
-                self.src is not None and
-                self.dst is not None
+                Acc(self._total_len)
                 )
 
 @Predicate
@@ -254,14 +253,11 @@ class SCIONBasePacket(PacketBase, Sized):
         return (Acc(self.cmn_hdr) and
                 Implies(self.cmn_hdr is not None, self.cmn_hdr.State()) and
                 Acc(self.addrs) and
+                self.addrs is not None and
                 Implies(self.addrs is not None, self.addrs.State()) and
                 Acc(self.path) and
-                Implies(self.path is not None, self.path.State()) and
-                # needed for a valid packet
                 self.path is not None and
-                self.addrs is not None
-                # Let(cast(InfoOpaqueField, Unfolding(Acc(self.path.State(), 1/20), self.path._ofs.get_by_idx(self.path._iof_idx))), bool, lambda iof:
-                #     self.path.get_iof_hops(iof) >= 0 and self.path.get_iof_idx() + self.path.get_iof_hops(iof) < self.path.get_ofs_len())
+                Implies(self.path is not None, self.path.State())
                 )
 
 class SCIONExtPacket(SCIONBasePacket):
@@ -902,10 +898,11 @@ class SCIONL4Packet(SCIONExtPacket):
     #     ...
 
 
-@Pure
-def incremented(spkt: SCIONBasePacket) -> bool:
-    Requires(Acc(spkt.State(), 1/10))
-    return True
+# @Pure
+# def incremented(spkt: SCIONBasePacket) -> bool:
+#     Requires(Acc(spkt.State(), 1/10))
+#     return True
+
 
 @Pure
 @ContractOnly
@@ -1088,6 +1085,20 @@ def call_iof_to_adt_2(pkt: SCIONL4Packet, iof: InfoOpaqueField) -> ADT_IOF:
 
 
 @Pure
+def call_iof_to_adt_path(path: SCIONPath, iof: InfoOpaqueField) -> ADT_IOF:
+    Requires(Acc(path.State(), 1/20))
+    Requires(iof in path.get_ofs_contents())
+    return Unfolding(Acc(path.State(), 1 / 20), call_iof_to_adt_path_1(path, iof))
+
+
+@Pure
+def call_iof_to_adt_path_1(path: SCIONPath, iof: InfoOpaqueField) -> ADT_IOF:
+    Requires(Acc(path._ofs, 1/20))
+    Requires(Acc(path._ofs.State(), 1 / 20))
+    Requires(iof in path.get_ofs_contents_1())
+    return Unfolding(Acc(path._ofs.State(), 1 / 20), iof_to_adt(iof))
+
+@Pure
 def call_map_ofs_list(pkt: SCIONL4Packet, iof_idx: int, iof_adt: ADT_IOF) -> Sequence[ADT_HOF]:
     Requires(Acc(pkt.State(), 1/20))
     # Requires(pkt.get_path() is not None)
@@ -1106,3 +1117,11 @@ def call_map_ofs_list_1(pkt: SCIONL4Packet, iof_idx: int, iof_adt: ADT_IOF) -> S
     Requires(iof_idx >= 0)
     Requires(iof_idx + iof_adt.hops < pkt.path.get_ofs_len())
     return Unfolding(Acc(pkt.path.State(), 1 / 20), map_ofs_list(pkt.path._ofs, iof_idx, iof_adt))
+
+@Pure
+def call_map_ofs_list_path(path: SCIONPath, iof_idx: int, iof_adt: ADT_IOF) -> Sequence[ADT_HOF]:
+    Requires(Acc(path.State(), 1 / 20))
+    Requires(iof_adt.hops >= 0)
+    Requires(iof_idx >= 0)
+    Requires(iof_idx + iof_adt.hops < path.get_ofs_len())
+    return Unfolding(Acc(path.State(), 1 / 20), map_ofs_list(path._ofs, iof_idx, iof_adt))
