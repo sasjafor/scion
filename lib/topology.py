@@ -98,10 +98,6 @@ class InterfaceElement(Element):
             self.to_addr = haddr_parse_interface(to_addr)
         self.to_if_id = 0  # Filled in later by IFID packets
 
-    # @Predicate
-    # def State(self) -> bool:
-    #     return Acc(self.addr)
-
 
 class RouterElement(Element):
     """

@@ -287,10 +287,6 @@ class SCIONAddrHdr(Serializable):
         return "%s(%sB): Src:<%s> Dst:<%s>" % (
             self.NAME, len(self), self.src, self.dst)
 
-    @Predicate
-    def State(self) -> bool:
-        return Acc(self.dst)
-
 
 class SCIONBasePacket(PacketBase):
     """
@@ -473,10 +469,6 @@ class SCIONBasePacket(PacketBase):
 
     def _inner_str(self):  # pragma: no cover
         return []
-
-    @Predicate
-    def State(self) -> bool:
-        return Acc(self.addrs) and Acc(self.addrs.State())
 
 
 class SCIONExtPacket(SCIONBasePacket):
@@ -664,10 +656,6 @@ class SCIONL4Packet(SCIONExtPacket):
 
     def get_l4_proto(self):  # pragma: no cover
         return self._l4_proto
-
-    # @Predicate
-    # def State(self) -> bool:
-    #     return Acc(self.addrs) and Acc(self.addrs.State())
 
 
 def build_base_hdrs(src, dst, l4=L4Proto.UDP):
