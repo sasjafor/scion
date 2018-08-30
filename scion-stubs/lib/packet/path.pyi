@@ -135,7 +135,7 @@ class SCIONPath(Serializable, Sized):
             # verification only.
             if ingress:
                 if iof_up_flag:
-                    offset = 2  ## type: Optional[int]
+                    offset = 2
                 else:
                     offset = 1
             else:
@@ -264,7 +264,6 @@ class SCIONPath(Serializable, Sized):
         hof_idx = self.get_hof_idx()
         iof = self.get_iof()
         skipped_verify_only = False
-        assert skipped_verify_only == True
         while True:
             Invariant(Acc(self.State()))
             Invariant(self.get_iof_idx() is not None)
@@ -294,6 +293,12 @@ class SCIONPath(Serializable, Sized):
             Invariant(Implies(self.get_hof_idx() < self.get_ofs_len() - 2, isinstance(self.ofs_get_by_idx(self.get_hof_idx() + 2), HopOpaqueField)))
             Invariant(self.get_ofs_contents() is Old(self.get_ofs_contents()))
             Invariant(skipped_verify_only is False)
+            Invariant(call_iof_to_adt_path(cast(SCIONPath, self), self.get_iof()) is Old(call_iof_to_adt_path(cast(SCIONPath, self), self.get_iof())))
+            Invariant(self.get_iof_idx() + call_iof_to_adt_path(cast(SCIONPath, self), self.get_iof()).hops < self.get_ofs_len())
+            Invariant(call_map_ofs_list_path(cast(SCIONPath, self), self.get_iof_idx(), call_iof_to_adt_path(cast(SCIONPath, self), self.get_iof())) is Old(call_map_ofs_list_path(cast(SCIONPath, self), self.get_iof_idx(), call_iof_to_adt_path(cast(SCIONPath, self), self.get_iof()))))
+            Invariant(self.get_ofs_len() == Old(self.get_ofs_len()))
+            Invariant(self.get_hof_idx() == Old(self.get_hof_idx()))
+            Invariant(self.get_hof_idx() <= Old(self.get_hof_idx()) + 1)
             Invariant(MustTerminate(1))
             Unfold(self.State())
             self._hof_idx += 1
@@ -336,8 +341,6 @@ class SCIONPath(Serializable, Sized):
         Requires(Acc(self.State(), 1/10))
         Requires(self.get_iof_idx() is not None)
         Requires(self.get_hof_idx() is not None)
-        # Requires(MustTerminate(2))
-        # Ensures(Acc(self.State(), 1/10))
         Ensures(self.get_iof_idx() is not None)
         Ensures(self.get_hof_idx() is not None)
         """
@@ -570,7 +573,6 @@ class SCIONPath(Serializable, Sized):
         Ensures(Implies(Result() is not None, Result() is not self.get_hof()))
         ...
 
-
 @Pure
 def valid_hof(path: SCIONPath, ingress: bool, interface_if_id: int, of_gen_key: bytes) -> bool:
     Requires(Acc(path.State(), 1/10))
@@ -583,10 +585,3 @@ def valid_hof(path: SCIONPath, ingress: bool, interface_if_id: int, of_gen_key: 
             Let(path.get_hof_ver_pure(), bool, lambda prev_hof:
             int(SCIONTime.get_time()) <= ts + path.get_hof_exp_time(hof) * EXP_TIME_UNIT and
             Unfolding(Acc(path.State(), 1/10), Unfolding(Acc(path._ofs.State(), 1/10), hof.verify_mac(of_gen_key, ts, prev_hof))))))))
-
-@Pure
-# @ContractOnly
-def incremented(path: SCIONPath) -> bool:
-    Requires(Acc(path.State(), 1/10))
-    # Ensures(Result().get_hof_idx() == path.get_hof_idx() + 1)
-    return True # for now try this

@@ -1,4 +1,4 @@
-from sascha.adt import ADT_IOF, ADT_HOF, ADT_Packet, ADT_ISD_AS, ADT_HostAddrBase, ADT_Address, ADT_Path, ADT_AddrHdr
+from adt.adt import ADT_IOF, ADT_HOF, ADT_Packet, ADT_ISD_AS, ADT_HostAddrBase, ADT_Address, ADT_Path, ADT_AddrHdr
 from lib.errors import SCIONBaseError, SCIONChecksumFailed
 from lib.packet.ext_hdr import ExtensionHeader
 from lib.packet.opaque_field import OpaqueFieldList, HopOpaqueField, OpaqueField, InfoOpaqueField
@@ -235,8 +235,33 @@ class SCIONBasePacket(PacketBase, Sized):
 
     def pack(self) -> bytes:
         Requires(Acc(self.State(), 1/10))
+        Requires(self.get_path() is not None)
+        Requires(self.get_addrs() is not None)
+        Requires(self.get_addrs_src() is not None)
+        Requires(self.get_addrs_dst() is not None)
+        Requires(self.get_addrs_src_isd_as() is not None)
+        Requires(self.get_addrs_dst_isd_as() is not None)
+        Requires(self.get_addrs_src_host() is not None)
+        Requires(self.get_addrs_dst_host() is not None)
+        Requires(self.get_path_iof_idx() is not None)
+        Requires(self.get_path_hof_idx() is not None)
+        Requires(Let(cast(InfoOpaqueField, Unfolding(Acc(self.State(), 1/20), Unfolding(Acc(self.path.State(), 1/20), self.path._ofs.get_by_idx(self.path._iof_idx)))), bool, lambda iof:
+                 self.get_path_iof_hops(iof) >= 0 and self.get_path_iof_idx() + self.get_path_iof_hops(iof) < self.get_path_ofs_len()))
         Requires(MustTerminate(2))
-        Ensures(Acc(self.State(), 1/10) and Result() is packed(self))
+        Ensures(Acc(self.State(), 1/10))
+        Ensures(self.get_path() is not None)
+        Ensures(self.get_addrs() is not None)
+        Ensures(self.get_addrs_src() is not None)
+        Ensures(self.get_addrs_dst() is not None)
+        Ensures(self.get_addrs_src_isd_as() is not None)
+        Ensures(self.get_addrs_dst_isd_as() is not None)
+        Ensures(self.get_addrs_src_host() is not None)
+        Ensures(self.get_addrs_dst_host() is not None)
+        Ensures(self.get_path_iof_idx() is not None)
+        Ensures(self.get_path_hof_idx() is not None)
+        Ensures(Let(cast(InfoOpaqueField, Unfolding(Acc(self.State(), 1/20), Unfolding(Acc(self.path.State(), 1/20), self.path._ofs.get_by_idx(self.path._iof_idx)))), bool, lambda iof:
+                 self.get_path_iof_hops(iof) >= 0 and self.get_path_iof_idx() + self.get_path_iof_hops(iof) < self.get_path_ofs_len()))
+        Ensures(Result() is packed(self))
         ...
 
     def reversed_copy(self) -> 'SCIONBasePacket':
@@ -253,69 +278,6 @@ class SCIONBasePacket(PacketBase, Sized):
                 Implies(self.addrs is not None, self.addrs.State()) and
                 Acc(self.path) and
                 Implies(self.path is not None, self.path.State()))
-
-
-class SCIONExtPacket(SCIONBasePacket):
-    def __init__(self, raw: bytes=None) -> None:  # pragma: no cover
-        self.ext_hdrs = []  # type: List[ExtensionHeader]
-        super().__init__(raw)
-
-    @Predicate
-    def State(self) -> bool:
-        return (Acc(self.ext_hdrs) and Acc(list_pred(self.ext_hdrs)) and
-                Forall(self.ext_hdrs, lambda e: (e.State(), [])))
-
-
-class SCIONL4Packet(SCIONExtPacket):
-    NAME = "SCIONL4Packet"
-
-    def __init__(self, raw: bytes=None) -> None:  # pragma: no cover
-        Ensures(raw is not None and is_wellformed_packet(raw))
-        Ensures(self.State())
-        Ensures(self.matches(raw))
-        Exsures(SCMPError, raw is None or not is_wellformed_packet(raw))
-        Exsures(SCIONBaseError, raw is None or not is_wellformed_packet(raw))
-        self.l4_hdr = None  # type: Optional[L4HeaderBase]
-
-    @Pure
-    def matches(self, packet: bytes) -> bool:
-        Requires(self.State())
-        Requires(is_wellformed_packet(packet))
-        return Unfolding(self.State(), self.cmn_hdr.matches(packet) and
-                self.addrs.matches(packet) and
-                self.path.matches(packet, Unfolding(self.addrs.State(), self.addrs._total_len)) and
-                extensions_match(Unfolding(self.cmn_hdr.State(), self.cmn_hdr.next_hdr), self.ext_hdrs, packet, Unfolding(self.cmn_hdr.State(), self.cmn_hdr.hdr_len)) and
-                self.l4_hdr.matches(packet, Unfolding(self.cmn_hdr.State(), self.cmn_hdr.hdr_len) + extension_len(self.ext_hdrs)))
-
-    @Predicate
-    def State(self) -> bool:
-        return (Acc(self.l4_hdr) and
-                Implies(self.l4_hdr is not None, self.l4_hdr.State()))
-
-    def update(self) -> None:
-        Requires(MustTerminate(1))
-        Requires(Acc(self.State(), 1/20))
-        Ensures(Acc(self.State(), 1/20))
-        ...
-
-    def parse_payload(self) -> SCMPPayload:
-        Requires(MustTerminate(7))
-        pass
-
-    @Pure
-    def __len__(self) -> int:
-        ...
-
-    def validate(self, pkt_len: int) -> None:
-        Requires(Acc(self.State(), 1/2))
-        Ensures(Acc(self.State(), 1/2))
-        Ensures(is_valid_packet(self))
-        Exsures(SCMPError, Acc(self.State(), 1/2) and not is_valid_packet(self))
-        Exsures(SCIONChecksumFailed, Acc(self.State(), 1/2) and not is_valid_packet(self))
-        ...
-
-    def convert_to_scmp_error(self, addr: SCIONAddr, class_: object, type_: object, pkt: SCIONL4Packet, *args: object, hopbyhop: bool=False, **kwargs: object) -> None:
-        ...
 
     """
     Start of performance helper functions
@@ -394,7 +356,7 @@ class SCIONL4Packet(SCIONExtPacket):
         Requires(Acc(self.addrs.dst.isd_as, 1/20))
         Requires(Acc(self.addrs.dst.isd_as.State(), 1/20))
         return Unfolding(Acc(self.addrs.dst.isd_as.State(), 1/20), self.addrs.dst.isd_as._isd)
-    
+
     @Pure
     def get_addrs_dst_isd_as_as(self) -> int:
         Requires(Acc(self.State(), 1/20))
@@ -458,7 +420,7 @@ class SCIONL4Packet(SCIONExtPacket):
         Requires(Acc(self.addrs.src.isd_as, 1/20))
         Requires(Acc(self.addrs.src.isd_as.State(), 1/20))
         return Unfolding(Acc(self.addrs.src.isd_as.State(), 1/20), self.addrs.src.isd_as._isd)
-    
+
     @Pure
     def get_addrs_src_isd_as_as(self) -> int:
         Requires(Acc(self.State(), 1/20))
@@ -594,7 +556,7 @@ class SCIONL4Packet(SCIONExtPacket):
         Requires(Acc(self.addrs, 1/20))
         Requires(Acc(self.addrs.State(), 1/20))
         return Unfolding(Acc(self.addrs.State(), 1/20), self.addrs.src)
-    
+
     @Pure
     def get_addrs_src_host(self) -> Optional[HostAddrBase]:
         Requires(Acc(self.State(), 1/20))
@@ -683,16 +645,6 @@ class SCIONL4Packet(SCIONExtPacket):
         Requires(Acc(self.path, 1/10))
         Requires(Acc(self.path.State(), 1/10))
         return Unfolding(Acc(self.path.State(), 1/10), self.path._ofs)
-
-    @Pure
-    def get_ext_hdrs_len(self) -> int:
-        Requires(Acc(self.State(), 1/10))
-        return Unfolding(Acc(self.State(), 1/100), len(self.ext_hdrs))
-
-    @Pure
-    def get_ext_hdrs(self) -> List[ExtensionHeader]:
-        Requires(Acc(self.State(), 1/10))
-        return Unfolding(Acc(self.State(), 1/100), self.ext_hdrs)
 
     @Pure
     def get_path_len(self) -> int:
@@ -867,7 +819,6 @@ class SCIONL4Packet(SCIONExtPacket):
         Requires(Acc(self.State(), 1/10))
         Requires(self.get_path() is not None)
         Requires(self.get_path_hof_idx() is not None)
-        # Ensures(Acc(self.State(), 1/10))
         return Unfolding(Acc(self.State(), 1/10), self.path.is_on_last_segment())
 
     @Pure
@@ -887,18 +838,82 @@ class SCIONL4Packet(SCIONExtPacket):
         Ensures(self.get_path_hof_idx() is not None)
         return Unfolding(Acc(self.State(), 1/10), self.path.get_fwd_if())
 
-    # @Pure
-    # @ContractOnly
-    # def incremented(self) -> None:
-    #     Requires(Acc(self.State()))
-    #     ...
+
+class SCIONExtPacket(SCIONBasePacket):
+    def __init__(self, raw: bytes=None) -> None:  # pragma: no cover
+        self.ext_hdrs = []  # type: List[ExtensionHeader]
+        super().__init__(raw)
+
+    @Predicate
+    def State(self) -> bool:
+        return (Acc(self.ext_hdrs) and Acc(list_pred(self.ext_hdrs)) and
+                Forall(self.ext_hdrs, lambda e: (e.State(), [])))
+
+    """
+    Start of helper functions for performance
+    """
+
+    @Pure
+    def get_ext_hdrs_len(self) -> int:
+        Requires(Acc(self.State(), 1/10))
+        return Unfolding(Acc(self.State(), 1/100), len(self.ext_hdrs))
+
+    @Pure
+    def get_ext_hdrs(self) -> List[ExtensionHeader]:
+        Requires(Acc(self.State(), 1/10))
+        return Unfolding(Acc(self.State(), 1/100), self.ext_hdrs)
 
 
-# @Pure
-# def incremented(spkt: SCIONBasePacket) -> bool:
-#     Requires(Acc(spkt.State(), 1/10))
-#     return True
+class SCIONL4Packet(SCIONExtPacket):
+    NAME = "SCIONL4Packet"
 
+    def __init__(self, raw: bytes=None) -> None:  # pragma: no cover
+        Ensures(raw is not None and is_wellformed_packet(raw))
+        Ensures(self.State())
+        Ensures(self.matches(raw))
+        Exsures(SCMPError, raw is None or not is_wellformed_packet(raw))
+        Exsures(SCIONBaseError, raw is None or not is_wellformed_packet(raw))
+        self.l4_hdr = None  # type: Optional[L4HeaderBase]
+
+    @Pure
+    def matches(self, packet: bytes) -> bool:
+        Requires(self.State())
+        Requires(is_wellformed_packet(packet))
+        return Unfolding(self.State(), self.cmn_hdr.matches(packet) and
+                self.addrs.matches(packet) and
+                self.path.matches(packet, Unfolding(self.addrs.State(), self.addrs._total_len)) and
+                extensions_match(Unfolding(self.cmn_hdr.State(), self.cmn_hdr.next_hdr), self.ext_hdrs, packet, Unfolding(self.cmn_hdr.State(), self.cmn_hdr.hdr_len)) and
+                self.l4_hdr.matches(packet, Unfolding(self.cmn_hdr.State(), self.cmn_hdr.hdr_len) + extension_len(self.ext_hdrs)))
+
+    @Predicate
+    def State(self) -> bool:
+        return (Acc(self.l4_hdr) and
+                Implies(self.l4_hdr is not None, self.l4_hdr.State()))
+
+    def update(self) -> None:
+        Requires(MustTerminate(1))
+        Requires(Acc(self.State(), 1/20))
+        Ensures(Acc(self.State(), 1/20))
+        ...
+
+    def parse_payload(self) -> SCMPPayload:
+        Requires(MustTerminate(7))
+        pass
+
+    @Pure
+    def __len__(self) -> int:
+        ...
+
+    def validate(self, pkt_len: int) -> None:
+        Requires(Acc(self.State(), 1/2))
+        Ensures(Acc(self.State(), 1/2))
+        Ensures(is_valid_packet(self))
+        Exsures(SCMPError, Acc(self.State(), 1/2) and not is_valid_packet(self))
+        Exsures(SCIONChecksumFailed, Acc(self.State(), 1/2) and not is_valid_packet(self))
+        ...
+
+    def convert_to_scmp_error(self, addr: SCIONAddr, class_: object, type_: object, pkt: SCIONL4Packet, *args: object, hopbyhop: bool=False, **kwargs: object) -> None:
+        ...
 
 @Pure
 @ContractOnly
@@ -916,18 +931,6 @@ def packed(spkt: SCIONL4Packet) -> bytes:
     Requires(spkt.get_path_hof_idx() is not None)
     Requires(Let(cast(InfoOpaqueField, Unfolding(Acc(spkt.State(), 1/20), Unfolding(Acc(spkt.path.State(), 1/20), spkt.path._ofs.get_by_idx(spkt.path._iof_idx)))), bool, lambda iof:
                  spkt.get_path_iof_hops(iof) >= 0 and spkt.get_path_iof_idx() + spkt.get_path_iof_hops(iof) < spkt.get_path_ofs_len()))
-    # Ensures(spkt.get_path() is not None)
-    # Ensures(spkt.get_addrs() is not None)
-    # Ensures(spkt.get_addrs_src() is not None)
-    # Ensures(spkt.get_addrs_dst() is not None)
-    # Ensures(spkt.get_addrs_src_isd_as() is not None)
-    # Ensures(spkt.get_addrs_dst_isd_as() is not None)
-    # Ensures(spkt.get_addrs_src_host() is not None)
-    # Ensures(spkt.get_addrs_dst_host() is not None)
-    # Ensures(spkt.get_path_iof_idx() is not None)
-    # Ensures(spkt.get_path_hof_idx() is not None)
-    # Ensures(Let(cast(InfoOpaqueField, Unfolding(Acc(spkt.State(), 1/20), Unfolding(Acc(spkt.path.State(), 1/20), spkt.path._ofs.get_by_idx(spkt.path._iof_idx)))), bool, lambda iof:
-    #              spkt.get_path_iof_hops(iof) >= 0 and spkt.get_path_iof_idx() + spkt.get_path_iof_hops(iof) < spkt.get_path_ofs_len()))
     Ensures(Result() is adt_packed(map_scion_packet_to_adt(spkt)))
     ...
     
@@ -971,7 +974,6 @@ ADT functions
 def iof_to_adt(iof: InfoOpaqueField) -> ADT_IOF:
     Requires(Acc(iof.State(), 1/20))
     Ensures(Result().hops == iof.get_hops())
-    # Ensures(Implies(iof.get_hops() >= 0, Result().hops >= 0))
     """
     Method to map a InfoOpaqueField to an ADT
     :param iof: the original IOF

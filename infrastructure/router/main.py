@@ -24,7 +24,7 @@ import zlib
 from nagini_contracts.io_contracts import IOExists2
 from nagini_contracts.obligations import MeasureAbove
 
-from sascha.adt import ADT_Packet, ADT_Path, ADT_IOF, ADT_HOF, ADT_AddrHdr, ADT_Address, ADT_ISD_AS, ADT_HostAddrBase
+from adt.adt import ADT_Packet, ADT_Path, ADT_IOF, ADT_HOF, ADT_AddrHdr, ADT_Address, ADT_ISD_AS, ADT_HostAddrBase
 from collections import defaultdict
 
 # External packages
@@ -105,7 +105,7 @@ from nagini_contracts.io_builtins import Place, token, IOOperation, IOExists1, T
 
 # for type annotations
 from typing import List, Tuple, Union, Callable, cast, Optional, Dict, Any, Iterable
-from lib.packet.scion import SCIONL4Packet, packed, adt_packed, map_scion_packet_to_adt
+from lib.packet.scion import SCIONL4Packet, packed, adt_packed, map_scion_packet_to_adt, is_wellformed_packet
 from lib.packet.host_addr import HostAddrBase
 from lib.util import Raw
 from lib.topology import InterfaceElement, RouterElement
@@ -138,7 +138,8 @@ class Router(SCIONElement):
         self.is_core_router = self.topology.is_core_as
         self.of_gen_key = PBKDF2(self.config.master_as_key, b"Derive OF Key")
         self.sibra_key = PBKDF2(self.config.master_as_key, b"Derive SIBRA Key")
-        self.if_states = defaultdict(InterfaceState)  # type: defaultdict[int, InterfaceState]
+        # self.if_states = defaultdict(InterfaceState)   # type: defaultdict[int, InterfaceState]
+        self.if_states = {} # type: Dict[int, InterfaceState]
         self.revocations = ExpiringDict(1000, self.FWD_REVOCATION_TIMEOUT)  # type: ExpiringDict[RevocationInfo, bool]
         self.pre_ext_handlers = {
             SibraExtBase.EXT_TYPE: True,
@@ -253,8 +254,10 @@ class Router(SCIONElement):
         self.handle_extensions(packet, False, from_local_as)
         Unfold(Acc(self.State(), 1/10))
         if from_local_as:
+            Assert(MeasureAbove(t, 1))
             result = self._remote_sock.send(t, packet.pack(), (str(dst), dst_port))
         else:
+            Assert(MeasureAbove(t, 1))
             result = self._udp_sock.send(t, packet.pack(), (str(dst), dst_port))
         Fold(Acc(self.State(), 1/10))
         return result[1]
@@ -292,7 +295,6 @@ class Router(SCIONElement):
             Invariant(Acc(spkt.State(), 1/9))
             Invariant(spkt.get_ext_hdrs_len() == 0)
             Invariant(MustTerminate(1))
-            # assert False
             if ext_hdr.EXT_CLASS != ExtensionClass.HOP_BY_HOP:
                 break
             if ext_hdr.EXT_TYPE == ExtHopByHopType.SCMP:
@@ -611,12 +613,6 @@ class Router(SCIONElement):
         Requires(Acc(self.State(), 1/9))
         Requires(path.get_iof_idx() is not None)
         Requires(path.get_hof_idx() is not None)
-        # Requires(Implies(not ingress,
-        #                  path.get_hof_idx() + 1 < path.get_ofs_len() and
-        #                  isinstance(path.ofs_get_by_idx(path.get_hof_idx() + 1), HopOpaqueField) and
-        #                  path.ofs_get_by_idx(path.get_hof_idx() + 1) is not path.ofs_get_by_idx(path.get_hof_idx())
-        #                  )
-        #          )
         Requires(pre_condition_for_get_hof_ver_path(ingress, path))
         Requires(MustTerminate(5))
         Ensures(Acc(path.State(), 1/9))
@@ -652,7 +648,7 @@ class Router(SCIONElement):
     def _egress_forward(self, t: Place, spkt: SCIONL4Packet) -> Place:
         IOExists1(Place)(lambda t2: (
             Requires(Acc(self.State(), 1/10)),
-            Requires(Acc(spkt.State(), 1/9)),
+            Requires(Acc(spkt.State(), 1/8)),
             Requires(self.get_interface_to_addr() is not None),
             Requires(spkt.get_ext_hdrs_len() == 0),
             Requires(MustTerminate(4)),
@@ -670,13 +666,14 @@ class Router(SCIONElement):
                  spkt.get_path_iof_hops(iof) >= 0 and spkt.get_path_iof_idx() + spkt.get_path_iof_hops(iof) < spkt.get_path_ofs_len())),
             Requires(token(t, 3) and udp_send(t, packed(spkt), str(self.get_interface_to_addr()), self.get_interface_to_udp_port(), t2)),
             Ensures(Acc(self.State(), 1/10)),
-            Ensures(Acc(spkt.State(), 1/9)),
+            Ensures(Acc(spkt.State(), 1/8)),
             Ensures(Result() is t2 and token(t2))
         ))
         addr = self.get_interface_to_addr()
         port = self.get_interface_to_udp_port()
         logging.debug("Forwarding to remote interface: %s:%s",
                       addr, port)
+        Assert(MeasureAbove(t, 2))
         return self.send(t, spkt, addr, port)
 
     def handle_data(self, t: Place, spkt: SCIONL4Packet, from_local_as: bool, drop_on_error: bool=False) -> Place:
@@ -699,39 +696,12 @@ class Router(SCIONElement):
             Requires(dict_pred(SVC_TO_SERVICE)),
             Requires(Let(cast(InfoOpaqueField, Unfolding(Acc(spkt.State(), 1/20), Unfolding(Acc(spkt.path.State(), 1/20), spkt.path._ofs.get_by_idx(spkt.path._iof_idx)))), bool, lambda iof:
                  spkt.get_path_iof_hops(iof) >= 0 and spkt.get_path_iof_idx() + spkt.get_path_iof_hops(iof) < spkt.get_path_ofs_len())),
-        # Requires(Implies(from_local_as,
-        #                  Let(spkt.get_path(), bool, lambda path:
-        #                  Unfolding(Acc(spkt.State(), 1 / 10),
-        #                            path.get_hof_idx() + 1 < path.get_ofs_len() and
-        #                            isinstance(path.ofs_get_by_idx(path.get_hof_idx() + 1), HopOpaqueField) and
-        #                            path.ofs_get_by_idx(path.get_hof_idx() + 1) is not path.ofs_get_by_idx(
-        #                                path.get_hof_idx())
-        #                            )))
-        #          )
-        # Requires(Unfolding(Acc(spkt.State(), 1 / 10), Let(spkt.path, bool, lambda path:
-        #             path.get_hof_idx() < path.get_ofs_len() - 1 and
-        #             Let(cast(HopOpaqueField, Unfolding(Acc(path.State(), 1 / 10), path._ofs.get_by_idx(path._hof_idx + 1))), bool, lambda hof:
-        #                 not path.get_hof_verify_only(hof)) and
-        #             path.get_hof_idx() - path.get_iof_idx() < path.get_iof_hops(cast(InfoOpaqueField, path.ofs_get_by_idx(path.get_iof_idx()))) and
-        #             Let(cast(InfoOpaqueField, path.ofs_get_by_idx(path.get_iof_idx())), bool, lambda iof:
-        #                 Implies((Let(cast(HopOpaqueField, path.ofs_get_by_idx(path.get_hof_idx() + 1)), bool, lambda hof:
-        #                     not path.get_hof_xover(hof) or
-        #                     path.get_iof_shortcut(iof)
-        #                 ) and
-        #                 (path.get_hof_idx() != path.get_iof_idx() + path.get_iof_hops(iof))),
-        #                 path.get_hof_idx() + 2 < path.get_ofs_len() and
-        #                 isinstance(path.ofs_get_by_idx(path.get_hof_idx() + 2), HopOpaqueField) and
-        #                 path.ofs_get_by_idx(path.get_hof_idx() + 2) is not path.ofs_get_by_idx(path.get_hof_idx() + 1)
-        #                 )
-        #             ) and
-        #             Implies(path.get_hof_idx() < path.get_ofs_len() - 2,
-        #             isinstance(path.ofs_get_by_idx(path.get_hof_idx() + 2), HopOpaqueField))))
-        #         )
             Requires(pre_condition_for_get_hof_ver(not from_local_as, spkt)),
             Requires(pre_condition_for_inc_hof_idx(spkt)),
             Requires(MustTerminate(self.get_topology_border_routers_len() + 7)),
             Requires(token(t, 5)),
             Requires(
+                Implies(spkt.get_path_len() != 0,
                     Implies(self.get_valid_hof(spkt, not from_local_as) and
                             not spkt.get_path_hof_verify_only(spkt.get_path_hof()) and
                             ((spkt.get_addrs_dst_isd_as() is None and self.get_addr_isd_as() is None) or (spkt.get_addrs_dst_isd_as() is not None and self.eq_isd_as(spkt))) and spkt.path_call_is_on_last_segment() and
@@ -752,11 +722,15 @@ class Router(SCIONElement):
                              not from_local_as and
                              self.in_ifid2br(spkt.get_path_fwd_if()) and
                              self.get_if_states_elem_is_active(spkt.get_path_fwd_if()),
-                             udp_send(t, packed(spkt), str(self.get_br_addr(self.get_ifid2br_elem(spkt.get_path_fwd_if()))), self.get_br_port(self.get_ifid2br_elem(spkt.get_path_fwd_if())), t2))),
+                             udp_send(t, adt_packed(incremented(map_scion_packet_to_adt(spkt))), str(self.get_br_addr(self.get_ifid2br_elem(spkt.get_path_fwd_if()))), self.get_br_port(self.get_ifid2br_elem(spkt.get_path_fwd_if())), t2)))),
             Ensures(Acc(spkt.State())),
             Ensures(Acc(self.State(), 1/2)),
             Ensures(dict_pred(SVC_TO_SERVICE)),
-            Ensures(Result() is t2 and token(t2)),
+            Ensures(spkt.get_path() is not None),
+            Ensures(spkt.get_path_iof_idx() is not None),
+            Ensures(spkt.get_path_hof_idx() is not None),
+            Ensures(Implies(self.get_valid_hof(spkt, not from_local_as), Result() is t2 and token(t2))),
+            Ensures(Implies(not self.get_valid_hof(spkt, not from_local_as), Result() is t and token(t))),
             Exsures(SCIONBaseException, Acc(spkt.State())),
             Exsures(SCIONBaseException, Acc(self.State(), 1/2)),
             Exsures(SCIONBaseException, dict_pred(SVC_TO_SERVICE))
@@ -819,35 +793,8 @@ class Router(SCIONElement):
             Requires(Let(cast(InfoOpaqueField, Unfolding(Acc(spkt.State(), 1/20), Unfolding(Acc(spkt.path.State(), 1/20), spkt.path._ofs.get_by_idx(spkt.path._iof_idx)))), bool, lambda iof:
                  spkt.get_path_iof_hops(iof) >= 0 and spkt.get_path_iof_idx() + spkt.get_path_iof_hops(iof) < spkt.get_path_ofs_len())),
             Requires(spkt.get_ext_hdrs_len() == 0),
-            # Requires(Implies(not ingress,
-            #              Let(spkt.get_path(), bool, lambda path:
-            #                 Unfolding(Acc(spkt.State(), 1/10),
-            #                     path.get_hof_idx() + 1 < path.get_ofs_len() and
-            #                     isinstance(path.ofs_get_by_idx(path.get_hof_idx() + 1), HopOpaqueField) and
-            #                     path.ofs_get_by_idx(path.get_hof_idx() + 1) is not path.ofs_get_by_idx(path.get_hof_idx())
-            #              )))
-            #      ),
             Requires(pre_condition_for_get_hof_ver(ingress, spkt)),
             Requires(dict_pred(SVC_TO_SERVICE)),
-            # Requires(Unfolding(Acc(spkt.State(), 1 / 10), Let(spkt.path, bool, lambda path:
-            #         path.get_hof_idx() < path.get_ofs_len() - 1 and
-            #         Let(cast(HopOpaqueField, Unfolding(Acc(path.State(), 1 / 10), path._ofs.get_by_idx(path._hof_idx + 1))), bool, lambda hof:
-            #             not path.get_hof_verify_only(hof)) and
-            #         path.get_hof_idx() - path.get_iof_idx() < path.get_iof_hops(cast(InfoOpaqueField, path.ofs_get_by_idx(path.get_iof_idx()))) and
-            #         Let(cast(InfoOpaqueField, path.ofs_get_by_idx(path.get_iof_idx())), bool, lambda iof:
-            #         Implies((Let(cast(HopOpaqueField, path.ofs_get_by_idx(path.get_hof_idx() + 1)), bool, lambda hof:
-            #             not path.get_hof_xover(hof) or
-            #             path.get_iof_shortcut(iof)
-            #          ) and
-            #         (path.get_hof_idx() != path.get_iof_idx() + path.get_iof_hops(iof))),
-            #             path.get_hof_idx() + 2 < path.get_ofs_len() and
-            #             isinstance(path.ofs_get_by_idx(path.get_hof_idx() + 2), HopOpaqueField) and
-            #             path.ofs_get_by_idx(path.get_hof_idx() + 2) is not path.ofs_get_by_idx(path.get_hof_idx() + 1)
-            #         )
-            #         ) and
-            #         Implies(path.get_hof_idx() < path.get_ofs_len() - 2,
-            #             isinstance(path.ofs_get_by_idx(path.get_hof_idx() + 2), HopOpaqueField))))
-            #      ),
             Requires(pre_condition_for_inc_hof_idx(spkt)),
             Requires(MustTerminate(self.get_topology_border_routers_len() + 6)),
             Requires(token(t, 4)),
@@ -872,11 +819,14 @@ class Router(SCIONElement):
                              ingress and
                              self.in_ifid2br(spkt.get_path_fwd_if()) and
                              self.get_if_states_elem_is_active(spkt.get_path_fwd_if()),
-                             udp_send(t, packed(spkt), str(self.get_br_addr(self.get_ifid2br_elem(spkt.get_path_fwd_if()))), self.get_br_port(self.get_ifid2br_elem(spkt.get_path_fwd_if())), t2))),
-                               # )),
+                             udp_send(t, adt_packed(incremented(map_scion_packet_to_adt(spkt))), str(self.get_br_addr(self.get_ifid2br_elem(spkt.get_path_fwd_if()))), self.get_br_port(self.get_ifid2br_elem(spkt.get_path_fwd_if())), t2))),
             Ensures(Acc(spkt.State())),
             Ensures(Acc(self.State(), 1/2)),
             Ensures(dict_pred(SVC_TO_SERVICE)),
+            Ensures(spkt.get_path() is not None),
+            Ensures(spkt.get_path_iof_idx() is not None),
+            Ensures(spkt.get_path_hof_idx() is not None),
+            Ensures(self.get_valid_hof(spkt, ingress)),
             Ensures(Result() is t2 and token(t2)),
             Exsures(SCIONBaseException, Acc(spkt.State())),
             Exsures(SCIONBaseException, Acc(self.State(), 1/2)),
@@ -884,7 +834,10 @@ class Router(SCIONElement):
             Exsures(SCIONBaseException, Acc(RaisedException().args_)),
             Exsures(SCIONIFVerificationError, len(RaisedException().args_) == 2),
             Exsures(SCIONOFVerificationError, len(RaisedException().args_) == 2),
-            Exsures(SCIONSegmentSwitchError, len(RaisedException().args_) >= 1)
+            Exsures(SCIONSegmentSwitchError, len(RaisedException().args_) >= 1),
+            Exsures(SCIONBaseException, spkt.get_path() is not None),
+            Exsures(SCIONBaseException, spkt.get_path_iof_idx() is not None),
+            Exsures(SCIONBaseException, spkt.get_path_hof_idx() is not None),
         # Exsures(SCIONBaseError, Unfolding(Rd(spkt.State()), spkt.path != None))
         # Exsures(SCIONBaseError, Unfolding(Rd(spkt.State()), Unfolding(Rd(spkt.path.State()), not valid_hof(spkt.path))))
         ))
@@ -1029,38 +982,39 @@ class Router(SCIONElement):
     def _calc_fwding_ingress(self, spkt: SCIONL4Packet) -> Tuple[int, bool, bool]:
         Requires(Acc(spkt.State()))
         Requires(spkt.get_path() is not None)
+        Requires(spkt.get_addrs() is not None)
+        Requires(spkt.get_addrs_src() is not None)
+        Requires(spkt.get_addrs_dst() is not None)
+        Requires(spkt.get_addrs_src_isd_as() is not None)
+        Requires(spkt.get_addrs_dst_isd_as() is not None)
+        Requires(spkt.get_addrs_src_host() is not None)
+        Requires(spkt.get_addrs_dst_host() is not None)
         Requires(spkt.get_path_iof_idx() is not None)
         Requires(spkt.get_path_hof_idx() is not None)
+        Requires(Let(cast(InfoOpaqueField, Unfolding(Acc(spkt.State(), 1/20), Unfolding(Acc(spkt.path.State(), 1/20), spkt.path._ofs.get_by_idx(spkt.path._iof_idx)))), bool, lambda iof:
+                 spkt.get_path_iof_hops(iof) >= 0 and spkt.get_path_iof_idx() + spkt.get_path_iof_hops(iof) < spkt.get_path_ofs_len()))
         Requires(spkt.get_ext_hdrs_len() == 0)
-        # Requires(Unfolding(Acc(spkt.State(), 1/10), Let(spkt.path, bool, lambda path:
-        #         path.get_hof_idx() < path.get_ofs_len() - 1 and
-        #         Let(cast(HopOpaqueField, Unfolding(Acc(path.State(), 1/10), path._ofs.get_by_idx(path._hof_idx + 1))), bool, lambda hof:
-        #             not path.get_hof_verify_only(hof)) and
-        #         path.get_hof_idx() - path.get_iof_idx() < path.get_iof_hops(cast(InfoOpaqueField, path.ofs_get_by_idx(path.get_iof_idx()))) and
-        #         Let(cast(InfoOpaqueField, path.ofs_get_by_idx(path.get_iof_idx())), bool, lambda iof:
-        #                 Implies((Let(cast(HopOpaqueField, path.ofs_get_by_idx(path.get_hof_idx() + 1)), bool, lambda hof:
-        #                             not path.get_hof_xover(hof) or
-        #                             path.get_iof_shortcut(iof)
-        #                             ) and
-        #                             (path.get_hof_idx() != path.get_iof_idx() + path.get_iof_hops(iof))),
-        #                         path.get_hof_idx() + 2 < path.get_ofs_len() and
-        #                         isinstance(path.ofs_get_by_idx(path.get_hof_idx() + 2), HopOpaqueField) and
-        #                         path.ofs_get_by_idx(path.get_hof_idx() + 2) is not path.ofs_get_by_idx(path.get_hof_idx() + 1)
-        #                         )
-        #             ) and
-        #         Implies(path.get_hof_idx() < path.get_ofs_len() - 2, isinstance(path.ofs_get_by_idx(path.get_hof_idx() + 2), HopOpaqueField)))))
         Requires(pre_condition_for_inc_hof_idx(spkt))
         Requires(MustTerminate(3))
         Ensures(Acc(spkt.State()))
         Ensures(spkt.get_path() is not None)
+        Ensures(spkt.get_addrs() is not None)
+        Ensures(spkt.get_addrs_src() is not None)
+        Ensures(spkt.get_addrs_dst() is not None)
+        Ensures(spkt.get_addrs_src_isd_as() is not None)
+        Ensures(spkt.get_addrs_dst_isd_as() is not None)
+        Ensures(spkt.get_addrs_src_host() is not None)
+        Ensures(spkt.get_addrs_dst_host() is not None)
         Ensures(spkt.get_path_iof_idx() is not None)
         Ensures(spkt.get_path_hof_idx() is not None)
+        Ensures(Let(cast(InfoOpaqueField, Unfolding(Acc(spkt.State(), 1/20), Unfolding(Acc(spkt.path.State(), 1/20), spkt.path._ofs.get_by_idx(spkt.path._iof_idx)))), bool, lambda iof:
+                 spkt.get_path_iof_hops(iof) >= 0 and spkt.get_path_iof_idx() + spkt.get_path_iof_hops(iof) < spkt.get_path_ofs_len()))
         Ensures(spkt.get_ext_hdrs_len() == 0)
         Ensures(spkt.get_path_ofs_contents() is Old(spkt.get_path_ofs_contents()))
         Ensures(spkt.get_path() is Old(spkt.get_path()))
         Ensures(spkt.get_path_iof_idx() == Old(spkt.get_path_iof_idx()))
         Ensures(Result()[2] is False)
-        # Ensures(Implies(spkt.get_path_hof_xover(spkt.get_path_hof()), spkt.get_path() == incremented(Old(spkt.get_path()))))
+        Ensures(Implies(spkt.get_path_hof_xover(spkt.get_path_hof()), map_scion_packet_to_adt(spkt) is incremented(Old(map_scion_packet_to_adt(spkt)))))
         Unfold(Acc(spkt.State(), 1/10))
         path = spkt.path
         hof = path.get_hof()
@@ -1125,6 +1079,7 @@ class Router(SCIONElement):
         Requires(len(flags) == 0)
         Requires(MustTerminate(2))
         Ensures(Acc(list_pred(flags), 1/9))
+        Ensures(not Result()[0])
         Ensures(not Result()[1])
         process = False
         # First check if any error or no_process flags are set
@@ -1190,15 +1145,44 @@ class Router(SCIONElement):
     #     self.handle_request(meta.packet, meta.addr, meta.from_local_as)
 
     def handle_request(self, t: Place, packet: bytes, _: object, from_local_socket: bool = True, sock: object = None) -> Place:
-        Requires(Acc(self.State(), 1 / 2))
-        Requires(self.get_topology_mtu() is not None)
-        Requires(self.get_interface_to_addr() is not None)
-        Requires(dict_pred(SVC_TO_SERVICE))
-        Requires(MustTerminate(self.get_topology_border_routers_len() + 8))
-        Ensures(Acc(self.State(), 1/2))
-        Ensures(dict_pred(SVC_TO_SERVICE))
-        Exsures(SCIONBaseException, Acc(self.State(), 1/2))
-        Exsures(SCIONBaseException, dict_pred(SVC_TO_SERVICE))
+        IOExists1(Place)(lambda t2: (
+            Requires(Acc(self.State(), 1 / 2)),
+            Requires(self.get_topology_mtu() is not None),
+            Requires(self.get_interface_to_addr() is not None),
+            Requires(dict_pred(SVC_TO_SERVICE)),
+            Requires(MustTerminate(self.get_topology_border_routers_len() + 8)),
+            Requires(token(t, 6)),
+            Requires(
+                Let(self.bytes_to_adt(packet), bool, lambda adt_pkt:
+                Implies(is_wellformed_packet(packet) and
+                    len(adt_pkt.path) != 0,
+                    Implies(self.get_valid_hof_adt(adt_pkt, not from_local_socket) and
+                            not adt_pkt.path.hofs[adt_pkt.path.hof_idx - 1].verify_only and
+                            ((self.get_addr_isd_as() is None) or (self.eq_isd_as_adt(adt_pkt))) and self.path_call_is_on_last_segment_adt(adt_pkt) and
+                            not (len(adt_pkt.path) and adt_pkt.path.hofs[adt_pkt.path.hof_idx - 1].verify_only),
+                         udp_send(t, adt_packed(adt_pkt), str(self.get_srv_addr_pure_adt(SVC_TO_SERVICE[adt_pkt.addrs.dst.host.addr], adt_pkt) if ((adt_pkt.addrs.dst.host.TYPE is not None and adt_pkt.addrs.dst.host.TYPE == AddrType.SVC) and adt_pkt.addrs.dst.host.addr in SVC_TO_SERVICE) else adt_pkt.addrs.dst.host), SCION_UDP_EH_DATA_PORT, t2))
+                    and
+                    Implies(self.get_valid_hof_adt(adt_pkt, not from_local_socket) and
+                             not adt_pkt.path.hofs[adt_pkt.path.hof_idx - 1].verify_only and
+                             not (((self.get_addr_isd_as() is None) or (self.eq_isd_as_adt(adt_pkt))) and self.path_call_is_on_last_segment_adt(adt_pkt)) and
+                             from_local_socket and
+                             self.in_ifid2br(self.get_path_fwd_if_adt(adt_pkt)) and
+                             self.get_if_states_elem_is_active(self.get_path_fwd_if_adt(adt_pkt)),
+                             udp_send(t, adt_packed(incremented(adt_pkt)), str(self.get_interface_to_addr()), self.get_interface_to_udp_port(), t2))
+                    and
+                    Implies(self.get_valid_hof_adt(adt_pkt, not from_local_socket) and
+                             not adt_pkt.path.hofs[adt_pkt.path.hof_idx - 1].verify_only and
+                             not (((self.get_addr_isd_as() is None) or (self.eq_isd_as_adt(adt_pkt))) and self.path_call_is_on_last_segment_adt(adt_pkt)) and
+                             not from_local_socket and
+                             self.in_ifid2br(self.get_path_fwd_if_adt(adt_pkt)) and
+                             self.get_if_states_elem_is_active(self.get_path_fwd_if_adt(adt_pkt)),
+                             udp_send(t, adt_packed(incremented(adt_pkt)), str(self.get_br_addr(self.get_ifid2br_elem(self.get_path_fwd_if_adt(adt_pkt)))), self.get_br_port(self.get_ifid2br_elem(self.get_path_fwd_if_adt(adt_pkt))), t2))))),
+            Ensures(Acc(self.State(), 1/2)),
+            Ensures(dict_pred(SVC_TO_SERVICE)),
+            Ensures(Implies(self.get_valid_hof_adt(self.bytes_to_adt(packet), not from_local_socket), Result() is t2 and token(t2))),
+            Exsures(SCIONBaseException, Acc(self.State(), 1/2)),
+            Exsures(SCIONBaseException, dict_pred(SVC_TO_SERVICE))
+        ))
         """
         Main routine to handle incoming SCION packets.
 
@@ -1390,12 +1374,28 @@ class Router(SCIONElement):
         return Unfolding(Acc(self.topology.State(), 1 / 20), br.get_interface_link_type())
 
     @Pure
+    @ContractOnly
+    def eq_isd_as_adt(self, adt_pkt: ADT_Packet) -> bool:
+        ...
+
+
+    @Pure
     def eq_isd_as(self, spkt: SCIONL4Packet) -> bool:
         Requires(Acc(self.State(), 1/10))
         Requires(Acc(spkt.State(), 1 / 10))
+        Requires(spkt.get_path() is not None)
         Requires(spkt.get_addrs() is not None)
+        Requires(spkt.get_addrs_src() is not None)
         Requires(spkt.get_addrs_dst() is not None)
+        Requires(spkt.get_addrs_src_isd_as() is not None)
         Requires(spkt.get_addrs_dst_isd_as() is not None)
+        Requires(spkt.get_addrs_src_host() is not None)
+        Requires(spkt.get_addrs_dst_host() is not None)
+        Requires(spkt.get_path_iof_idx() is not None)
+        Requires(spkt.get_path_hof_idx() is not None)
+        Requires(Let(cast(InfoOpaqueField, Unfolding(Acc(spkt.State(), 1/20), Unfolding(Acc(spkt.path.State(), 1/20), spkt.path._ofs.get_by_idx(spkt.path._iof_idx)))), bool, lambda iof:
+                 spkt.get_path_iof_hops(iof) >= 0 and spkt.get_path_iof_idx() + spkt.get_path_iof_hops(iof) < spkt.get_path_ofs_len()))
+        Ensures(Result() is self.eq_isd_as_adt(map_scion_packet_to_adt(spkt)))
         return Unfolding(Acc(spkt.State(), 1 / 10), self.eq_isd_as_1(spkt))
 
     @Pure
@@ -1453,7 +1453,16 @@ class Router(SCIONElement):
     @ContractOnly
     def get_if_states_elem_is_active(self, fwd_if: int) -> bool:
         Requires(Acc(self.State(), 1 / 10))
-        # Requires(Unfolding(Acc(self.State(), 1/10), self.if_states.__contains__(fwd_if)))
+        # to avoid problems with a defaultdict, add missing key explicitly
+        if Unfolding(Acc(self.State(), 1 / 10), fwd_if not in self.if_states):
+            self.if_states[fwd_if] = InterfaceState()
+        return Unfolding(Acc(self.State(), 1 / 10), self.get_if_states_elem_is_active_1(fwd_if, cast(InterfaceState, self.if_states[fwd_if])))
+
+    def get_if_states_elem_is_active_p(self, fwd_if: int) -> bool:
+        Requires(Acc(self.State(), 1 / 10))
+        # to avoid problems with a defaultdict, add missing key explicitly
+        if Unfolding(Acc(self.State(), 1 / 10), fwd_if not in self.if_states):
+            self.if_states[fwd_if] = InterfaceState()
         return Unfolding(Acc(self.State(), 1 / 10), self.get_if_states_elem_is_active_1(fwd_if, cast(InterfaceState, self.if_states[fwd_if])))
 
     @Pure
@@ -1461,20 +1470,9 @@ class Router(SCIONElement):
         Requires(Acc(self.if_states, 1/10))
         Requires(Acc(dict_pred(self.if_states), 1/10))
         Requires(Forall(self.if_states, lambda x: (Acc(cast(InterfaceState, self.if_states[x]).State(), 1/10))))
-        # Requires(fwd_if in self.if_states)
+        Requires(fwd_if in self.if_states)
         Requires(if_state is self.if_states[fwd_if])
-        Requires(Acc(if_state.State(), 1 / 10))
         return Unfolding(Acc(if_state.State(), 1 / 10), if_state.is_active)
-
-    # @Pure
-    # def get_ifid2br_elem_1(self, fwd_if: int) -> RouterElement:
-    #     Requires(Acc(self.ifid2br, 1/10))
-    #     Requires(Acc(self.topology, 1/10))
-    #     Requires(Acc(self.topology.State(), 1/10))
-    #     Requires(Acc(dict_pred(self.ifid2br), 1/10))
-    #     Requires(self.ifid2br.__contains__(fwd_if))
-    #     Ensures(Result() in self.topology.get_border_routers())
-    #     return self.ifid2br[fwd_if]
 
     @Pure
     def get_br_addr(self, br: RouterElement) -> Optional[HostAddrBase]:
@@ -1552,13 +1550,74 @@ class Router(SCIONElement):
         return Unfolding(Acc(self.State(), 1 / 10), fwd_if in self.ifid2br)
 
     @Pure
+    def get_path_fwd_if(self, spkt: SCIONL4Packet) -> int:
+        Requires(Acc(spkt.State(), 1/10))
+        Requires(spkt.get_path() is not None)
+        Requires(spkt.get_addrs() is not None)
+        Requires(spkt.get_addrs_src() is not None)
+        Requires(spkt.get_addrs_dst() is not None)
+        Requires(spkt.get_addrs_src_isd_as() is not None)
+        Requires(spkt.get_addrs_dst_isd_as() is not None)
+        Requires(spkt.get_addrs_src_host() is not None)
+        Requires(spkt.get_addrs_dst_host() is not None)
+        Requires(spkt.get_path_iof_idx() is not None)
+        Requires(spkt.get_path_hof_idx() is not None)
+        Requires(Let(cast(InfoOpaqueField, Unfolding(Acc(spkt.State(), 1/20), Unfolding(Acc(spkt.path.State(), 1/20), spkt.path._ofs.get_by_idx(spkt.path._iof_idx)))), bool, lambda iof:
+                 spkt.get_path_iof_hops(iof) >= 0 and spkt.get_path_iof_idx() + spkt.get_path_iof_hops(iof) < spkt.get_path_ofs_len()))
+        Ensures(Result() is self.get_path_fwd_if_adt(map_scion_packet_to_adt(spkt)))
+        return Unfolding(Acc(spkt.State(), 1/10), spkt.path.get_fwd_if())
+
+    @Pure
+    @ContractOnly
+    def get_path_fwd_if_adt(self, adt_pkt: ADT_Packet) -> int:
+        ...
+
+    @Pure
     def get_valid_hof(self, spkt: SCIONL4Packet, ingress: bool) -> bool:
         Requires(Acc(self.State(), 1/10))
         Requires(Acc(spkt.State(), 1/10))
         Requires(spkt.get_path() is not None)
+        Requires(spkt.get_addrs() is not None)
+        Requires(spkt.get_addrs_src() is not None)
+        Requires(spkt.get_addrs_dst() is not None)
+        Requires(spkt.get_addrs_src_isd_as() is not None)
+        Requires(spkt.get_addrs_dst_isd_as() is not None)
+        Requires(spkt.get_addrs_src_host() is not None)
+        Requires(spkt.get_addrs_dst_host() is not None)
         Requires(spkt.get_path_iof_idx() is not None)
         Requires(spkt.get_path_hof_idx() is not None)
+        Requires(Let(cast(InfoOpaqueField, Unfolding(Acc(spkt.State(), 1/20), Unfolding(Acc(spkt.path.State(), 1/20), spkt.path._ofs.get_by_idx(spkt.path._iof_idx)))), bool, lambda iof:
+                 spkt.get_path_iof_hops(iof) >= 0 and spkt.get_path_iof_idx() + spkt.get_path_iof_hops(iof) < spkt.get_path_ofs_len()))
+        Ensures(Result() is self.get_valid_hof_adt(map_scion_packet_to_adt(spkt), ingress))
         return Unfolding(Acc(spkt.State(), 1/10), valid_hof(spkt.path, ingress, self.get_interface_if_id(), self.get_of_gen_key()))
+
+    @Pure
+    @ContractOnly
+    def get_valid_hof_adt(self, adt_pkt: ADT_Packet, ingress: bool) -> bool:
+        ...
+
+    @Pure
+    def path_call_is_on_last_segment(self, spkt: SCIONL4Packet) -> bool:
+        Requires(Acc(spkt.State(), 1/10))
+        Requires(spkt.get_path() is not None)
+        Requires(spkt.get_addrs() is not None)
+        Requires(spkt.get_addrs_src() is not None)
+        Requires(spkt.get_addrs_dst() is not None)
+        Requires(spkt.get_addrs_src_isd_as() is not None)
+        Requires(spkt.get_addrs_dst_isd_as() is not None)
+        Requires(spkt.get_addrs_src_host() is not None)
+        Requires(spkt.get_addrs_dst_host() is not None)
+        Requires(spkt.get_path_iof_idx() is not None)
+        Requires(spkt.get_path_hof_idx() is not None)
+        Requires(Let(cast(InfoOpaqueField, Unfolding(Acc(spkt.State(), 1/20), Unfolding(Acc(spkt.path.State(), 1/20), spkt.path._ofs.get_by_idx(spkt.path._iof_idx)))), bool, lambda iof:
+                 spkt.get_path_iof_hops(iof) >= 0 and spkt.get_path_iof_idx() + spkt.get_path_iof_hops(iof) < spkt.get_path_ofs_len()))
+        Ensures(Result() is self.path_call_is_on_last_segment_adt(map_scion_packet_to_adt(spkt)))
+        return Unfolding(Acc(spkt.State(), 1/10), spkt.path.is_on_last_segment())
+
+    @Pure
+    @ContractOnly
+    def path_call_is_on_last_segment_adt(self, adt_pkt: ADT_Packet) -> bool:
+        ...
 
     """
     Additional helper functions for non-pure functions
@@ -1566,7 +1625,26 @@ class Router(SCIONElement):
 
     @Pure
     @ContractOnly
-    def get_srv_addr_pure(self, service: str, pkt: SCIONL4Packet) -> HostAddrBase:
+    def get_srv_addr_pure(self, service: str, spkt: SCIONL4Packet) -> HostAddrBase:
+        Requires(Acc(spkt.State(), 1/10))
+        Requires(spkt.get_path() is not None)
+        Requires(spkt.get_addrs() is not None)
+        Requires(spkt.get_addrs_src() is not None)
+        Requires(spkt.get_addrs_dst() is not None)
+        Requires(spkt.get_addrs_src_isd_as() is not None)
+        Requires(spkt.get_addrs_dst_isd_as() is not None)
+        Requires(spkt.get_addrs_src_host() is not None)
+        Requires(spkt.get_addrs_dst_host() is not None)
+        Requires(spkt.get_path_iof_idx() is not None)
+        Requires(spkt.get_path_hof_idx() is not None)
+        Requires(Let(cast(InfoOpaqueField, Unfolding(Acc(spkt.State(), 1/20), Unfolding(Acc(spkt.path.State(), 1/20), spkt.path._ofs.get_by_idx(spkt.path._iof_idx)))), bool, lambda iof:
+                 spkt.get_path_iof_hops(iof) >= 0 and spkt.get_path_iof_idx() + spkt.get_path_iof_hops(iof) < spkt.get_path_ofs_len()))
+        Ensures(Result() is self.get_srv_addr_pure_adt(map_scion_packet_to_adt(spkt)))
+        ...
+
+    @Pure
+    @ContractOnly
+    def get_srv_addr_pure_adt(self, service: str, adt_pkt: ADT_Packet) -> HostAddrBase:
         ...
 
 @Pure
@@ -1644,7 +1722,6 @@ def pre_condition_for_inc_hof_idx_path(path: SCIONPath) -> bool:
 def incremented(adt_packet: ADT_Packet) -> ADT_Packet:
     return ADT_Packet(adt_packet.addrs, ADT_Path(adt_packet.path.A_HOFS, adt_packet.path.B_HOFS, adt_packet.path.C_HOFS, adt_packet.path.iof, adt_packet.path.hofs, adt_packet.path.iof_idx, adt_packet.path.hof_idx + 1))
 
-# @ContractOnly
 def call_inc_hof_idx(spkt: SCIONL4Packet) -> bool:
     Requires(Acc(spkt.State()))
     Requires(spkt.get_path() is not None)
@@ -1675,181 +1752,7 @@ def call_inc_hof_idx(spkt: SCIONL4Packet) -> bool:
     Ensures(Let(cast(InfoOpaqueField, Unfolding(Acc(spkt.State(), 1/20), Unfolding(Acc(spkt.path.State(), 1/20), spkt.path._ofs.get_by_idx(spkt.path._iof_idx)))), bool, lambda iof:
                  spkt.get_path_iof_hops(iof) >= 0 and spkt.get_path_iof_idx() + spkt.get_path_iof_hops(iof) < spkt.get_path_ofs_len()))
     Ensures(map_scion_packet_to_adt(spkt) is incremented(Old(map_scion_packet_to_adt(spkt))))
-    # adt_old = map_scion_packet_to_adt(spkt)
     Unfold(Acc(spkt.State()))
     res = spkt.path.inc_hof_idx()
     Fold(Acc(spkt.State()))
-    # adt = map_scion_packet_to_adt(spkt)
-    # assert adt.addrs is adt_old.addrs
-    # assert adt.path.hof_idx == adt_old.path.hof_idx + 1
-    # assert adt.path.iof_idx == adt_old.path.iof_idx
-    # assert adt.path.A_HOFS == adt_old.path.A_HOFS
-    # assert adt.path.B_HOFS == adt_old.path.B_HOFS
-    # assert adt.path.C_HOFS == adt_old.path.C_HOFS
-    # assert adt.path.iof is adt_old.path.iof
-    # assert adt.path.hofs is adt_old.path.hofs
     return res
-
-# def call_inc_hof_idx_1(path: SCIONPath) -> bool:
-#     Requires(Acc(path.State()))
-#     Requires(path.get_iof_idx() is not None)
-#     Requires(path.get_hof_idx() is not None)
-#     Requires(pre_condition_for_inc_hof_idx_path(path))
-#     return path.inc_hof_idx()
-
-# """
-# ADT functions
-# """
-#
-# @Pure
-# def iof_to_adt(iof: InfoOpaqueField) -> ADT_IOF:
-#     Requires(Acc(iof.State(), 1/20))
-#     Ensures(Result().hops == iof.get_hops())
-#     # Ensures(Implies(iof.get_hops() >= 0, Result().hops >= 0))
-#     """
-#     Method to map a InfoOpaqueField to an ADT
-#     :param iof: the original IOF
-#     :return: ADT containing the same information
-#     """
-#     return ADT_IOF(iof.get_up_flag(), iof.get_shortcut(), iof.get_peer(), iof.get_timestamp(), iof.get_hops())
-#
-# @Pure
-# def hof_to_adt(hof: HopOpaqueField) -> ADT_HOF:
-#     Requires(Acc(hof.State(), 1/20))
-#     """
-#     Method to map a HopOpaqueField to an ADT
-#     :param hof: the original HOF
-#     :return: ADT containing the same information
-#     """
-#     return ADT_HOF(hof.get_xover(), hof.get_verify_only(), hof.get_forward_only(), hof.get_exp_time(), hof.get_ingress_if(), hof.get_egress_if())
-#
-# @Pure
-# def map_ofs_list_rec(seq: Sequence[ADT_HOF], ofs: OpaqueFieldList, curr_idx: int, last_idx: int) -> Sequence[ADT_HOF]:
-#     Requires(Acc(ofs.State(), 1/20))
-#     Requires(last_idx < ofs.get_len())
-#     Requires(curr_idx >= 0)
-#     Requires(curr_idx <= last_idx)
-#     Requires(curr_idx < ofs.get_len())
-#     """
-#     Method to map the InfoOpaqueField and the HopOpaqueFields from the packet to a Nagini Sequence
-#     :param ofs: OpaqueFields from the packet
-#     :param iof_idx: index of the InfoOpaqueField that precedes the HopOpaqueFields
-#     :return: sequence of OpaqueField ADTs
-#     """
-#     hof = ofs.get_hof_by_idx(curr_idx)
-#     hof_adt = Unfolding(Acc(ofs.State(), 1/20), hof_to_adt(hof))
-#     hof_seq = Sequence(hof_adt) # type: Sequence[ADT_HOF]
-#     res = seq.__add__(hof_seq)
-#     if curr_idx == last_idx:
-#         return res
-#     return map_ofs_list_rec(res, ofs, curr_idx + 1, last_idx)
-#
-# @Pure
-# def map_ofs_list(ofs: OpaqueFieldList, iof_idx: int, iof: ADT_IOF) -> Sequence[ADT_HOF]:
-#     Requires(Acc(ofs.State(), 1 / 20))
-#     Requires(iof.hops >= 0)
-#     Requires(iof_idx >= 0)
-#     Requires(iof_idx + iof.hops < ofs.get_len())
-#     """
-#     Method to map the InfoOpaqueField and the HopOpaqueFields from the packet to a Nagini Sequence
-#     :param ofs: OpaqueFields from the packet
-#     :param iof_idx: index of the InfoOpaqueField that precedes the HopOpaqueFields
-#     :return: sequence of OpaqueField ADTs
-#     """
-#     res = Sequence() # type: Sequence[ADT_HOF]
-#     if iof.hops == 0:
-#         return res
-#     return map_ofs_list_rec(res, ofs, iof_idx + 1, iof_idx + iof.hops)
-#
-# @Pure
-# def map_scion_packet_to_adt(pkt: SCIONL4Packet) -> ADT_Packet:
-#     Requires(Acc(pkt.State(), 1 / 20))
-#     Requires(pkt.get_path() is not None)
-#     Requires(pkt.get_addrs() is not None)
-#     Requires(pkt.get_addrs_src() is not None)
-#     Requires(pkt.get_addrs_dst() is not None)
-#     Requires(pkt.get_addrs_src_isd_as() is not None)
-#     Requires(pkt.get_addrs_dst_isd_as() is not None)
-#     Requires(pkt.get_addrs_src_host() is not None)
-#     Requires(pkt.get_addrs_dst_host() is not None)
-#     Requires(pkt.get_path_iof_idx() is not None)
-#     Requires(pkt.get_path_hof_idx() is not None)
-#     Requires(Let(cast(InfoOpaqueField, Unfolding(Acc(pkt.State(), 1/20), Unfolding(Acc(pkt.path.State(), 1/20), pkt.path._ofs.get_by_idx(pkt.path._iof_idx)))), bool, lambda iof:
-#                  pkt.get_path_iof_hops(iof) >= 0 and pkt.get_path_iof_idx() + pkt.get_path_iof_hops(iof) < pkt.get_path_ofs_len()))
-#     """
-#     Method to map a SCIONPacket to the ADT defined in this file
-#     :param packet: the packet to be mapped
-#     :return: ADT containing the same information as the packet
-#     """
-#
-#     iof_idx = pkt.get_path_iof_idx()
-#
-#     iof = pkt.get_path_iof()
-#
-#     src_isd_as = ADT_ISD_AS(pkt.get_addrs_src_isd_as_isd(), pkt.get_addrs_src_isd_as_as())
-#     dst_isd_as = ADT_ISD_AS(pkt.get_addrs_dst_isd_as_isd(), pkt.get_addrs_dst_isd_as_as())
-#
-#     src_host = ADT_HostAddrBase(pkt.get_addrs_src_host().TYPE, pkt.get_addrs_src_host_addr())
-#     dst_host = ADT_HostAddrBase(pkt.get_addrs_dst_host().TYPE, pkt.get_addrs_dst_host_addr())
-#
-#     src = ADT_Address(src_isd_as, src_host)
-#     dst = ADT_Address(dst_isd_as, dst_host)
-#
-#     iof_adt = call_iof_to_adt(pkt, iof)
-#     ofs_seq = call_map_ofs_list(pkt, iof_idx, iof_adt)
-#
-#     addrs = ADT_AddrHdr(src, dst, pkt.get_addrs_total_len())
-#     path = ADT_Path(pkt.get_path().A_HOFS, pkt.get_path().B_HOFS, pkt.get_path().C_HOFS, iof_adt, ofs_seq, pkt.get_path_iof_idx(), pkt.get_path_hof_idx())
-#
-#     return ADT_Packet(addrs, path)
-#
-#
-# """
-# start of performance helper functions
-# """
-#
-#
-# @Pure
-# def call_iof_to_adt(pkt: SCIONL4Packet, iof: InfoOpaqueField) -> ADT_IOF:
-#     Requires(Acc(pkt.State(), 1/20))
-#     Requires(pkt.get_path() is not None)
-#     Requires(iof in pkt.get_path_ofs_contents())
-#     return Unfolding(Acc(pkt.State(), 1/20), call_iof_to_adt_1(pkt, iof))
-#
-#
-# @Pure
-# def call_iof_to_adt_1(pkt: SCIONL4Packet, iof: InfoOpaqueField) -> ADT_IOF:
-#     Requires(Acc(pkt.path, 1 / 20))
-#     Requires(Acc(pkt.path.State(), 1/20))
-#     Requires(iof in pkt.get_path_ofs_contents_1())
-#     return Unfolding(Acc(pkt.path.State(), 1 / 20), call_iof_to_adt_2(pkt, iof))
-#
-#
-# @Pure
-# def call_iof_to_adt_2(pkt: SCIONL4Packet, iof: InfoOpaqueField) -> ADT_IOF:
-#     Requires(Acc(pkt.path, 1 / 20))
-#     Requires(Acc(pkt.path._ofs, 1/20))
-#     Requires(Acc(pkt.path._ofs.State(), 1 / 20))
-#     Requires(iof in pkt.get_path_ofs_contents_2())
-#     return Unfolding(Acc(pkt.path._ofs.State(), 1 / 20), iof_to_adt(iof))
-#
-#
-# @Pure
-# def call_map_ofs_list(pkt: SCIONL4Packet, iof_idx: int, iof_adt: ADT_IOF) -> Sequence[ADT_HOF]:
-#     Requires(Acc(pkt.State(), 1/20))
-#     Requires(pkt.get_path() is not None)
-#     Requires(iof_adt.hops >= 0)
-#     Requires(iof_idx >= 0)
-#     Requires(iof_idx + iof_adt.hops < pkt.get_path_ofs_len())
-#     return Unfolding(Acc(pkt.State(), 1 / 20), call_map_ofs_list_1(pkt, iof_idx, iof_adt))
-#
-#
-# @Pure
-# def call_map_ofs_list_1(pkt: SCIONL4Packet, iof_idx: int, iof_adt: ADT_IOF) -> Sequence[ADT_HOF]:
-#     Requires(Acc(pkt.path, 1/20))
-#     Requires(pkt.path is not None)
-#     Requires(Acc(pkt.path.State(), 1 / 20))
-#     Requires(iof_adt.hops >= 0)
-#     Requires(iof_idx >= 0)
-#     Requires(iof_idx + iof_adt.hops < pkt.path.get_ofs_len())
-#     return Unfolding(Acc(pkt.path.State(), 1 / 20), map_ofs_list(pkt.path._ofs, iof_idx, iof_adt))
