@@ -137,7 +137,7 @@ class SCIONPath(Serializable, Sized):
             # verification only.
             if ingress:
                 if iof_up_flag:
-                    offset = 2
+                    offset = 2 # type: Optional[int]
                 else:
                     offset = 1
             else:

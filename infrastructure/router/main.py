@@ -180,13 +180,6 @@ class Router(SCIONElement):
                 Acc(self.pre_ext_handlers) and
                 Acc(self.post_ext_handlers))
 
-    # @ContractOnly
-    # @Pure
-    # def get_if_states_seq(self) -> Sequence[InterfaceState]:
-    #     Ensures(Forall(cast(Sequence[InterfaceState], Result()), lambda x: (x in self.if_states.values())))
-    #     # helper method to return the values of self.if_states
-    #     pass
-
     def _service_type(self) -> Optional[str]:
         return ROUTER_SERVICE
 
@@ -709,20 +702,20 @@ class Router(SCIONElement):
                          udp_send(t, packed(spkt), str(self.get_srv_addr_pure(SVC_TO_SERVICE[spkt.get_addrs_dst_host_addr()], spkt) if ((spkt.get_addrs_dst_host().TYPE is not None and spkt.get_addrs_dst_host().TYPE == AddrType.SVC) and spkt.get_addrs_dst_host_addr() in SVC_TO_SERVICE) else spkt.get_addrs_dst_host()), SCION_UDP_EH_DATA_PORT, t2))
                     and
                     Implies(self.get_valid_hof(spkt, not from_local_as) and
-                             not spkt.get_path_hof_verify_only(spkt.get_path_hof()) and
-                             not (((spkt.get_addrs_dst_isd_as() is None and self.get_addr_isd_as() is None) or (spkt.get_addrs_dst_isd_as() is not None and self.eq_isd_as(spkt))) and spkt.path_call_is_on_last_segment()) and
-                             from_local_as and
-                             self.in_ifid2br(spkt.get_path_fwd_if()) and
-                             self.get_if_states_elem_is_active(spkt.get_path_fwd_if()),
-                             udp_send(t, adt_packed(incremented(map_scion_packet_to_adt(spkt))), str(self.get_interface_to_addr()), self.get_interface_to_udp_port(), t2))
+                            not spkt.get_path_hof_verify_only(spkt.get_path_hof()) and
+                            not (((spkt.get_addrs_dst_isd_as() is None and self.get_addr_isd_as() is None) or (spkt.get_addrs_dst_isd_as() is not None and self.eq_isd_as(spkt))) and spkt.path_call_is_on_last_segment()) and
+                            from_local_as and
+                            self.in_ifid2br(spkt.get_path_fwd_if()) and
+                            self.get_if_states_elem_is_active_pure(spkt.get_path_fwd_if()),
+                            udp_send(t, adt_packed(incremented(map_scion_packet_to_adt(spkt))), str(self.get_interface_to_addr()), self.get_interface_to_udp_port(), t2))
                     and
                     Implies(self.get_valid_hof(spkt, not from_local_as) and
-                             not spkt.get_path_hof_verify_only(spkt.get_path_hof()) and
-                             not (((spkt.get_addrs_dst_isd_as() is None and self.get_addr_isd_as() is None) or (spkt.get_addrs_dst_isd_as() is not None and self.eq_isd_as(spkt))) and spkt.path_call_is_on_last_segment()) and
-                             not from_local_as and
-                             self.in_ifid2br(spkt.get_path_fwd_if()) and
-                             self.get_if_states_elem_is_active(spkt.get_path_fwd_if()),
-                             udp_send(t, adt_packed(incremented(map_scion_packet_to_adt(spkt))), str(self.get_br_addr(self.get_ifid2br_elem(spkt.get_path_fwd_if()))), self.get_br_port(self.get_ifid2br_elem(spkt.get_path_fwd_if())), t2)))),
+                            not spkt.get_path_hof_verify_only(spkt.get_path_hof()) and
+                            not (((spkt.get_addrs_dst_isd_as() is None and self.get_addr_isd_as() is None) or (spkt.get_addrs_dst_isd_as() is not None and self.eq_isd_as(spkt))) and spkt.path_call_is_on_last_segment()) and
+                            not from_local_as and
+                            self.in_ifid2br(spkt.get_path_fwd_if()) and
+                            self.get_if_states_elem_is_active_pure(spkt.get_path_fwd_if()),
+                            udp_send(t, adt_packed(incremented(map_scion_packet_to_adt(spkt))), str(self.get_br_addr(self.get_ifid2br_elem(spkt.get_path_fwd_if()))), self.get_br_port(self.get_ifid2br_elem(spkt.get_path_fwd_if())), t2)))),
             Ensures(Acc(spkt.State())),
             Ensures(Acc(self.State(), 1/2)),
             Ensures(dict_pred(SVC_TO_SERVICE)),
@@ -806,20 +799,20 @@ class Router(SCIONElement):
                          udp_send(t, packed(spkt), str(self.get_srv_addr_pure(SVC_TO_SERVICE[spkt.get_addrs_dst_host_addr()], spkt) if ((spkt.get_addrs_dst_host().TYPE is not None and spkt.get_addrs_dst_host().TYPE == AddrType.SVC) and spkt.get_addrs_dst_host_addr() in SVC_TO_SERVICE) else spkt.get_addrs_dst_host()), SCION_UDP_EH_DATA_PORT, t2))
                     and
                     Implies(self.get_valid_hof(spkt, ingress) and
-                             not spkt.get_path_hof_verify_only(spkt.get_path_hof()) and
-                             not (((spkt.get_addrs_dst_isd_as() is None and self.get_addr_isd_as() is None) or (spkt.get_addrs_dst_isd_as() is not None and self.eq_isd_as(spkt))) and spkt.path_call_is_on_last_segment()) and
-                             not ingress and
-                             self.in_ifid2br(spkt.get_path_fwd_if()) and
-                             self.get_if_states_elem_is_active(spkt.get_path_fwd_if()),
-                             udp_send(t, adt_packed(incremented(map_scion_packet_to_adt(spkt))), str(self.get_interface_to_addr()), self.get_interface_to_udp_port(), t2))
+                            not spkt.get_path_hof_verify_only(spkt.get_path_hof()) and
+                            not (((spkt.get_addrs_dst_isd_as() is None and self.get_addr_isd_as() is None) or (spkt.get_addrs_dst_isd_as() is not None and self.eq_isd_as(spkt))) and spkt.path_call_is_on_last_segment()) and
+                            not ingress and
+                            self.in_ifid2br(spkt.get_path_fwd_if()) and
+                            self.get_if_states_elem_is_active_pure(spkt.get_path_fwd_if()),
+                            udp_send(t, adt_packed(incremented(map_scion_packet_to_adt(spkt))), str(self.get_interface_to_addr()), self.get_interface_to_udp_port(), t2))
                     and
                     Implies(self.get_valid_hof(spkt, ingress) and
-                             not spkt.get_path_hof_verify_only(spkt.get_path_hof()) and
-                             not (((spkt.get_addrs_dst_isd_as() is None and self.get_addr_isd_as() is None) or (spkt.get_addrs_dst_isd_as() is not None and self.eq_isd_as(spkt))) and spkt.path_call_is_on_last_segment()) and
-                             ingress and
-                             self.in_ifid2br(spkt.get_path_fwd_if()) and
-                             self.get_if_states_elem_is_active(spkt.get_path_fwd_if()),
-                             udp_send(t, adt_packed(incremented(map_scion_packet_to_adt(spkt))), str(self.get_br_addr(self.get_ifid2br_elem(spkt.get_path_fwd_if()))), self.get_br_port(self.get_ifid2br_elem(spkt.get_path_fwd_if())), t2))),
+                            not spkt.get_path_hof_verify_only(spkt.get_path_hof()) and
+                            not (((spkt.get_addrs_dst_isd_as() is None and self.get_addr_isd_as() is None) or (spkt.get_addrs_dst_isd_as() is not None and self.eq_isd_as(spkt))) and spkt.path_call_is_on_last_segment()) and
+                            ingress and
+                            self.in_ifid2br(spkt.get_path_fwd_if()) and
+                            self.get_if_states_elem_is_active_pure(spkt.get_path_fwd_if()),
+                            udp_send(t, adt_packed(incremented(map_scion_packet_to_adt(spkt))), str(self.get_br_addr(self.get_ifid2br_elem(spkt.get_path_fwd_if()))), self.get_br_port(self.get_ifid2br_elem(spkt.get_path_fwd_if())), t2))),
             Ensures(Acc(spkt.State())),
             Ensures(Acc(self.State(), 1/2)),
             Ensures(dict_pred(SVC_TO_SERVICE)),
@@ -837,9 +830,7 @@ class Router(SCIONElement):
             Exsures(SCIONSegmentSwitchError, len(RaisedException().args_) >= 1),
             Exsures(SCIONBaseException, spkt.get_path() is not None),
             Exsures(SCIONBaseException, spkt.get_path_iof_idx() is not None),
-            Exsures(SCIONBaseException, spkt.get_path_hof_idx() is not None),
-        # Exsures(SCIONBaseError, Unfolding(Rd(spkt.State()), spkt.path != None))
-        # Exsures(SCIONBaseError, Unfolding(Rd(spkt.State()), Unfolding(Rd(spkt.path.State()), not valid_hof(spkt.path))))
+            Exsures(SCIONBaseException, spkt.get_path_hof_idx() is not None)
         ))
         path = spkt.get_path()
         if len(spkt) > self.get_topology_mtu():
@@ -851,12 +842,9 @@ class Router(SCIONElement):
             #  raise SCMPOversizePkt("Packet larger than mtu", mtu)
             pass
         Unfold(Acc(spkt.State(), 1/4))
-        # self.verify_hof(path, ingress=ingress)
         try:
-            # Assert(Acc(spkt.path.State(), 1/4))
             self.verify_hof(spkt.path, ingress=ingress)
         finally:
-            # Assert(Acc(spkt.path.State(), 1/4))
             Fold(Acc(spkt.State(), 1/4))
         Unfold(Acc(spkt.State(), 1 / 4))
         hof = spkt.path.get_hof()
@@ -865,8 +853,6 @@ class Router(SCIONElement):
             raise SCMPNonRoutingHOF
         # FIXME(aznair): Remove second condition once PathCombinator is less
         # stupid.
-        # spkt_isd_as = spkt.get_addrs_dst_isd_as()
-        # self_isd_as = self.get_addr_isd_as()
         if ((spkt.get_addrs_dst_isd_as() is None and self.get_addr_isd_as() is None) or (spkt.get_addrs_dst_isd_as() is not None and self.eq_isd_as(spkt))) and spkt.path_call_is_on_last_segment():
             Assert(MeasureAbove(t, 3))
             return self.deliver(t, spkt)
@@ -916,10 +902,7 @@ class Router(SCIONElement):
             logging.debug("Sending to IF %s (%s:%s)", fwd_if, if_addr, port)
             return self.send(t, spkt, if_addr, port)
         else:
-            # Unfold(Acc(spkt.State()))
-            # path.inc_hof_idx()
             call_inc_hof_idx(spkt)
-            # Fold(Acc(spkt.State()))
             return self._egress_forward(t, spkt)
 
     def _validate_segment_switch(self, path: SCIONPath, fwd_if: int, prev_if: int,
@@ -1174,45 +1157,45 @@ class Router(SCIONElement):
     #     self.handle_request(meta.packet, meta.addr, meta.from_local_as)
 
     def handle_request(self, t: Place, packet: bytes, _: object, from_local_socket: bool = True, sock: object = None) -> Place:
-        # IOExists1(Place)(lambda t2: (
-        #     Requires(Acc(self.State(), 1 / 2)),
-        #     Requires(self.get_topology_mtu() is not None),
-        #     Requires(self.get_interface_to_addr() is not None),
-        #     Requires(dict_pred(SVC_TO_SERVICE)),
-        #     Requires(MustTerminate(self.get_topology_border_routers_len() + 8)),
-        #     Requires(token(t, 6)),
-        #     Requires(
-        #         Let(self.bytes_to_adt(packet), bool, lambda adt_pkt:
-        #         Implies(is_wellformed_packet(packet) and
-        #             not self._needs_local_processing_adt(adt_pkt) and
-        #             len(adt_pkt.path) != 0,
-        #             Implies(self.get_valid_hof_adt(adt_pkt, not from_local_socket) and
-        #                     not adt_pkt.path.hofs[adt_pkt.path.hof_idx - 1].verify_only and
-        #                     ((self.get_addr_isd_as() is None) or (self.eq_isd_as_adt(adt_pkt))) and self.path_call_is_on_last_segment_adt(adt_pkt) and
-        #                     not (len(adt_pkt.path) and adt_pkt.path.hofs[adt_pkt.path.hof_idx - 1].verify_only),
-        #                  udp_send(t, adt_packed(adt_pkt), str(self.get_srv_addr_pure_adt(SVC_TO_SERVICE[adt_pkt.addrs.dst.host.addr], adt_pkt) if ((adt_pkt.addrs.dst.host.TYPE is not None and adt_pkt.addrs.dst.host.TYPE == AddrType.SVC) and adt_pkt.addrs.dst.host.addr in SVC_TO_SERVICE) else adt_pkt.addrs.dst.host), SCION_UDP_EH_DATA_PORT, t2))
-        #             and
-        #             Implies(self.get_valid_hof_adt(adt_pkt, not from_local_socket) and
-        #                      not adt_pkt.path.hofs[adt_pkt.path.hof_idx - 1].verify_only and
-        #                      not (((self.get_addr_isd_as() is None) or (self.eq_isd_as_adt(adt_pkt))) and self.path_call_is_on_last_segment_adt(adt_pkt)) and
-        #                      from_local_socket and
-        #                      self.in_ifid2br(self.get_path_fwd_if_adt(adt_pkt)) and
-        #                      self.get_if_states_elem_is_active(self.get_path_fwd_if_adt(adt_pkt)),
-        #                      udp_send(t, adt_packed(incremented(adt_pkt)), str(self.get_interface_to_addr()), self.get_interface_to_udp_port(), t2))
-        #             and
-        #             Implies(self.get_valid_hof_adt(adt_pkt, not from_local_socket) and
-        #                      not adt_pkt.path.hofs[adt_pkt.path.hof_idx - 1].verify_only and
-        #                      not (((self.get_addr_isd_as() is None) or (self.eq_isd_as_adt(adt_pkt))) and self.path_call_is_on_last_segment_adt(adt_pkt)) and
-        #                      not from_local_socket and
-        #                      self.in_ifid2br(self.get_path_fwd_if_adt(adt_pkt)) and
-        #                      self.get_if_states_elem_is_active(self.get_path_fwd_if_adt(adt_pkt)),
-        #                      udp_send(t, adt_packed(incremented(adt_pkt)), str(self.get_br_addr(self.get_ifid2br_elem(self.get_path_fwd_if_adt(adt_pkt)))), self.get_br_port(self.get_ifid2br_elem(self.get_path_fwd_if_adt(adt_pkt))), t2))))),
-        #     Ensures(Acc(self.State(), 1/2)),
-        #     Ensures(dict_pred(SVC_TO_SERVICE)),
-        #     Ensures(Implies(self.get_valid_hof_adt(self.bytes_to_adt(packet), not from_local_socket), Result() is t2 and token(t2))),
-        #     Exsures(SCIONBaseException, Acc(self.State(), 1/2)),
-        #     Exsures(SCIONBaseException, dict_pred(SVC_TO_SERVICE))
-        # ))
+        IOExists1(Place)(lambda t2: (
+            Requires(Acc(self.State(), 1 / 2)),
+            Requires(self.get_topology_mtu() is not None),
+            Requires(self.get_interface_to_addr() is not None),
+            Requires(dict_pred(SVC_TO_SERVICE)),
+            Requires(MustTerminate(self.get_topology_border_routers_len() + 8)),
+            Requires(token(t, 6)),
+            Requires(
+                Let(self.bytes_to_adt(packet), bool, lambda adt_pkt:
+                Implies(is_wellformed_packet(packet) and
+                    not self._needs_local_processing_adt(adt_pkt) and
+                    len(adt_pkt.path) != 0,
+                    Implies(self.get_valid_hof_adt(adt_pkt, not from_local_socket) and
+                            not adt_pkt.path.hofs[adt_pkt.path.hof_idx - 1].verify_only and
+                            ((self.get_addr_isd_as() is None) or (self.eq_isd_as_adt(adt_pkt))) and self.path_call_is_on_last_segment_adt(adt_pkt) and
+                            not (len(adt_pkt.path) and adt_pkt.path.hofs[adt_pkt.path.hof_idx - 1].verify_only),
+                         udp_send(t, adt_packed(adt_pkt), str(self.get_srv_addr_pure_adt(SVC_TO_SERVICE[adt_pkt.addrs.dst.host.addr], adt_pkt) if ((adt_pkt.addrs.dst.host.TYPE is not None and adt_pkt.addrs.dst.host.TYPE == AddrType.SVC) and adt_pkt.addrs.dst.host.addr in SVC_TO_SERVICE) else adt_pkt.addrs.dst.host), SCION_UDP_EH_DATA_PORT, t2))
+                    and
+                    Implies(self.get_valid_hof_adt(adt_pkt, not from_local_socket) and
+                             not adt_pkt.path.hofs[adt_pkt.path.hof_idx - 1].verify_only and
+                             not (((self.get_addr_isd_as() is None) or (self.eq_isd_as_adt(adt_pkt))) and self.path_call_is_on_last_segment_adt(adt_pkt)) and
+                             from_local_socket and
+                             self.in_ifid2br(self.get_path_fwd_if_adt(adt_pkt)) and
+                             self.get_if_states_elem_is_active(self.get_path_fwd_if_adt(adt_pkt)),
+                             udp_send(t, adt_packed(incremented(adt_pkt)), str(self.get_interface_to_addr()), self.get_interface_to_udp_port(), t2))
+                    and
+                    Implies(self.get_valid_hof_adt(adt_pkt, not from_local_socket) and
+                             not adt_pkt.path.hofs[adt_pkt.path.hof_idx - 1].verify_only and
+                             not (((self.get_addr_isd_as() is None) or (self.eq_isd_as_adt(adt_pkt))) and self.path_call_is_on_last_segment_adt(adt_pkt)) and
+                             not from_local_socket and
+                             self.in_ifid2br(self.get_path_fwd_if_adt(adt_pkt)) and
+                             self.get_if_states_elem_is_active(self.get_path_fwd_if_adt(adt_pkt)),
+                             udp_send(t, adt_packed(incremented(adt_pkt)), str(self.get_br_addr(self.get_ifid2br_elem(self.get_path_fwd_if_adt(adt_pkt)))), self.get_br_port(self.get_ifid2br_elem(self.get_path_fwd_if_adt(adt_pkt))), t2))))),
+            Ensures(Acc(self.State(), 1/2)),
+            Ensures(dict_pred(SVC_TO_SERVICE)),
+            Ensures(Implies(self.get_valid_hof_adt(self.bytes_to_adt(packet), not from_local_socket), Result() is t2 and token(t2))),
+            Exsures(SCIONBaseException, Acc(self.State(), 1/2)),
+            Exsures(SCIONBaseException, dict_pred(SVC_TO_SERVICE))
+        ))
         """
         Main routine to handle incoming SCION packets.
 
@@ -1481,21 +1464,20 @@ class Router(SCIONElement):
 
     @Pure
     @ContractOnly
+    def get_if_states_elem_is_active_pure(self, fwd_if: int) -> bool:
+        Requires(Acc(self.State(), 1 / 10))
+        ...
+
     def get_if_states_elem_is_active(self, fwd_if: int) -> bool:
         Requires(Acc(self.State(), 1 / 10))
-        # to avoid problems with a defaultdict, add missing key explicitly
-        if Unfolding(Acc(self.State(), 1 / 10), fwd_if not in self.if_states):
-            self.if_states[fwd_if] = InterfaceState()
-        return Unfolding(Acc(self.State(), 1 / 10), self.get_if_states_elem_is_active_1(fwd_if, cast(InterfaceState, self.if_states[fwd_if])))
-
-    def get_if_states_elem_is_active_p(self, fwd_if: int) -> bool:
-        Requires(Acc(self.State(), 1 / 10))
         Ensures(Acc(self.State(), 1/10))
-        Ensures(Result() is self.get_if_states_elem_is_active(fwd_if))
+        Ensures(Result() is self.get_if_states_elem_is_active_pure(fwd_if))
         # to avoid problems with a defaultdict, add missing key explicitly
         if Unfolding(Acc(self.State(), 1 / 10), fwd_if not in self.if_states):
             self.if_states[fwd_if] = InterfaceState()
-        return Unfolding(Acc(self.State(), 1 / 10), self.get_if_states_elem_is_active_1(fwd_if, cast(InterfaceState, self.if_states[fwd_if])))
+        res = Unfolding(Acc(self.State(), 1 / 10), self.get_if_states_elem_is_active_1(fwd_if, cast(InterfaceState, self.if_states[fwd_if])))
+        Assume(res is self.get_if_states_elem_is_active_pure(fwd_if))
+        return res
 
     @Pure
     def get_if_states_elem_is_active_1(self, fwd_if: int, if_state: InterfaceState) -> bool:
@@ -1671,13 +1653,13 @@ class Router(SCIONElement):
         Requires(spkt.get_path_hof_idx() is not None)
         Requires(Let(cast(InfoOpaqueField, Unfolding(Acc(spkt.State(), 1/20), Unfolding(Acc(spkt.path.State(), 1/20), spkt.path._ofs.get_by_idx(spkt.path._iof_idx)))), bool, lambda iof:
                  spkt.get_path_iof_hops(iof) >= 0 and spkt.get_path_iof_idx() + spkt.get_path_iof_hops(iof) < spkt.get_path_ofs_len()))
-        # Ensures(Result() is self.get_srv_addr_pure_adt(service, map_scion_packet_to_adt(spkt)))
+        Ensures(Result() is self.get_srv_addr_pure_adt(service, map_scion_packet_to_adt(spkt)))
         ...
 
-    # @Pure
-    # @ContractOnly
-    # def get_srv_addr_pure_adt(self, service: str, adt_pkt: ADT_Packet) -> HostAddrBase:
-    #     ...
+    @Pure
+    @ContractOnly
+    def get_srv_addr_pure_adt(self, service: str, adt_pkt: ADT_Packet) -> HostAddrBase:
+        ...
 
 @Pure
 def pre_condition_for_get_hof_ver(ingress: bool, spkt: SCIONL4Packet) -> bool:

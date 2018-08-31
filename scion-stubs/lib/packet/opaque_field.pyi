@@ -44,12 +44,6 @@ class OpaqueFieldList(Sized):
 
     @Pure
     @ContractOnly
-    def get_hofs_in_segment(self, iof: InfoOpaqueField) -> Sequence[HopOpaqueField]:
-        Requires(Acc(self.State(), 1/10))
-        # Helper method for contracts that returns the hop fields in a segment for a given InfoOpaqueField
-
-    @Pure
-    @ContractOnly
     def __len__(self) -> int:
         Requires(Acc(self._labels, 1/20))
         Requires(Acc(dict_pred(self._labels), 1/20))
@@ -70,7 +64,6 @@ class OpaqueFieldList(Sized):
     def get_hof_by_idx(self, idx: int) -> HopOpaqueField:
         Requires(Acc(self.State(), 1/20))
         Requires(idx >= 0 and idx < self.get_len())
-        # Requires(idx >= 0 and idx < Unfolding(Acc(self.State(), 1/20), len(self)))
         Ensures(Result() is Unfolding(Acc(self.State(), 1/20), self.contents()[idx]))
         Ensures(Result() in Unfolding(Acc(self.State(), 1/20), self.contents()))
 
@@ -173,9 +166,6 @@ class HopOpaqueField(OpaqueField):
     def calc_mac(self, key: bytes, ts: int, prev_hof:'HopOpaqueField'=None) -> bytes:
         Requires(Acc(self.State(), 1/10))
         Requires(Implies(prev_hof is not None, Acc(prev_hof.State(), 1/10)))
-        # Requires(MustTerminate(1))
-        # Ensures(Acc(self.State(), 1/10))
-        # Ensures(Implies(prev_hof is not None, Acc(prev_hof.State(), 1/10)))
         ...
 
     def set_mac(self, key: bytes, ts: int, prev_hof:'HopOpaqueField'=None) -> None:
