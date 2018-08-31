@@ -126,7 +126,9 @@ class SCIONPath(Serializable, Sized):
         if not self.get_hof_xover(hof) or (self.get_iof_shortcut(iof) and not self.get_iof_peer(iof)):
             # For normal hops on any type of segment, or cross-over hops on
             # non-peer shortcut hops, just use next/prev HOF.
-            return self._get_hof_ver_normal(iof)
+            res = self._get_hof_ver_normal(iof)
+            Assume(res is self.get_hof_ver_pure())
+            return res
         iof_peer = self.get_iof_peer(iof)
         iof_up_flag = self.get_iof_up_flag(iof)
         if iof_peer:
@@ -159,8 +161,12 @@ class SCIONPath(Serializable, Sized):
         # Map the local direction of travel and the IOF up flag to the required
         # offset of the verification HOF (or None, if there's no relevant HOF).
         if not isinstance(offset, int):
-            return None
-        return cast(HopOpaqueField, Unfolding(Acc(self.State(), 1/10), self._ofs.get_by_idx(self._hof_idx + offset)))
+            res = None
+            Assume(res is self.get_hof_ver_pure())
+            return res
+        res = cast(HopOpaqueField, Unfolding(Acc(self.State(), 1/10), self._ofs.get_by_idx(self._hof_idx + offset)))
+        Assume(res is self.get_hof_ver_pure())
+        return res
 
     def _get_hof_ver_normal(self, iof: InfoOpaqueField) -> Optional[HopOpaqueField]:
         Requires(Acc(self.State(), 1/10))

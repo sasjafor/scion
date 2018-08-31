@@ -1060,10 +1060,33 @@ class Router(SCIONElement):
     def _needs_local_processing(self, pkt: SCIONL4Packet) -> bool:
         Requires(Acc(self.State(), 1/10))
         Requires(Acc(pkt.State(), 1/10))
+        Requires(pkt.get_path() is not None)
         Requires(pkt.get_addrs() is not None)
+        Requires(pkt.get_addrs_src() is not None)
+        Requires(pkt.get_addrs_dst() is not None)
+        Requires(pkt.get_addrs_src_isd_as() is not None)
+        Requires(pkt.get_addrs_dst_isd_as() is not None)
+        Requires(pkt.get_addrs_src_host() is not None)
+        Requires(pkt.get_addrs_dst_host() is not None)
+        Requires(pkt.get_path_iof_idx() is not None)
+        Requires(pkt.get_path_hof_idx() is not None)
+        Requires(Let(cast(InfoOpaqueField, Unfolding(Acc(pkt.State(), 1/20), Unfolding(Acc(pkt.path.State(), 1/20), pkt.path._ofs.get_by_idx(pkt.path._iof_idx)))), bool, lambda iof:
+                 pkt.get_path_iof_hops(iof) >= 0 and pkt.get_path_iof_idx() + pkt.get_path_iof_hops(iof) < pkt.get_path_ofs_len()))
         Requires(MustTerminate(2))
         Ensures(Acc(self.State(), 1/10))
         Ensures(Acc(pkt.State(), 1/10))
+        Ensures(pkt.get_path() is not None)
+        Ensures(pkt.get_addrs() is not None)
+        Ensures(pkt.get_addrs_src() is not None)
+        Ensures(pkt.get_addrs_dst() is not None)
+        Ensures(pkt.get_addrs_src_isd_as() is not None)
+        Ensures(pkt.get_addrs_dst_isd_as() is not None)
+        Ensures(pkt.get_addrs_src_host() is not None)
+        Ensures(pkt.get_addrs_dst_host() is not None)
+        Ensures(pkt.get_path_iof_idx() is not None)
+        Ensures(pkt.get_path_hof_idx() is not None)
+        Ensures(Let(cast(InfoOpaqueField, Unfolding(Acc(pkt.State(), 1/20), Unfolding(Acc(pkt.path.State(), 1/20), pkt.path._ofs.get_by_idx(pkt.path._iof_idx)))), bool, lambda iof:
+                 pkt.get_path_iof_hops(iof) >= 0 and pkt.get_path_iof_idx() + pkt.get_path_iof_hops(iof) < pkt.get_path_ofs_len()))
         Ensures(Result() is self._needs_local_processing_adt(map_scion_packet_to_adt(pkt)))
         return pkt.get_addrs_dst() in [
             self.get_addr(),
@@ -1467,6 +1490,8 @@ class Router(SCIONElement):
 
     def get_if_states_elem_is_active_p(self, fwd_if: int) -> bool:
         Requires(Acc(self.State(), 1 / 10))
+        Ensures(Acc(self.State(), 1/10))
+        Ensures(Result() is self.get_if_states_elem_is_active(fwd_if))
         # to avoid problems with a defaultdict, add missing key explicitly
         if Unfolding(Acc(self.State(), 1 / 10), fwd_if not in self.if_states):
             self.if_states[fwd_if] = InterfaceState()
