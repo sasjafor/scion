@@ -234,34 +234,6 @@ class SCIONBasePacket(PacketBase, Sized):
         self._payload = b""
 
     def pack(self) -> bytes:
-        Requires(Acc(self.State(), 1/10))
-        Requires(self.get_path() is not None)
-        Requires(self.get_addrs() is not None)
-        Requires(self.get_addrs_src() is not None)
-        Requires(self.get_addrs_dst() is not None)
-        Requires(self.get_addrs_src_isd_as() is not None)
-        Requires(self.get_addrs_dst_isd_as() is not None)
-        Requires(self.get_addrs_src_host() is not None)
-        Requires(self.get_addrs_dst_host() is not None)
-        Requires(self.get_path_iof_idx() is not None)
-        Requires(self.get_path_hof_idx() is not None)
-        Requires(Let(cast(InfoOpaqueField, Unfolding(Acc(self.State(), 1/20), Unfolding(Acc(self.path.State(), 1/20), self.path._ofs.get_by_idx(self.path._iof_idx)))), bool, lambda iof:
-                 self.get_path_iof_hops(iof) >= 0 and self.get_path_iof_idx() + self.get_path_iof_hops(iof) < self.get_path_ofs_len()))
-        Requires(MustTerminate(2))
-        Ensures(Acc(self.State(), 1/10))
-        Ensures(self.get_path() is not None)
-        Ensures(self.get_addrs() is not None)
-        Ensures(self.get_addrs_src() is not None)
-        Ensures(self.get_addrs_dst() is not None)
-        Ensures(self.get_addrs_src_isd_as() is not None)
-        Ensures(self.get_addrs_dst_isd_as() is not None)
-        Ensures(self.get_addrs_src_host() is not None)
-        Ensures(self.get_addrs_dst_host() is not None)
-        Ensures(self.get_path_iof_idx() is not None)
-        Ensures(self.get_path_hof_idx() is not None)
-        Ensures(Let(cast(InfoOpaqueField, Unfolding(Acc(self.State(), 1/20), Unfolding(Acc(self.path.State(), 1/20), self.path._ofs.get_by_idx(self.path._iof_idx)))), bool, lambda iof:
-                 self.get_path_iof_hops(iof) >= 0 and self.get_path_iof_idx() + self.get_path_iof_hops(iof) < self.get_path_ofs_len()))
-        Ensures(Result() is packed(self))
         ...
 
     def reversed_copy(self) -> 'SCIONBasePacket':
@@ -913,6 +885,37 @@ class SCIONL4Packet(SCIONExtPacket):
         ...
 
     def convert_to_scmp_error(self, addr: SCIONAddr, class_: object, type_: object, pkt: SCIONL4Packet, *args: object, hopbyhop: bool=False, **kwargs: object) -> None:
+        ...
+
+    def pack(self) -> bytes:
+        Requires(Acc(self.State(), 1/10))
+        Requires(self.get_path() is not None)
+        Requires(self.get_addrs() is not None)
+        Requires(self.get_addrs_src() is not None)
+        Requires(self.get_addrs_dst() is not None)
+        Requires(self.get_addrs_src_isd_as() is not None)
+        Requires(self.get_addrs_dst_isd_as() is not None)
+        Requires(self.get_addrs_src_host() is not None)
+        Requires(self.get_addrs_dst_host() is not None)
+        Requires(self.get_path_iof_idx() is not None)
+        Requires(self.get_path_hof_idx() is not None)
+        Requires(Let(cast(InfoOpaqueField, Unfolding(Acc(self.State(), 1/20), Unfolding(Acc(self.path.State(), 1/20), self.path._ofs.get_by_idx(self.path._iof_idx)))), bool, lambda iof:
+                 self.get_path_iof_hops(iof) >= 0 and self.get_path_iof_idx() + self.get_path_iof_hops(iof) < self.get_path_ofs_len()))
+        Requires(MustTerminate(2))
+        Ensures(Acc(self.State(), 1/10))
+        Ensures(self.get_path() is not None)
+        Ensures(self.get_addrs() is not None)
+        Ensures(self.get_addrs_src() is not None)
+        Ensures(self.get_addrs_dst() is not None)
+        Ensures(self.get_addrs_src_isd_as() is not None)
+        Ensures(self.get_addrs_dst_isd_as() is not None)
+        Ensures(self.get_addrs_src_host() is not None)
+        Ensures(self.get_addrs_dst_host() is not None)
+        Ensures(self.get_path_iof_idx() is not None)
+        Ensures(self.get_path_hof_idx() is not None)
+        Ensures(Let(cast(InfoOpaqueField, Unfolding(Acc(self.State(), 1/20), Unfolding(Acc(self.path.State(), 1/20), self.path._ofs.get_by_idx(self.path._iof_idx)))), bool, lambda iof:
+                 self.get_path_iof_hops(iof) >= 0 and self.get_path_iof_idx() + self.get_path_iof_hops(iof) < self.get_path_ofs_len()))
+        Ensures(Result() is packed(self))
         ...
 
 @Pure
